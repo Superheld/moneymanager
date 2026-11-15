@@ -21,6 +21,7 @@ import {
   vorsorgestand,
   vorsorgevermoegen,
   type Cent,
+  type ErgebnisVorsorge,
   type Nettovermoegen,
   type Vorsorgestand,
   type Vorsorgeziel,
@@ -75,6 +76,30 @@ export async function vorsorgeLaden(deps: VorsorgeDeps, heute: string): Promise<
     ohneSparenMonatlich:
       annahme.renteMonatlich +
       moeglicheEntnahme(stand.hochgerechnet, annahme.entnahmeMonate, annahme.renditeBp),
+  };
+}
+
+/**
+ * Was die Ergebnisrechnung braucht, um die Rate des Ziels je Monat selbst zu rechnen
+ * (`vorsorgerateIm` im Kern) — `undefined`, solange kein Ziel angelegt ist.
+ *
+ * Die GANZE Reihe der Annahmen, nicht die von heute: ein vergangener Monat kostet die
+ * Rate, die damals galt. Und derselbe Bestand wie in `vorsorgeLaden`, damit die Rate in
+ * der Übersicht dieselbe ist wie die auf der Karte im Bereich Vermögen.
+ */
+export async function ergebnisvorsorgeLaden(deps: VorsorgeDeps): Promise<ErgebnisVorsorge | undefined> {
+  const [ziele, annahmen, bestand] = await Promise.all([
+    deps.vorsorgeRepo.ziele(),
+    deps.vorsorgeRepo.annahmen(),
+    vermoegensbestandLaden(deps),
+  ]);
+  const ziel = ziele[0];
+  if (!ziel) return undefined;
+  return {
+    zielId: ziel.id,
+    bezeichnung: ziel.bezeichnung,
+    annahmen: annahmen.filter((a) => a.zielId === ziel.id),
+    bestand,
   };
 }
 

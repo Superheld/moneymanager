@@ -346,10 +346,15 @@ function PlanPosten({
   const name = postenname(posten, zeile, namen, t);
   const kategorie = posten.kategorieId ? namen.kategorie.get(posten.kategorieId) : undefined;
   // Was die Zahl daneben einschränkt, steht offen da: dass sie nur ein Teil der Zahlung
-  // ist, und dass aus dem Topf mehr bezahlt wurde, als er den Monat kostet.
+  // ist, dass aus dem Topf mehr bezahlt wurde, als er den Monat kostet — und beim
+  // Vorsorgeziel, was wirklich überwiesen wurde. Dort auch, wenn es nichts war: die Rate
+  // steht als Kosten da, ob gespart wurde oder nicht, und genau das will man hier sehen.
   const zusatz = [
     posten.teile ? t("ergebnis.anteil", { teile: posten.teile }) : undefined,
     posten.entnahme ? t("ergebnis.entnommen", { betrag: geld.formatMitSymbol(-posten.entnahme) }) : undefined,
+    posten.zufuehrung !== undefined
+      ? t("ergebnis.ueberwiesen", { betrag: geld.formatMitSymbol(-posten.zufuehrung || 0) })
+      : undefined,
     kategorie && kategorie !== name ? kategorie : undefined,
   ].filter(Boolean);
 

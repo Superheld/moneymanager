@@ -12,6 +12,9 @@
 //   • Ein TOPF kostet seine Rate. Was aus ihm bezahlt wird, ist eine Entnahme und zählt
 //     nicht noch einmal — ausser der Topf reicht nicht (siehe `topfKosten`).
 //   • Eine RÜCKLAGE kostet den Zuwachs ihres Solls. Ihr Kauf ist eine Entnahme.
+//   • Ein VORSORGEZIEL kostet die Sparrate, die es verlangt (`vorsorgerateIm`). Was
+//     tatsächlich in die Vorsorge überwiesen wurde, ist die Zuführung und steht in der
+//     Überleitung, nicht in den Kosten. Ohne Ziel zählt die Überweisung selbst.
 //
 // Darunter steht die ÜBERLEITUNG: sie führt vom Ergebnis zur Änderung der Kontostände
 // und muss exakt auf die Summe der Buchungen ohne Gegenbein aufgehen. Das ist keine
@@ -27,14 +30,16 @@
 // WAS HIER NOCH NICHT GILT, und wer es ändert, ändert es hier:
 //
 //   • Einnahmen werden nicht periodisiert — ein Jahresbonus steht in seinem Monat.
-//   • Die Vorsorge zählt mit dem, was tatsächlich umgebucht wurde, nicht mit der Rate,
-//     die ein Vorsorgeziel verlangt. Das Ziel gibt es noch nicht.
+//   • Ohne Vorsorgeziel — und in Monaten, für die es keine Rate verlangt (vor seiner
+//     ersten Annahme, ab dem Zielmonat) — zählt die Vorsorge mit dem, was tatsächlich
+//     umgebucht wurde. Das ist kein Ersatz für die Rate, sondern das einzige, was dann
+//     bekannt ist.
 //   • Der Kauf aus einer RÜCKLAGE wird nur gegen ihren Stand geprüft, wenn die
 //     Ausbuchung ihren Zyklus kennt (seit Migration 76). Bei älteren ist der Stand
 //     von damals nicht mehr zu rechnen; ihr Kauf gilt als gedeckt.
 
 import type { Cent } from "./basis/geld";
-import { addMonate, monateZwischen, parseIso, toIso } from "./basis/datum";
+import { addMonate, addTage, monateZwischen, parseIso, toIso } from "./basis/datum";
 import { RHYTHMUS_MONATE, type Zahlungsregel } from "./basis/zahlungsregel";
 import type { IstBuchung } from "./buchung/istbuchung";
 import { projiziereRegel } from "./buchung/projektion";
@@ -43,6 +48,8 @@ import { einordnen, type Einordnung, type Einordnungskontext } from "./einordnun
 import type { Kategorie } from "./kategorien/kategorie";
 import { istVorsorgekonto, type Zahlungskonto } from "./konten/konto";
 import { hatGeschichte, sollRuecklage, zyklusSoll, type Ruecklage, type Ruecklagenzyklus } from "./ruecklagen/ruecklage";
+import type { VermoegensEingabe } from "./vermoegen/vermoegen";
+import { annahmeIm, vorsorgestand, vorsorgevermoegen, type Vorsorgezielannahme } from "./vorsorge/vorsorge";
 
 export type ErgebnisZeileId =
   | "einnahmen"
@@ -79,6 +86,13 @@ export interface ErgebnisPosten {
    * Auszahlung, nicht die Kosten — sie steht in der Überleitung.
    */
   readonly entnahme?: Cent;
+  /**
+   * Beim Vorsorgeziel: was im Monat tatsächlich in die Vorsorge ging, vorzeichenbehaftet
+   * wie die Buchungen (abgehend negativ). Die Kosten sind die Rate; das hier ist die
+   * Gegenseite auf dem Konto, und ob beides übereinstimmt, ist genau die Frage, die
+   * jemand an dieser Zeile hat.
+   */
+  readonly zufuehrung?: Cent;
 }
 
 export interface ErgebnisZeile {
@@ -93,15 +107,19 @@ export interface Stufe {
   readonly ist: Cent | null;
 }
 
-export type UeberleitungId = "raten" | "entnahmen" | "periodisierung" | "vorsorgeEigen";
+export type UeberleitungId = "raten" | "entnahmen" | "periodisierung" | "zufuehrung" | "vorsorgeEigen";
 
 /**
  * Vom Ergebnis zur Änderung der Kontostände.
  *
- *   raten          + Raten der Töpfe und Rücklagen: Kosten, aber nicht abgeflossen
+ *   raten          + Raten der Töpfe, Rücklagen und des Vorsorgeziels: Kosten, aber
+ *                    nicht abgeflossen
  *   entnahmen      − was aus Töpfen und Rücklagen bezahlt wurde: abgeflossen, keine Kosten
  *   periodisierung ± Fixkosten: bezahlt minus auf den Monat entfallend
- *   vorsorgeEigen  + Vorsorge auf eigenen Konten: Kosten, aber weiter eigenes Geld
+ *   zufuehrung     − was in die Vorsorge ging, solange ein Ziel die Rate stellt:
+ *                    abgeflossen, aber nicht die Kosten (die waren die Rate)
+ *   vorsorgeEigen  + Vorsorge auf eigenen Konten: zählt oben (als Kosten oder als
+ *                    Zuführung), ist aber weiter eigenes Geld
  */
 export interface Ueberleitung {
   readonly ergebnis: Cent;
@@ -152,6 +170,72 @@ export interface ErgebnisEingabe {
   readonly vertragJeBuchung: ReadonlyMap<string, string>;
   /** Heutiges Datum (ISO) — trennt Plan von Plan und Ist. */
   readonly heute: string;
+  /** Das Vorsorgeziel, falls eines angelegt ist. Fehlt es, zählt die tatsächliche Umbuchung. */
+  readonly vorsorge?: ErgebnisVorsorge;
+}
+
+/**
+ * Was die Ergebnisrechnung über das Vorsorgeziel wissen muss, um seine Rate für JEDEN
+ * Monat selbst zu rechnen.
+ *
+ * Die Bausteine und nicht eine fertige Rate je Monat: die Rate hängt am Monat (welche
+ * Annahme gilt, wie viel zu seinem Anfang da war), und die Ergebnisrechnung entscheidet,
+ * welche Monate sie rechnet. Eine Funktion von aussen wäre eine Regel, die der Kern nicht
+ * sieht; eine Liste fertiger Raten müsste jeder Aufrufer für genau die richtigen Monate
+ * bauen. So rechnet die Rate an genau einer Stelle (`vorsorgerateIm`), mit derselben
+ * Kette wie die Karte im Bereich Vermögen.
+ */
+export interface ErgebnisVorsorge {
+  readonly zielId: string;
+  readonly bezeichnung: string;
+  /** Die Reihe der Annahmen dieses Ziels (`annahmeIm` wählt je Monat). */
+  readonly annahmen: readonly Vorsorgezielannahme[];
+  /** Der Bestand, über den `vorsorgevermoegen` rechnet — dieselbe Auswahl wie im Bereich Vermögen. */
+  readonly bestand: Pick<VermoegensEingabe, "konten" | "buchungen" | "depotwerte" | "gegenstaende" | "werte">;
+}
+
+/**
+ * Was das Vorsorgeziel im Monat `monat` („YYYY-MM") kostet, POSITIV — oder `undefined`,
+ * wenn es in diesem Monat keine Rate verlangt.
+ *
+ * Gerechnet wird ZUM MONATSANFANG: mit der Annahme, die in dem Monat gilt, und dem
+ * Vorsorgevermögen am letzten Tag des Vormonats. Zwei Gründe:
+ *
+ *   • Die Rate eines vergangenen Monats darf sich nicht ändern, nur weil heute mehr da
+ *     ist. Mit dem Vermögen von heute stünde jeder Rückblick nach jeder Überweisung
+ *     anders da.
+ *   • Der Vormonat und nicht der Erste selbst: sonst senkte eine Überweisung am Ersten
+ *     die Rate desselben Monats, und wer früh im Monat spart, hätte weniger gekostet als
+ *     wer es am Monatsende tut.
+ *
+ * Keine Rate (`undefined`) gibt es in drei Fällen, und alle drei rechnen wie ohne Ziel —
+ * die tatsächliche Umbuchung zählt:
+ *
+ *   • VOR der ersten Annahme. Ein Ziel, das im März angelegt wurde, hat im Januar nichts
+ *     verlangt (`annahmeIm`).
+ *   • AB dem Zielmonat. Dann wird entnommen, nicht angespart; eine Rate über null
+ *     verbleibende Monate gibt es nicht.
+ *   • Wenn das Ziel nicht mehr erreichbar ist (`sparrate === null`). Das tritt nur am
+ *     Zielmonat auf und fällt damit in den Fall davor. Eine erfundene Rate an dieser
+ *     Stelle wäre eine Behauptung, und null als Rate machte jede tatsächliche Überweisung
+ *     kostenlos.
+ *
+ * Eine Rate von NULL ist dagegen eine Aussage: das Ziel ist gedeckt und verlangt nichts.
+ * Dann kostet die Vorsorge den Monat nichts, und was trotzdem überwiesen wird, steht nur
+ * in der Überleitung — Überschuss, der zufällig im Depot liegt.
+ */
+export function vorsorgerateIm(v: ErgebnisVorsorge, monat: string): Cent | undefined {
+  const annahme = annahmeIm(
+    v.annahmen.filter((a) => a.zielId === v.zielId),
+    monat,
+  );
+  if (!annahme) return undefined;
+  const monatsanfang = `${monat}-01`;
+  const vortag = toIso(addTage(parseIso(monatsanfang), -1));
+  const vermoegen = vorsorgevermoegen(v.bestand, v.zielId, vortag).netto;
+  const stand = vorsorgestand(annahme, vermoegen, monatsanfang);
+  if (stand.monateBisZiel <= 0 || stand.sparrate == null) return undefined;
+  return stand.sparrate;
 }
 
 /**
@@ -273,12 +357,36 @@ export function monatsErgebnis(basis: Ergebnisbasis, monatAb: string): MonatsErg
     basis.einordnungen.filter((x) => x.art === "fixkosten"),
     { von, zukunft, periodisiert: true },
   );
-  const vorsorge = regelZeile(
-    "vorsorge",
-    e.regeln.filter(istVorsorgeregel),
-    basis.einordnungen.filter((x) => x.art === "vorsorge"),
-    { von, zukunft, periodisiert: false },
-  );
+  // Mit Ziel ersetzt seine Rate die Zeile ganz, auch die Daueraufträge darin: deren
+  // Plan neben der Rate stünde zweimal für dasselbe Geld da. Die Überweisungen selbst
+  // stehen am Posten (`zufuehrung`) und in der Überleitung.
+  const vorsorgerate = e.vorsorge ? vorsorgerateIm(e.vorsorge, monat) : undefined;
+  const zugefuehrt = summe(derArt("vorsorge").map((x) => x.betrag));
+  const vorsorge =
+    vorsorgerate === undefined || !e.vorsorge
+      ? regelZeile(
+          "vorsorge",
+          e.regeln.filter(istVorsorgeregel),
+          basis.einordnungen.filter((x) => x.art === "vorsorge"),
+          { von, zukunft, periodisiert: false },
+        )
+      : zeile(
+          "vorsorge",
+          vorsorgerate === 0 && zugefuehrt === 0
+            ? []
+            : [{
+                schluessel: `vorsorgeziel:${e.vorsorge.zielId}@${von}`,
+                bezeichnung: e.vorsorge.bezeichnung,
+                plan: -vorsorgerate || 0,
+                ist: zukunft ? null : -vorsorgerate || 0,
+                // Wie eine Rücklage: die Rate steht mit dem ganzen Monat da, ob schon
+                // überwiesen wurde oder nicht — „offen" hiesse, es kommt noch etwas.
+                status: zukunft ? "offen" : "gebucht",
+                zufuehrung: zukunft ? undefined : zugefuehrt,
+              }],
+          zukunft,
+        );
+  const mitZiel = vorsorgerate !== undefined;
 
   const laufendeKosten = zeile(
     "laufend",
@@ -422,9 +530,12 @@ export function monatsErgebnis(basis: Ergebnisbasis, monatAb: string): MonatsErg
     ueberleitung: zukunft
       ? undefined
       : ueberleitung(ergebnis.ist ?? 0, {
-          raten: -((abschreibungen.ist ?? 0) + (wagnisse.ist ?? 0)) || 0,
+          raten: -((abschreibungen.ist ?? 0) + (wagnisse.ist ?? 0) + (mitZiel ? vorsorge.ist ?? 0 : 0)) || 0,
           entnahmen: summe([...derArt("topf"), ...derArt("ruecklage")].map((x) => x.betrag)),
           periodisierung: summe(derArt("fixkosten").map((x) => x.betrag)) - (fixkosten.ist ?? 0) || 0,
+          // Mit Ziel ist die Überweisung nicht die Kosten, sondern ihre Gegenseite: sie
+          // geht vom Konto, steht aber nicht im Ergebnis. Ohne Ziel steht sie schon oben.
+          zufuehrung: mitZiel ? zugefuehrt : 0,
           vorsorgeEigen:
             -summe(
               derArt("vorsorge")
@@ -566,9 +677,10 @@ function regelZeile(
  *     als ausgegeben, bis der Monat das Gegenteil zeigt; ist es schon überzogen, zählt
  *     die Überziehung. Wer den Rest als gespart rechnet, gibt ihn in Gedanken zweimal
  *     aus.
- *   • **Alles andere** (Rücklagen, aufbauende Budgets, Ungeplantes) — das Ist. Die
- *     Raten stehen schon mit dem ganzen Monat da, und Ungeplantes lässt sich nicht
- *     vorhersagen: geschätzt wird hier nichts.
+ *   • **Alles andere** (Rücklagen, aufbauende Budgets, die Rate eines Vorsorgeziels,
+ *     Ungeplantes) — das Ist. Die Raten stehen schon mit dem ganzen Monat da, ob
+ *     überwiesen oder nicht, und Ungeplantes lässt sich nicht vorhersagen: geschätzt
+ *     wird hier nichts.
  *
  * Der letzte Punkt ist die Grenze der Rechnung: sie kennt keine Ausgabe, die noch
  * niemand geplant hat. Die Zahl ist deshalb eine Obergrenze für einen Monat, in dem

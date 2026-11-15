@@ -30,6 +30,7 @@ import {
   ruecklagenrateFehlt,
   zeilenIst,
   type ErgebnisKennzahlen,
+  type ErgebnisVorsorge,
   type KostenZeileId,
   type Ruecklage,
   blindeFlecken,
@@ -81,6 +82,7 @@ import {
 } from "../core";
 import type { Umsatz } from "./import";
 import { vertragsbindungLaden } from "./vertraege/vertragszuordnung";
+import { ergebnisvorsorgeLaden, type VorsorgeDeps } from "./vorsorge/vorsorge";
 import type {
   BudgetRepository,
   KategorieRepository,
@@ -112,6 +114,8 @@ export interface AnalyseDeps {
   readonly ruecklagenRepo: RuecklagenRepository;
   /** Für „Reicht das Geld?": was die Bank schon kennt, ist vom Stand faktisch weg. */
   readonly vormerkungRepo: VormerkungRepository;
+  /** Für die Kostensicht: mit Vorsorgeziel kostet ein Monat dessen Rate, nicht die Überweisung. */
+  readonly vorsorge: VorsorgeDeps;
 }
 
 export interface Analysebasis {
@@ -150,10 +154,16 @@ export interface Analysebasis {
   readonly vertragJeBuchung: ReadonlyMap<string, string>;
   /** Was die Bank kennt und noch nicht gebucht hat — der Startpunkt der Liquiditätsvorschau. */
   readonly vormerkungen: readonly Vormerkung[];
+  /**
+   * Das Vorsorgeziel für die Kostensicht, `undefined` ohne Ziel — dieselbe Angabe, die
+   * die Übersicht ihrer Ergebnisrechnung gibt, damit derselbe Monat dort und hier
+   * dieselbe Zahl trägt.
+   */
+  readonly vorsorge?: ErgebnisVorsorge;
 }
 
 export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
-  const [buchungen, konten, kategorien, umsaetze, bindung, budgets, vertraege, regeln, ruecklagen, ausbuchungen, zuordnungen, vormerkungen] =
+  const [buchungen, konten, kategorien, umsaetze, bindung, budgets, vertraege, regeln, ruecklagen, ausbuchungen, zuordnungen, vormerkungen, vorsorge] =
     await Promise.all([
       deps.ledger.alle(),
       deps.kontoRepo.alle(),
@@ -167,6 +177,7 @@ export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
       deps.ruecklagenRepo.ausbuchungen(),
       deps.zuordnungRepo.alle(),
       deps.vormerkungRepo.alle(),
+      ergebnisvorsorgeLaden(deps.vorsorge),
     ]);
   const umsatzZuBuchung = belegZuBuchung(umsaetze);
   const vertragJeBuchung = new Map<string, string>();
@@ -189,6 +200,7 @@ export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
     ausbuchungen,
     vertragJeBuchung,
     vormerkungen,
+    vorsorge,
   };
 }
 
@@ -599,6 +611,7 @@ export function analyseKostenverlauf(basis: Analysebasis, von: string, bis: stri
     konten: basis.konten,
     vertragJeBuchung: basis.vertragJeBuchung,
     heute,
+    vorsorge: basis.vorsorge,
   });
   const start = { ...parseIso(von), d: 1 };
   const ergebnisse = Array.from({ length: monateImFenster(von, bis) }, (_, i) =>

@@ -104,7 +104,13 @@ Vorsorge oder Investment (`istVorsorgekonto`) und die Umschichtung ohne Gegenbei
 ein Wertpapierkauf auf ein Depot, das die App nicht als Konto führt. Eine Umbuchung aufs
 Sparkonto zählt nicht: Geld ohne Zweck beiseitezulegen ist Überschuss.
 
+**Mit Vorsorgeziel steht die Vorsorge mit seiner RATE da** (seit 2026-11-15), wie eine
+Rücklage: in „bisher" wie in „geplant", ob überwiesen wurde oder nicht. Was tatsächlich
+überwiesen wurde, steht am Posten daneben („überwiesen: …", auch wenn es nichts war —
+genau das will man an dieser Zeile sehen) und im Weg zum Konto als „In die Vorsorge
+überwiesen". Ohne Ziel, vor seiner ersten Annahme und ab dem Zielmonat zählt die
+Überweisung selbst, wie bisher. Die Regeln stehen in `src/core/CLAUDE.md`.
+
 **Was die Karten noch nicht können**, steht im Kopf von `core/ergebnis.ts`: Einnahmen
-werden nicht periodisiert, und die Vorsorge zählt mit der tatsächlichen Umbuchung statt
-mit der Rate eines Ziels. Der Kauf aus einer Rücklage wird seit Migration 76 gegen das
+werden nicht periodisiert. Der Kauf aus einer Rücklage wird seit Migration 76 gegen das
 Angesparte geprüft; was darüber hinausgeht, steht als Kosten in der Zeile der Rücklagen.

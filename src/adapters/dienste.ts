@@ -248,6 +248,7 @@ export function uebersicht(heute: string): Promise<Uebersichtsdaten> {
       kontoRepo: sqliteZahlungskontoRepository,
       ruecklagenRepo: sqliteRuecklagenRepository,
       vertragRepo: sqliteVertragRepository,
+      vorsorge: VORSORGE_DEPS,
     },
     heute,
   );
@@ -556,8 +557,15 @@ export function vermoegen(heute: string): Promise<Vermoegenssicht> {
   return vermoegenLaden(VERMOEGEN_BESTAND, heute);
 }
 
+/**
+ * Das Ziel samt dem Bestand, gegen den es rechnet — für die Karte im Bereich Vermögen UND
+ * für die Zeile Vorsorge der Ergebnisrechnung (Übersicht, Kostensicht der Analyse).
+ * Eine Konstante, damit alle drei aus denselben Quellen lesen.
+ */
+const VORSORGE_DEPS = { ...VERMOEGEN_BESTAND, vorsorgeRepo: sqliteVorsorgeRepository };
+
 export function vorsorge(heute: string): Promise<Vorsorgesicht | null> {
-  return vorsorgeLaden({ ...VERMOEGEN_BESTAND, vorsorgeRepo: sqliteVorsorgeRepository }, heute);
+  return vorsorgeLaden(VORSORGE_DEPS, heute);
 }
 
 export function vorsorgezielFestlegen(eingabe: VorsorgezielEingabe, heute: string) {
@@ -676,6 +684,7 @@ export function analyse(): Promise<Analysebasis> {
     regelRepo: sqliteZahlungsregelRepository,
     ruecklagenRepo: sqliteRuecklagenRepository,
     vormerkungRepo: sqliteVormerkungRepository,
+    vorsorge: VORSORGE_DEPS,
   });
 }
 
