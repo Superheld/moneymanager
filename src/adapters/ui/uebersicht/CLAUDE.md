@@ -2,29 +2,49 @@
 
 Gilt für die Übersicht. Die Grenze zur Analyse steht in der Wurzel-`CLAUDE.md` unter „Die App in zehn Bereichen“. Was überall gilt, steht in der Wurzel-`CLAUDE.md`.
 
-**Die Monatskarten rechnen über die LIQUIDEN Konten, die Budgetliste über ALLE** (seit
-2026-11-11). Gefiltert werden für die Karten die BUCHUNGEN und Zahlungsregeln, nicht die
-Budgets: jedes Budget führt dort seine Zeile und plant seine Rate.
+**Die Monatskarten sind eine Ergebnisrechnung** (seit 2026-11-15, `ErgebnisKarten.tsx`
+auf `core/ergebnis.ts`): sie zeigen, was der Monat KOSTET, nicht was in ihm vom Konto
+ging. Die Begriffe dazu stehen in `src/core/CLAUDE.md` unter „Auszahlung und Kosten".
 
-Die Budgetliste trug bis 2026-11-11 dieselbe liquide Sicht, und das hatte eine Folge,
-die man ihr nicht ansah: ein aufbauendes Budget auf seinem Rücklagenkonto war blind für
-seine eigenen Ausgaben. Die gingen vom Rücklagenkonto ab und zählten nicht — der Balken
-stand immer auf null, der Stand wuchs Monat für Monat um die Rate. Jetzt zeigt die Liste
-dieselben Zahlen wie der Bereich Budgets. **Der Preis:** die Zeilen „Budgets monatlich"
-und „Budgets aufbauend" der Monatskarten können für denselben Monat einen kleineren
-Verbrauch zeigen als die Liste darunter — die Karte fragt, was aus dem Verfügbaren
-wegging, die Liste, wie das Budget steht.
+Drei Stufen, jede mit ihrer Zwischensumme, weil jede eine eigene Frage beantwortet:
 
-**Budgets stehen getrennt nach Art** — monatlich (Rest verfällt) und aufbauend (Rest
-bleibt), in der Übersicht wie im Bereich Budgets und in den Monatskarten als zwei Zeilen
-„Budgets monatlich" und „Budgets aufbauend". Seit 2026-11-09 nach der Art JEDES Budgets,
-nicht mehr nach dem Dach seines Baums: ein aufbauendes Kind unter einem monatlichen Dach
-steht bei den aufbauenden. Doppelt zählt dabei nichts: ein Dach gilt für alles ausser
-seinen Unterbudgets, Betrag wie Verbrauch sind getrennte Töpfe (`core/budgets/budget.ts`,
-Kopf). Bis 2026-11-09 zog das Kind seinen Betrag vom Dach ab — ein aufbauendes Dach mit
-grösserem Kind sank dadurch jeden Monat, ohne dass etwas ausgegeben wurde.
+| Stufe | Zeilen | beantwortet |
+|---|---|---|
+| nach den Pflichten | Einnahmen − Fixkosten | was bleibt, bevor ich etwas entscheide |
+| was der Alltag übrig lässt | − laufende Kosten − Ungeplantes | wie ich diesen Monat gewirtschaftet habe |
+| bleibt wirklich frei | − Rücklagen − aufbauende Budgets − Vorsorge | was ich ausgeben kann, ohne mir etwas vorzumachen |
 
-Daran hängt die Karte **„Was da ist"** — die realen Stände je Kontoklasse, über ALLE
+**Eine Zwischensumme steht nur da, wenn danach noch etwas abgeht.** Ohne Rücklagen und
+Vorsorge wäre die zweite dieselbe Zahl wie das Ergebnis darunter.
+
+**Rücklagen und aufbauende Budgets stehen mit ihrer RATE da**, in „bisher" wie in
+„geplant". Was aus ihnen bezahlt wurde, ist eine Entnahme: sie steht am Posten daneben
+und in der Überleitung, nicht in den Kosten. Reicht ein aufbauendes Budget nicht, zählt
+das Ungedeckte als Kosten des Monats (`topfKosten`).
+
+**Fixkosten sind, was einem Vertrag ZUGEORDNET ist.** Die alte Karte fand die Zahlung zu
+einem Plan-Posten über Betragsnähe; jetzt entscheidet die Vertragszuordnung der Buchung,
+dieselbe, nach der die Budgetliste rechnet. Eine Vertragszahlung ohne Zuordnung steht
+unter „Ungeplant" (oder in ihrem Budget), und der Vertrag daneben als „offen" — das ist
+kein Fehler der Karte, sondern der Hinweis, dass die Zuordnung fehlt.
+
+**Unter der Karte steht der Weg zum Konto** („Und auf dem Konto?", die Überleitung). Er
+ist aufklappbar und erscheint nur, wenn Ergebnis und Kontostandsänderung sich
+unterscheiden. Er ist der Beleg, dass die Rechnung darüber gegen die Bank aufgeht, und
+gehört deshalb zur Karte und nicht in einen anderen Bereich.
+
+**Die ganze Übersicht rechnet über ALLE Konten.** Kosten hängen nicht daran, von welchem
+Konto bezahlt wurde. Bis 2026-11-15 rechneten die Karten über die liquiden Konten und die
+Budgetliste über alle; dasselbe Budget zeigte in Karte und Liste verschiedene Zahlen, und
+der Untertitel der Seite musste es erklären. Der Satz ist weg, weil der Unterschied weg
+ist.
+
+**Budgets stehen in der Liste getrennt nach Art** — monatlich (Rest verfällt) und
+aufbauend (Rest bleibt), nach der Art JEDES Budgets, nicht nach dem Dach seines Baums.
+In den Karten sind es zwei Zeilen in zwei Stufen: die monatlichen sind laufende Kosten,
+die aufbauenden stehen bei den Rücklagen.
+
+Darunter steht die Karte **„Was da ist"** — die realen Stände je Kontoklasse, über ALLE
 Konten. Die Klasse ist die Rechenregel und jedes Konto hat genau eine, die Summen addieren
 sich also zum Ganzen. Jede Bündelung, in der dasselbe Konto mehrfach vorkommen darf,
 ergäbe hier „das Vermögen" grösser, als es ist — was man so ansehen will, gehört in die
@@ -37,19 +57,13 @@ dasteht. Die Rechnung dahinter (`liquiditaetsvorschau` in `core/konten/liquidita
 ist geblieben und getestet, hat aber keine Oberfläche mehr; ebenso `veraltet` am
 Abrufstand. Wer sie wieder zeigt, sucht ihr einen leiseren Ort.
 
-**Die Monatskarten rechnen Umbuchungen über ALLE erfassten Konten** (seit 2026-11-09,
-`kreis` in `core/monatsausblick.ts`). Eine Umbuchung vom Giro aufs Tagesgeld, Spar- oder
-Rücklagenkonto bewegt eigenes Geld — sie fällt aus Plan und Ist heraus, gleich welcher
-Klasse das Ziel ist. Stehen bleibt nur, was die erfassten Konten verlässt, in der Zeile
-**„Umbuchungen nach außen"**: eine Umschichtung ohne Gegenkonto, etwa ein Wertpapierkauf
-auf ein Depot, das die App nicht als Konto führt. Am 2026-11-08 war der Kreis einen Tag
-lang die liquiden Konten; dann stand die Überweisung aufs Sparkonto als „Sparen &
-Vorsorge" in der Karte, und ob sie als Rücklage erschien, hing an der Klasse des Ziels.
+**Umbuchungen zwischen erfassten Konten stehen in keiner Zeile** — sie bewegen eigenes
+Geld. Zwei Ausnahmen, und beide sind Vorsorge: die Umbuchung auf ein Konto der Klasse
+Vorsorge oder Investment (`istVorsorgekonto`) und die Umschichtung ohne Gegenbein, etwa
+ein Wertpapierkauf auf ein Depot, das die App nicht als Konto führt. Eine Umbuchung aufs
+Sparkonto zählt nicht: Geld ohne Zweck beiseitezulegen ist Überschuss.
 
-**Die Zeile „Rücklagen" ist eine Rechnung, keine Überweisung**: je Rücklage der Zuwachs
-ihres Solls im Monat, in Plan und Ist mit demselben Betrag. Gebunden ist die Rate, ob
-überwiesen wurde oder nicht; ist das Ziel erreicht, bindet sie nichts mehr. So stand die
-Zeile bis 2026-09-01 schon einmal da und flog heraus, weil dasselbe Zurücklegen daneben
-als geplante Umbuchung stand und doppelt zählte — **wer Umbuchungen wieder in die Karte
-holt, holt diese Doppelzählung mit.** Rücklagen zählen deshalb auch wieder zu
-`hatPlandaten`.
+**Was die Karten noch nicht können**, steht im Kopf von `core/ergebnis.ts`: Einnahmen
+werden nicht periodisiert, die Vorsorge zählt mit der tatsächlichen Umbuchung statt mit
+der Rate eines Ziels, und der Kauf aus einer Rücklage wird nicht gegen ihren Stand
+geprüft.

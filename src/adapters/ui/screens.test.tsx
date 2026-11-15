@@ -195,11 +195,12 @@ describe("UebersichtScreen", () => {
   });
 
   /**
-   * Die drei Monatskarten rechnen nur über die LIQUIDEN Konten. Vorher filterten sie nach
-   * gar keinem — was auf einem Rücklagenkonto passierte, stand mit in „so sieht der
-   * Monat aus", obwohl es dort gerade nicht zur Verfügung steht.
+   * Monatskarten und Budgetliste zählen DIESELBEN Buchungen (seit 2026-11-15). Kosten
+   * hängen nicht daran, von welchem Konto bezahlt wurde. Bis dahin rechneten die Karten
+   * nur über die liquiden Konten und die Liste über alle — dasselbe Budget zeigte im
+   * selben Bild zwei verschiedene Zahlen.
    */
-  it("lässt Buchungen auf Rücklagenkonten aus den Monatskarten heraus, nicht aus der Budgetliste", async () => {
+  it("zählt in Monatskarten und Budgetliste dieselben Buchungen, gleich von welchem Konto", async () => {
     await grunddaten();
     await sqliteZahlungskontoRepository.speichern({
       id: "k-rueck", bezeichnung: "Tagesgeldkonto", typ: "Tagesgeld", klasse: "ruecklage",
@@ -221,12 +222,9 @@ describe("UebersichtScreen", () => {
     });
 
     rendere(<UebersichtScreen />);
-    // Die Monatskarte zeigt den Verbrauch vom Girokonto …
-    await waitFor(() => expect(document.body.textContent).toMatch(/123,45/));
-    // … und nicht die Summe beider Konten. Genau die stünde da ohne den Filter.
-    expect(document.body.textContent).not.toMatch(/802,36/);
-    // Die Budgetliste rechnet seit 2026-11-11 über ALLE Konten — ein Budget ist ein Topf,
-    // und was aus ihm ging, ging aus ihm: 1.000,00 − 123,45 − 678,91 = 197,64.
+    // Die Monatskarte zeigt die Summe beider Konten: 123,45 + 678,91 …
+    await waitFor(() => expect(document.body.textContent).toMatch(/802,36/));
+    // … und die Budgetliste rechnet mit denselben: 1.000,00 − 802,36 = 197,64.
     await waitFor(() => expect(document.body.textContent).toMatch(/197,64/));
     expect(document.body.textContent).not.toMatch(/876,55/);
   });

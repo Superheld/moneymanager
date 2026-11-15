@@ -212,6 +212,27 @@ describe("Abschreibungen — die Rücklage", () => {
   });
 });
 
+describe("Abschreibungen — wann eine Rücklage kostet", () => {
+  const frei: Ruecklage = { id: "f", bezeichnung: "Puffer", rate: 5000, beginn: "2025-01-01" };
+  const mitZiel: Ruecklage = { id: "z", bezeichnung: "Gerät", ziel: 60000, fristMonate: 12, beginn: "2025-01-01" };
+  const kosten = (ruecklagen: Ruecklage[], monat: string, heute = "2025-12-31") =>
+    zeile(rechne(eingabe({ ruecklagen, heute }), monat), "abschreibungen");
+
+  it("plant im künftigen Monat, ohne ein Ist zu behaupten", () => {
+    expect(kosten([frei], "2025-10", "2025-08-16")).toMatchObject({ plan: -5000, ist: null });
+  });
+
+  it("kostet nichts mehr, wenn das Ziel erreicht ist — und nichts vor dem Beginn", () => {
+    const erreicht = { ...mitZiel, fristMonate: 3 };
+    const spaeter = { ...frei, beginn: "2025-09-01" };
+    expect(kosten([erreicht, spaeter], "2025-08")).toBeUndefined();
+  });
+
+  it("zählt den Monat des Beginns mit", () => {
+    expect(kosten([{ ...frei, beginn: "2025-08-20" }], "2025-08")?.plan).toBe(-5000);
+  });
+});
+
 describe("Vorsorge", () => {
   it("zählt die Umbuchung auf ein Vorsorgekonto als Kosten, obwohl das Geld bleibt", () => {
     const raus = ist("2025-02-01", -30000, { charakter: "Umschichtung", transferId: "t1", gegenkontoId: "depotkonto" });

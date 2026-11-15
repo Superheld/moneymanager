@@ -26,14 +26,12 @@
 // Geld, das auf ein Konto geht, das die App nicht kennt (der Wertpapierkauf ohne
 // erfasstes Depotkonto).
 //
-// DIE RÜCKLAGEN SIND EINE RECHNUNG, KEINE ÜBERWEISUNG (wieder seit 2026-11-09): je
-// Rücklage ihre Monatsrate, in Plan und Ist mit demselben Betrag — gebunden ist sie, ob
-// überwiesen wurde oder nicht. Genau so stand die Zeile schon bis 2026-09-01 da und flog
-// damals heraus, weil dasselbe Zurücklegen daneben als geplante Umbuchung stand und
-// doppelt zählte. Der Grund ist weg, seit die Umbuchungen den Kreis nicht mehr verlassen.
-// Dazwischen (2026-11-08) zeigte die Zeile die echte Überweisung aufs Rücklagenkonto;
-// das hing an der Kontoklasse und blieb leer, wo die Rücklagen auf einem anders
-// eingestuften Konto lagen.
+// KEINE KALKULATORISCHE ZEILE (seit 2026-11-15). Hier stand die Zeile „Rücklagen" mit den
+// Raten der Rücklagen — Kosten, denen keine Buchung gegenübersteht. Sie gehört in die
+// Ergebnisrechnung (`ergebnis.ts`) und steht jetzt dort. Diese Datei rechnet nur noch,
+// was GEBUCHT ist oder gebucht werden wird, und ihre Ist-Spalte summiert deshalb wieder
+// auf die Buchungen des Monats. Benutzt wird sie vom Ausblick der Analyse, der nach dem
+// Saldo fragt.
 //
 // BUDGETS STEHEN IN ZWEI ZEILEN, monatlich und aufbauend — nach der Art JEDES Budgets,
 // wie in der Budgetliste (`nachArtGetrennt`), damit dasselbe Budget in Karte und Liste
@@ -47,7 +45,6 @@ import type { Kategorie } from "./kategorien/kategorie";
 import { kategorieAnteile, type IstBuchung } from "./buchung/istbuchung";
 import { projiziereRegel, type Planbuchung } from "./buchung/projektion";
 import { istUmbuchungsregel } from "./vertraege/umbuchungErkennung";
-import { sollRuecklage, type Ruecklage } from "./ruecklagen/ruecklage";
 import type { Zahlungsregel } from "./basis/zahlungsregel";
 
 /** Die Zeilen der Aufrechnung, in Anzeigereihenfolge. */
@@ -56,7 +53,6 @@ export type AusblickZeileId =
   | "vertraege"
   | "budgets"
   | "budgetsAufbauend"
-  | "ruecklagen"
   | "umschichtung"
   | "sonstiges";
 
@@ -157,11 +153,6 @@ export interface MonatsAusblickEingabe {
    * denn jedes erfasste Konto liegt im Kreis.
    */
   readonly kreis?: ReadonlySet<string>;
-  /**
-   * Die Rücklagen, deren Monatsrate als Abzug in der Zeile „Rücklagen" steht. Optional:
-   * die Aufrechnung der Analyse fragt nach dem Saldo, und eine Rate ist keine Bewegung.
-   */
-  readonly ruecklagen?: readonly Ruecklage[];
 }
 
 /**
@@ -207,7 +198,6 @@ export function monatsAusblick(e: MonatsAusblickEingabe): MonatsAusblick {
   const einnahmen = zeileAusRegeln("einnahmen", planPosten, zugeordnet, "Ertrag");
   const vertraege = zeileAusRegeln("vertraege", planPosten, zugeordnet, "Aufwand");
   const umschichtung = zeileAusRegeln("umschichtung", planPosten, zugeordnet, "Umschichtung");
-  const ruecklagen = ruecklagenZeile(e.ruecklagen ?? [], von, bis, zukunft);
 
   // Was noch keiner Zeile gehört — die Basis für Budgets und Sonstiges.
   const offenesIst = istImMonat.filter((b) => !verbraucht.has(b.id));
@@ -245,10 +235,9 @@ export function monatsAusblick(e: MonatsAusblickEingabe): MonatsAusblick {
     vertraege,
     budgetZeilen.monatlich,
   ];
-  // Aufbauende Budgets, Rücklagen und Umschichtung nur, wenn es sie gibt: drei Zeilen
-  // voller Nullen wären bei einem Haushalt ohne sie Lärm.
+  // Aufbauende Budgets und Umschichtung nur, wenn es sie gibt: Zeilen voller Nullen
+  // wären bei einem Haushalt ohne sie Lärm.
   if (budgetZeilen.aufbauend.posten.length > 0) zeilen.push(budgetZeilen.aufbauend);
-  if (ruecklagen.posten.length > 0) zeilen.push(ruecklagen);
   if (umschichtung.plan !== 0 || weitereUmschichtung.length > 0) {
     zeilen.push(mitEinzelposten(umschichtung, weitereUmschichtung));
   }
@@ -357,39 +346,6 @@ function zeileAusRegeln(
     id,
     plan: summe(posten.map((p) => p.plan)),
     ist: summe(posten.map((p) => p.ist ?? 0)),
-    posten,
-  };
-}
-
-/**
- * Die Rücklagen des Monats: je Rücklage, was ihr Soll in diesem Monat wächst.
- *
- * Über den Zuwachs des Solls und nicht über die blosse Rate, damit die Zeile dieselbe
- * Rechnung trägt wie der Bereich Rücklagen: vor dem Beginn steht nichts, und eine
- * Rücklage, deren Ziel erreicht ist, bindet nichts mehr — bis sie ausgebucht wird und
- * von vorn anfängt.
- *
- * Plan und Ist sind derselbe Betrag: gebunden ist die Rate, sobald der Monat läuft, ob
- * das Geld schon umgebucht wurde oder nicht. Nur ein künftiger Monat hat kein Ist.
- */
-function ruecklagenZeile(items: readonly Ruecklage[], von: string, bis: string, zukunft: boolean): AusblickZeile {
-  const posten = items
-    .map((r): AusblickPosten => {
-      const plan = -(sollRuecklage(r, bis) - sollRuecklage(r, von)) || 0;
-      return {
-        schluessel: `ruecklage:${r.id}`,
-        bezeichnung: r.bezeichnung,
-        plan,
-        ist: zukunft ? null : plan,
-        status: zukunft ? "offen" : "gebucht",
-      };
-    })
-    .filter((p) => p.plan !== 0)
-    .sort((a, b) => a.plan - b.plan);
-  return {
-    id: "ruecklagen",
-    plan: summe(posten.map((p) => p.plan)),
-    ist: zukunft ? null : summe(posten.map((p) => p.ist ?? 0)),
     posten,
   };
 }

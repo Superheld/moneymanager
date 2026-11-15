@@ -370,7 +370,6 @@ describe("monatsAusblick — Umbuchungen und der Kreis", () => {
         ist: [bein({ gegenkontoId: ziel })],
       });
       expect(zeile(a, "umschichtung")).toBeUndefined();
-      expect(zeile(a, "ruecklagen")).toBeUndefined();
     }
   });
 
@@ -389,39 +388,5 @@ describe("monatsAusblick — Umbuchungen und der Kreis", () => {
     // Die Aufrechnung über ALLE Konten (Ausblick der Analyse) gibt keinen Kreis an.
     const a = monatsAusblick({ ...basis, ist: [bein({ gegenkontoId: "ruecklage" })], monatAb: "2026-08-01" });
     expect(zeile(a, "umschichtung")).toBeUndefined();
-  });
-});
-
-/**
- * Die Rücklagen stehen als Rechnung da: je Rücklage der Zuwachs ihres Solls im Monat,
- * in Plan und Ist gleich — gebunden ist die Rate, ob überwiesen wurde oder nicht.
- */
-describe("monatsAusblick — Rücklagen als Raten", () => {
-  const frei = { id: "rk-frei", bezeichnung: "Puffer", rate: euroZuCent(50), beginn: "2026-01-01" };
-  const mitZiel = { id: "rk-ziel", bezeichnung: "Waschmaschine", ziel: euroZuCent(600), fristMonate: 12, beginn: "2026-01-01" };
-
-  it("zieht die Rate ab, auch wenn nichts überwiesen wurde", () => {
-    const a = monatsAusblick({ ...basis, ruecklagen: [frei, mitZiel], monatAb: "2026-08-01" });
-    const r = zeile(a, "ruecklagen")!;
-    expect(r).toMatchObject({ plan: euroZuCent(-100), ist: euroZuCent(-100) });
-    expect(r.posten.map((p) => p.bezeichnung)).toEqual(["Puffer", "Waschmaschine"]);
-    expect(a.restIst).toBe(euroZuCent(-100));
-  });
-
-  it("plant im künftigen Monat, ohne ein Ist zu behaupten", () => {
-    const a = monatsAusblick({ ...basis, ruecklagen: [frei], monatAb: "2026-10-01" });
-    expect(zeile(a, "ruecklagen")).toMatchObject({ plan: euroZuCent(-50), ist: null });
-  });
-
-  it("bindet nichts mehr, wenn das Ziel erreicht ist — und nichts vor dem Beginn", () => {
-    const erreicht = { ...mitZiel, fristMonate: 3 }; // Ziel im April beisammen
-    const spaeter = { ...frei, beginn: "2026-09-01" };
-    const a = monatsAusblick({ ...basis, ruecklagen: [erreicht, spaeter], monatAb: "2026-08-01" });
-    expect(zeile(a, "ruecklagen")).toBeUndefined();
-  });
-
-  it("zählt den Monat des Beginns mit", () => {
-    const a = monatsAusblick({ ...basis, ruecklagen: [{ ...frei, beginn: "2026-08-20" }], monatAb: "2026-08-01" });
-    expect(zeile(a, "ruecklagen")!.plan).toBe(euroZuCent(-50));
   });
 });
