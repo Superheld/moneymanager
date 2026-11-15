@@ -7,10 +7,12 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { hatZiel, minorZuMajor, waehlbareKonten, type Ruecklage, type Zahlungskonto } from "../../../application";
+import { hatZiel, minorZuMajor, waehlbareKonten, type Kategorie, type Ruecklage, type Zahlungskonto } from "../../../application";
 import { ruecklageAktualisieren, ruecklageAnlegen } from "../../dienste";
 import { Button, FormField } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
+import { CategoryPicker } from "../bausteine/CategoryPicker";
+import { Feldzeile } from "../bausteine/Feldzeile";
 import { Datumsfeld } from "../bausteine/Datumsfeld";
 import { Modal } from "../bausteine/Modal";
 import { fehlerNachricht, useGeld } from "../bausteine/einstellungenKontext";
@@ -22,6 +24,7 @@ export function RuecklageDialog({
   ruecklage,
   heute,
   konten,
+  kategorien,
   onClose,
   onGespeichert,
 }: {
@@ -29,6 +32,7 @@ export function RuecklageDialog({
   ruecklage: Ruecklage | null;
   heute: string;
   konten: readonly Zahlungskonto[];
+  kategorien: readonly Kategorie[];
   onClose: () => void;
   onGespeichert: () => void | Promise<void>;
 }) {
@@ -42,6 +46,7 @@ export function RuecklageDialog({
   const [rate, setRate] = useState(r?.rate == null ? "" : String(minorZuMajor(r.rate, geld.waehrung)));
   const [beginn, setBeginn] = useState(r?.beginn ?? heute);
   const [kontoId, setKontoId] = useState(r?.kontoId ?? "");
+  const [kategorieId, setKategorieId] = useState(r?.kategorieId ?? "");
   const [fehler, setFehler] = useState<string | null>(null);
 
   async function speichern() {
@@ -56,6 +61,7 @@ export function RuecklageDialog({
       rate: form === "rate" ? (geld.parse(rate) ?? 0) : undefined,
       beginn,
       kontoId: kontoId || undefined,
+      kategorieId: kategorieId || undefined,
     };
     try {
       if (r) await ruecklageAktualisieren(r.id, eingabe);
@@ -117,6 +123,15 @@ export function RuecklageDialog({
             wert={kontoId}
             aufAenderung={setKontoId}
             optionen={[{ wert: "", text: t("ruecklagen.kontoKeins") }, ...waehlbareKonten(konten, kontoId).map((k) => ({ wert: k.id, text: k.bezeichnung }))]}
+          />
+        </FormField>
+        {/* Die Kategorie ist ein Vorschlag fürs Ausbuchen und keine Regel: sie holt die
+            passenden Buchungen nach vorn. Deshalb optional, und deshalb mit einem Weg
+            zurück — der Picker selbst kennt kein „keine". */}
+        <FormField label={t("ruecklagen.feldKategorie")} hint={t("ruecklagen.feldKategorieHinweis")}>
+          <Feldzeile
+            feld={<CategoryPicker kategorien={[...kategorien]} value={kategorieId} onChange={setKategorieId} placeholder={t("ruecklagen.kategorieKeine")} />}
+            knopf={kategorieId ? <Button variant="link" onClick={() => setKategorieId("")}>{t("ruecklagen.kategorieEntfernen")}</Button> : null}
           />
         </FormField>
       </div>

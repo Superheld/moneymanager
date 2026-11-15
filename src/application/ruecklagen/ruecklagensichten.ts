@@ -7,6 +7,7 @@
 // leicht anders noch einmal auftaucht.
 
 import {
+  kategorieUnterbaum,
   mindestRuecklage,
   monatsRuecklageGesamt,
   ruecklagenKonten,
@@ -15,6 +16,7 @@ import {
   ruecklagenfluss,
   zielwertGesamt,
   type Cent,
+  type Kategorie,
   type Ruecklage,
   type RuecklagenDeckung,
   type Ruecklagenfluss,
@@ -52,20 +54,52 @@ export interface Buchungswahl {
   readonly betrag: Cent;
   /** Empfänger, sonst die Notiz — das, woran man die Zahlung wiedererkennt. */
   readonly bezeichnung: string;
+  /** Die Kategorie der Buchung; fehlt bei einer geteilten oder noch nicht eingeordneten. */
+  readonly kategorieId?: string;
+}
+
+/** Eine Buchung in der Auswahl EINER Rücklage — mit der Auskunft, ob sie nahe liegt. */
+export interface Buchungsvorschlag extends Buchungswahl {
+  /** Liegt die Buchung in der Kategorie der Rücklage (oder darunter)? */
+  readonly passt: boolean;
+}
+
+/**
+ * Die Auswahl beim Ausbuchen EINER Rücklage: zuerst, was in ihrer Kategorie liegt, dann
+ * die jüngsten Abflüsse.
+ *
+ * Die Kategorie einer Rücklage ist damit ein VORSCHLAG und keine Regel. Zugeordnet wird
+ * weiterhin von Hand, eine Buchung je Ausbuchung: eine Rücklage ist ein Gegenstand mit
+ * einem Kauf, und welcher Kauf es war, weiss nur, wer ihn getätigt hat. Wer viele
+ * Ausgaben über eine Kategorie aus einem Topf bezahlen will, nimmt ein aufbauendes
+ * Budget — dort zählt die Kategorie von selbst.
+ *
+ * Ohne Kategorie an der Rücklage ist die Liste dieselbe wie bisher.
+ */
+export function buchungswahlFuer(
+  sicht: Pick<Ruecklagensicht, "buchungswahl" | "kategorien">,
+  ruecklage: Pick<Ruecklage, "kategorieId">,
+): Buchungsvorschlag[] {
+  const baum = ruecklage.kategorieId ? kategorieUnterbaum(sicht.kategorien, ruecklage.kategorieId) : new Set<string>();
+  const alle = sicht.buchungswahl.map((b) => ({ ...b, passt: !!b.kategorieId && baum.has(b.kategorieId) }));
+  // `buchungswahl` ist schon nach Datum sortiert, neueste zuerst; die Teilung erhält das.
+  return [...alle.filter((b) => b.passt), ...alle.filter((b) => !b.passt)].slice(0, WAHL_ANZAHL);
 }
 
 /**
  * So viele Abflüsse stehen beim Ausbuchen zur Auswahl.
  *
  * Eine Auswahl über den ganzen Bestand wäre eine Liste, die niemand durchsieht; die
- * gesuchte Zahlung liegt in aller Regel wenige Tage zurück. Wer weiter zurück muss,
- * ändert das Datum — dann verschiebt sich das Fenster mit.
+ * gesuchte Zahlung liegt in aller Regel wenige Tage zurück — oder in der Kategorie der
+ * Rücklage, und die steht dann vorn (`buchungswahlFuer`).
  */
 const WAHL_ANZAHL = 50;
 
 export interface Ruecklagensicht {
   readonly ruecklagen: readonly Ruecklage[];
   readonly konten: readonly Zahlungskonto[];
+  /** Für die Kategoriewahl im Dialog und für `buchungswahlFuer`. */
+  readonly kategorien: readonly Kategorie[];
   readonly kontoNamen: ReadonlyMap<string, string>;
   /** Reicht das Ersparte für den bis heute aufgelaufenen Bedarf? */
   readonly deckung: RuecklagenDeckung;
@@ -141,7 +175,7 @@ export async function ruecklagenLaden(
   deps: RuecklagenDeps,
   heute: string,
 ): Promise<Ruecklagensicht> {
-  const [ruecklagen, buchungen, konten, regeln, vertraege, ausbuchungen, umsaetze, budget] =
+  const [ruecklagen, buchungen, konten, regeln, vertraege, ausbuchungen, umsaetze, budget, kategorien] =
     await Promise.all([
       deps.ruecklagenRepo.alle(),
       deps.ledger.alle(),
@@ -151,6 +185,7 @@ export async function ruecklagenLaden(
       deps.ruecklagenRepo.ausbuchungen(),
       deps.umsatzRepo.alle(),
       budgetAnspruecheLaden(deps, heute),
+      deps.kategorieRepo.alle(),
     ]);
   const kontostaende = new Map(konten.map((k) => [k.id, realerKontostand(k, buchungen)]));
   // Nur laufende Verträge: ein gekündigter zahlt nicht mehr ein, und eine Mindestrücklage
@@ -163,6 +198,7 @@ export async function ruecklagenLaden(
   return {
     ruecklagen,
     konten,
+    kategorien,
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
     deckung: ruecklagenDeckung(ruecklagen, heute, kontostaende, budget.ansprueche),
     proMonat: monatsRuecklageGesamt(ruecklagen),
@@ -184,13 +220,16 @@ export async function ruecklagenLaden(
     buchungswahl: spurenAus(buchungen, umsaetze)
       // Nur Abflüsse: eine Rücklage wird ausgegeben, nicht eingenommen.
       .filter((sp) => sp.betrag < 0)
+      // ALLE Abflüsse, neueste zuerst — gekürzt wird in `buchungswahlFuer`, nachdem die
+      // zur Rücklage passenden nach vorn geholt sind. Vorher gekürzt fiele die gesuchte
+      // Zahlung heraus, sobald sie älter ist als die fünfzig jüngsten.
       .sort((a, b) => b.datum.localeCompare(a.datum))
-      .slice(0, WAHL_ANZAHL)
       .map((sp) => ({
         id: sp.id,
         datum: sp.datum,
         betrag: sp.betrag,
         bezeichnung: sp.gegenpartei || sp.verwendungszweck || "",
+        kategorieId: sp.kategorieId,
       })),
   };
 }

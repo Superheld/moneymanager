@@ -254,7 +254,10 @@ export {
 } from "./depot/depotsichten";
 export {
   ruecklagenLaden,
+  // Sortiert eine schon geladene Auswahl für EINE Rücklage — wie `budgetstaende(sicht, am)`.
+  buchungswahlFuer,
   type Buchungswahl,
+  type Buchungsvorschlag,
   type Ruecklagensicht,
   type RuecklagenDeps,
 } from "./ruecklagen/ruecklagensichten";
