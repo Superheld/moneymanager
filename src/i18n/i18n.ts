@@ -603,6 +603,42 @@ const de = {
     abbrechen: "Abbrechen",
     laeuft: "wird gelöscht …",
   },
+  einrichtung: {
+    titel: "Damit die Zahlen stimmen",
+    untertitel: "{{erledigt}} von {{gesamt}} erledigt. Die App rechnet mit dem, was du ihr sagst — das hier fehlt ihr noch.",
+    erledigt: "erledigt",
+    wartet: "kommt danach",
+    freiwillig: "wenn du magst",
+    zuBereich: "Zu „{{bereich}}“",
+    schritt: {
+      konto: {
+        frage: "Wo liegt dein Geld?",
+        warum: "Leg die Konten an, die du im Blick haben willst: Girokonto, Tagesgeld, Bargeld. Ohne Konto gibt es nichts zu rechnen.",
+      },
+      buchungen: {
+        frage: "Was ist auf den Konten passiert?",
+        warum: "Hol die Umsätze deiner Bank herein — als Datei oder per Abruf. Ein paar Monate reichen für den Anfang.",
+      },
+      kategorien: {
+        frage: "Wofür war das Geld?",
+        warum: "Jede Zahlung braucht eine Kategorie, sonst weiß die App nicht, wozu sie gehört.",
+        warumAnzahl_one: "Eine Zahlung der letzten drei Monate hat noch keine Kategorie. Sie steht so lange unter „Ungeplant“.",
+        warumAnzahl_other: "{{count}} Zahlungen der letzten drei Monate haben noch keine Kategorie. Sie stehen so lange unter „Ungeplant“.",
+      },
+      vertraege: {
+        frage: "Was kommt und geht jeden Monat fest?",
+        warum: "Miete, Strom, Versicherungen, dein Gehalt: was regelmäßig und in fester Höhe fließt, ist ein Vertrag. Daraus rechnet die App, was dir nach den Pflichten bleibt.",
+      },
+      budgets: {
+        frage: "Was darf der Alltag kosten?",
+        warum: "Einkaufen, Tanken, Freizeit: gib dir je Monat einen Rahmen. Dann siehst du, was davon noch da ist.",
+      },
+      ruecklagen: {
+        frage: "Wofür legst du zurück?",
+        warum: "Urlaub, das nächste Auto, eine neue Waschmaschine: eine Rücklage verteilt die große Ausgabe auf die Monate davor.",
+      },
+    },
+  },
   uebersicht: {
     titel: "Übersicht",
     untertitel: "Wie du gerade dastehst — was dieser Monat und die beiden nächsten kosten, über alle Konten",
@@ -2914,6 +2950,42 @@ const en: typeof de = {
     bestaetigen: "Delete permanently",
     abbrechen: "Cancel",
     laeuft: "deleting …",
+  },
+  einrichtung: {
+    titel: "Getting the numbers right",
+    untertitel: "{{erledigt}} of {{gesamt}} done. The app works with what you tell it — this is still missing.",
+    erledigt: "done",
+    wartet: "comes next",
+    freiwillig: "if you like",
+    zuBereich: "Go to “{{bereich}}”",
+    schritt: {
+      konto: {
+        frage: "Where is your money?",
+        warum: "Add the accounts you want to keep an eye on: current account, savings, cash. Without an account there is nothing to calculate.",
+      },
+      buchungen: {
+        frage: "What happened on the accounts?",
+        warum: "Bring in your bank transactions — as a file or by fetching them. A few months are enough to start.",
+      },
+      kategorien: {
+        frage: "What was the money for?",
+        warum: "Every payment needs a category, otherwise the app cannot tell what it belongs to.",
+        warumAnzahl_one: "One payment from the last three months has no category yet. Until then it is listed as “Unplanned”.",
+        warumAnzahl_other: "{{count}} payments from the last three months have no category yet. Until then they are listed as “Unplanned”.",
+      },
+      vertraege: {
+        frage: "What comes in and goes out every month?",
+        warum: "Rent, electricity, insurance, your salary: whatever flows regularly at a fixed amount is a contract. From these the app works out what is left after your obligations.",
+      },
+      budgets: {
+        frage: "What may everyday life cost?",
+        warum: "Groceries, fuel, leisure: give yourself a monthly frame. Then you can see how much of it is left.",
+      },
+      ruecklagen: {
+        frage: "What are you putting money aside for?",
+        warum: "Holidays, the next car, a new washing machine: a reserve spreads the big expense over the months before it.",
+      },
+    },
   },
   uebersicht: {
     titel: "Overview",

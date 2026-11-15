@@ -63,7 +63,9 @@ import { BuchungDetail } from "../buchung/BuchungDetail";
 import { Buchungsliste } from "../bausteine/Buchungsliste";
 import { AUFKLAPP_ZEILEN_SCHMAL } from "../bausteine/aufklappen";
 import { DepotKarte } from "./DepotKarte";
+import { EinrichtungKarte } from "./EinrichtungKarte";
 import { ErgebnisKarten } from "./ErgebnisKarten";
+import type { ScreenId } from "../bausteine/AppShell";
 import { VorschauKarte } from "./VorschauKarte";
 import { PageHead } from "../bausteine/PageHead";
 import { VermoegenKarte } from "./VermoegenKarte";
@@ -78,7 +80,11 @@ function heuteIso(): string {
   return toIso({ y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate() });
 }
 
-export function UebersichtScreen() {
+/**
+ * `onNavigate` ist freiwillig: die Übersicht führt nur aus der Einrichtungskarte hinaus,
+ * und ohne Shell (Tests) stehen deren Schritte dann ohne Knopf da.
+ */
+export function UebersichtScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => void } = {}) {
   const { t } = useTranslation();
   const geld = useGeld();
   const heute = useMemo(heuteIso, []);
@@ -169,6 +175,8 @@ export function UebersichtScreen() {
       />
 
       {fehler && <Card style={{ borderColor: "var(--warn)" }}>{t("uebersicht.fehlerDb")} ({fehler})</Card>}
+
+      {daten && <EinrichtungKarte stand={daten.einrichtung} onNavigate={onNavigate} />}
 
       {daten && (
         <ErgebnisKarten

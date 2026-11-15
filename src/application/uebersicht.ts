@@ -25,6 +25,8 @@ import {
   vorschauAlleKonten,
   type Kategorie,
   bilanzJeKlasse,
+  einrichtungsstand,
+  type Einrichtungsstand,
   type Klassenbilanz,
   type MonatsErgebnis,
   type Vorschauzeile,
@@ -113,6 +115,13 @@ export interface Uebersichtsdaten {
   readonly vermoegen: readonly Klassenbilanz[];
   /** Anspruchs-ID → Name der Rücklage bzw. der Budget-Kategorie. */
   readonly anspruchNamen: ReadonlyMap<string, string>;
+  /**
+   * Was dem Haushalt noch fehlt, damit die Karten darüber stimmen (`core/einrichtung.ts`).
+   *
+   * Aus denselben geladenen Daten gerechnet wie alles andere hier — ein eigener Ladeweg
+   * könnte „keine Budgets" melden, während die Budgetliste daneben welche zeigt.
+   */
+  readonly einrichtung: Einrichtungsstand;
 }
 
 /**
@@ -183,6 +192,14 @@ export async function uebersichtLaden(
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
     vermoegen: bilanzJeKlasse(staendeJeKlasse(konten, buchungen), belegung.jeKonto),
     anspruchNamen: belegung.namen,
+    einrichtung: einrichtungsstand({
+      kontenAnzahl: konten.length,
+      buchungen,
+      regeln,
+      budgets,
+      ruecklagenAnzahl: ruecklagen.length,
+      heute,
+    }),
   };
 }
 
