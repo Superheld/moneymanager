@@ -681,13 +681,13 @@ describe("BudgetsScreen · Betragsversionen", () => {
     await screen.findByText(/Verlauf · Lebensmittel/);
 
     // Laufender Monat: der neue Rahmen, plus der Hinweis auf den Wechsel.
-    await waitFor(() => expect(document.body.textContent).toMatch(/Rahmen geändert/));
+    await waitFor(() => expect(document.body.textContent).toMatch(/Budget geändert/));
     expect(document.body.textContent).toMatch(/vorher 400,00/);
 
     // Vormonat: der alte Rahmen — und KEIN Hinweis, da hat sich nichts geändert.
     await auswahlWaehlen(nutzer, "Monat", monatVersetzt(-1));
     await waitFor(() => expect(document.body.textContent).toMatch(/von 400,00/));
-    expect(document.body.textContent).not.toMatch(/Rahmen geändert:/);
+    expect(document.body.textContent).not.toMatch(/Budget geändert:/);
   });
 
   it("führt die Beträge im Dialog auf und lässt eine alte Version korrigieren", async () => {

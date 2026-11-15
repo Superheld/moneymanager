@@ -124,7 +124,7 @@ describe("1 · Trainingsdaten", () => {
     rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.daten);
 
-    expect(screen.getByText(/Umschichtung — eigenes Geld/)).toBeTruthy();
+    expect(screen.getByText(/Umbuchung — eigenes Geld/)).toBeTruthy();
   });
 
   it("warnt vor Kategorien mit zu wenig Material und nennt sie beim Namen", async () => {

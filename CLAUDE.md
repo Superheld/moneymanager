@@ -553,11 +553,21 @@ Kommentare und diese Doku benutzen das Fachwort, die Oberfläche das rechte:
 | innen (Code, Doku) | aussen (Oberfläche, de) |
 |---|---|
 | Fixkosten | Feste Ausgaben |
-| laufende Kosten | Alltag |
+| laufende Kosten | Monatliche Budgets |
 | ungeplant | Ohne Plan |
 | Einordnung | Zählt als |
 | nach den Pflichten | Bleibt nach festen Ausgaben |
 | Fixkostenquote | Anteil fester Ausgaben |
+
+**Ein Wort je Sache, und zwar das der Navigation.** Was in einem Bereich gepflegt
+wird, heisst überall so wie der Bereich: ein Budget ist ein Budget (nicht „Rahmen",
+„Topf" oder „Alltag"), sein Geld je Monat der „Betrag"; eine Rücklage hat eine „Rate";
+eine Bewegung zwischen eigenen Konten ist eine „Umbuchung" (nie „Umschichtung" — das ist
+der Charakter im Code); der Charakter selbst heisst aussen „Ausgabe" und „Einnahme".
+Drei Wörter sind dagegen mit Absicht verschieden, weil sie Verschiedenes meinen:
+**Umsatz** ist die Zeile der Bank, **Buchung** dieselbe in der App, **Zahlung** die
+Buchung eines Vertrags. Ebenso **Anbieter** (am Vertrag) und **Empfänger / Sender** (an
+der Buchung). Wer einen neuen Text schreibt, sucht zuerst das vorhandene Wort.
 
 Wer in einem Kommentar „Ungeplant" liest, sucht in der App also „Ohne Plan". Die
 Tabelle steht hier, weil die Kommentare nicht nachgezogen sind und es auch nicht werden
