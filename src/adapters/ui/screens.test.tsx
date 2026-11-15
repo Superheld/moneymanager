@@ -360,7 +360,9 @@ describe("UebersichtScreen", () => {
     });
 
     rendere(<UebersichtScreen />);
-    await screen.findByText(/Lebensmittel/);
+    // Der Name steht zweimal da: in der Budgetliste und, weil ein aufbauendes Budget
+    // Geld auf seinem Konto bindet, in der Karte „Was da ist".
+    await screen.findAllByText(/Lebensmittel/);
     // Übertrag 170,00 + Rate 100,00, in diesem Monat nichts weg → Rest 270,00.
     await waitFor(() => expect(document.body.textContent).toMatch(/Übertrag 170,00/));
     expect(document.body.textContent).toMatch(/270,00/);

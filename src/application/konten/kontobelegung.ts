@@ -12,7 +12,11 @@ import {
   realerKontostand,
   ruecklagenAnsprueche,
   type Anspruch,
+  type BudgetSicht,
+  type IstBuchung,
   type Kontobelegung,
+  type Ruecklage,
+  type Zahlungskonto,
 } from "../../core";
 import { vertragsBuchungenLaden } from "../budgets/budgetsichten";
 import type {
@@ -66,18 +70,38 @@ export async function budgetAnspruecheLaden(
   };
 }
 
+/**
+ * Die Belegung aus schon geladenen Daten — für Sichten, die ohnehin alles in der Hand
+ * haben (die Übersicht). Dieselbe Zusammenstellung der Ansprüche wie in
+ * `kontobelegungLaden`: wer einen dritten Anspruch einführt, trägt ihn HIER ein.
+ */
+export function belegungssicht(
+  e: {
+    konten: readonly Zahlungskonto[];
+    buchungen: IstBuchung[];
+    ruecklagen: readonly Ruecklage[];
+    sicht: BudgetSicht;
+  },
+  heute: string,
+): Belegungssicht {
+  const kategorie = new Map(e.sicht.kategorien.map((k) => [k.id, k.name]));
+  const namen = new Map(e.sicht.budgets.map((b) => [b.id, kategorie.get(b.kategorieId) ?? "?"]));
+  for (const r of e.ruecklagen) namen.set(r.id, r.bezeichnung);
+  const staende = new Map(e.konten.map((k) => [k.id, realerKontostand(k, e.buchungen)]));
+  return {
+    jeKonto: kontobelegung(staende, [...ruecklagenAnsprueche(e.ruecklagen, heute), ...aufbauendeAnsprueche(e.sicht, heute)]),
+    namen,
+  };
+}
+
 export async function kontobelegungLaden(deps: KontobelegungDeps, heute: string): Promise<Belegungssicht> {
-  const [konten, buchungen, ruecklagen, budget] = await Promise.all([
+  const [konten, buchungen, ruecklagen, kategorien, budgets, vertragsBuchungen] = await Promise.all([
     deps.kontoRepo.alle(),
     deps.ledger.alle(),
     deps.ruecklagenRepo.alle(),
-    budgetAnspruecheLaden(deps, heute),
+    deps.kategorieRepo.alle(),
+    deps.budgetRepo.alle(),
+    vertragsBuchungenLaden(deps.zuordnungRepo),
   ]);
-  const staende = new Map(konten.map((k) => [k.id, realerKontostand(k, buchungen)]));
-  const namen = new Map(budget.namen);
-  for (const r of ruecklagen) namen.set(r.id, r.bezeichnung);
-  return {
-    jeKonto: kontobelegung(staende, [...ruecklagenAnsprueche(ruecklagen, heute), ...budget.ansprueche]),
-    namen,
-  };
+  return belegungssicht({ konten, buchungen, ruecklagen, sicht: { buchungen, kategorien, budgets, vertragsBuchungen } }, heute);
 }

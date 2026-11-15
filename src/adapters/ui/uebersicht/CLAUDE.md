@@ -50,6 +50,20 @@ sich also zum Ganzen. Jede Bündelung, in der dasselbe Konto mehrfach vorkommen 
 ergäbe hier „das Vermögen" grösser, als es ist — was man so ansehen will, gehört in die
 Analyse.
 
+**Sie zeigt seit 2026-11-15 auch, was GEBUNDEN ist**: unter jeder Klasse die Rücklagen
+und aufbauenden Budgets, die ihr Geld dort haben, und was frei bleibt (`bilanzJeKlasse`
+auf der Kontobelegung). Ein Stand ohne diese Aufteilung liest sich als verfügbar, auch
+wenn er zur Hälfte einer Rücklage gehört. Die Rechnung gab es schon; zu sehen war sie
+nur im Kontoauszug, je Konto. Drei Dinge daran:
+
+- **Je Konto gerechnet, dann addiert.** Ein Überschuss auf dem einen Konto deckt die
+  Lücke auf dem anderen nicht, solange niemand umbucht. Über die Summe der Klasse
+  gerechnet verschwände genau die Unterdeckung, die man sehen soll.
+- **Was fehlt, steht in Worten da**, nicht als negatives „frei". Es ist eine
+  Einschränkung der Zahlen darüber.
+- **Wo nichts gebunden ist, wird nichts aufgeteilt.** „Gebunden 0, frei alles" sagte
+  nur, was die Zeile schon sagt.
+
 **Die Karte „Da ist etwas zu tun" ist seit 2026-11-08 weg.** Sie stand ganz oben, rot
 gerahmt, und meldete Konten, die im Vorschaufenster ins Minus laufen, dazu einen zu lange
 zurückliegenden Abruf. Im Gebrauch war das zu laut für eine Seite, die sagen soll, wie man

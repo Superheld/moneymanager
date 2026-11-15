@@ -327,7 +327,7 @@ export function UebersichtScreen() {
 
       <div className="karten-paar">
         {depotdaten && <DepotKarte daten={depotdaten} />}
-        {daten && <VermoegenKarte klassen={daten.klassen} />}
+        {daten && <VermoegenKarte klassen={daten.vermoegen} namen={daten.anspruchNamen} />}
       </div>
 
       {/* Nach einer Änderung wird die ganze Übersicht neu gerechnet, nicht nur die Zeile:
