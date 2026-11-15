@@ -17,6 +17,7 @@
 import { describe, expect, it } from "vitest";
 import { istMonatsverlauf, kategorieAggregat } from "./historie";
 import { monatsAusblick } from "../monatsausblick";
+import { ergebnisbasis, monatsErgebnis } from "../ergebnis";
 import type { IstBuchung } from "./istbuchung";
 import type { Kategorie } from "../kategorien/kategorie";
 import type { Zahlungskonto } from "../konten/konto";
@@ -150,5 +151,38 @@ describe("Rückfluss im Monatsausblick", () => {
       ist: [buchung("2022-03-04", -4200, "Aufwand", "le"), buchung("2022-03-19", 4200, "Aufwand", "le")],
     });
     expect(a.zeilen.find((z) => z.id === "sonstiges")?.ist).toBe(0);
+  });
+});
+
+describe("Rückfluss in der Ergebnisrechnung", () => {
+  // Die Einordnung verzweigt auf den Charakter, die Ergebnisrechnung summiert danach.
+  // Ein Rückfluss bleibt in der Art seiner Ausgabe und trägt sein Vorzeichen bis in die
+  // Überleitung — dreht ihn eine der beiden Stellen, läuft die Probe gegen die Buchungen
+  // um das Doppelte weg.
+  const rechne = (ist: IstBuchung[]) =>
+    monatsErgebnis(
+      ergebnisbasis({
+        regeln: [],
+        budgets: [],
+        ruecklagen: [],
+        ist,
+        kategorien: [LEBENSMITTEL],
+        konten: [konto(0)],
+        vertragJeBuchung: new Map(),
+        heute: "2022-03-31",
+      }),
+      "2022-03-01",
+    );
+
+  it("hebt das Ergebnis um seinen Betrag und zählt nicht zu den Einnahmen", () => {
+    const r = rechne([buchung("2022-03-19", 3000, "Aufwand", "le")]);
+    expect(r.ergebnis.ist).toBe(3000);
+    expect(r.zeilen.find((z) => z.id === "einnahmen")?.ist).toBe(0);
+    expect(r.zeilen.find((z) => z.id === "ungeplant")?.ist).toBe(3000);
+  });
+
+  it("geht in der Überleitung mit seinem Vorzeichen auf", () => {
+    const r = rechne([buchung("2022-03-04", -4200, "Aufwand", "le"), buchung("2022-03-19", 3000, "Aufwand", "le")]);
+    expect(r.ueberleitung?.kontoaenderung).toBe(-1200);
   });
 });

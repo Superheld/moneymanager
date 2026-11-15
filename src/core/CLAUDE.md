@@ -12,7 +12,7 @@ macht jeden Test von der Laufzeit abhängig. Zeitpunkte kommen als Parameter her
 `zahlungsregel`, `muster`, `fehler`, `region`. Alles Fachliche liegt in seinem Bereich
 (`buchung/`, `konten/`, `budgets/`, `vertraege/`, `kategorien/`, `ruecklagen/`,
 `stammdaten/`). In der Wurzel bleibt nur, was über Bereiche hinweg rechnet
-(`monatsausblick.ts`) und die Fassade `index.ts`.
+(`monatsausblick.ts`, `einordnung.ts`, `ergebnis.ts`) und die Fassade `index.ts`.
 
 ## Geld
 
@@ -131,10 +131,25 @@ auf" ausführbar macht.
   Nutzer ein, und sie stehen neben jedem Ergebnis, das von ihnen abhängt — nie als
   Konstante im Kern.
 
-**Was davon heute schon gilt, und was nicht:** die Aufrechnung in `monatsausblick.ts`
-rechnet noch gemischt — Rücklagen mit der Rate, aufbauende Budgets mit der Auszahlung,
-Verträge zur Fälligkeit. Dieser Abschnitt beschreibt, wohin gebaut wird. Wer dort etwas
-ändert, ändert es in diese Richtung und nicht in die andere.
+### Wo es steht
+
+| Datei | beantwortet |
+|---|---|
+| `einordnung.ts` | Was IST diese Buchung — Einnahme, Fixkosten, laufende Kosten, Entnahme aus Topf oder Rücklage, Vorsorge, Umbuchung, ungeplant? Die eine Stelle dafür; wer auswertet, fragt hier und sortiert nicht selbst. |
+| `ergebnis.ts` | Was kostet der Monat? Baut auf der Einordnung und fügt die Zeit hinzu (Periodisierung, Topfkosten), dazu die Überleitung. |
+| `monatsausblick.ts` | Die ältere Aufrechnung nach Auszahlung. Sie rechnet noch gemischt (Rücklagen mit der Rate) und ordnet über Betragsnähe zu; sie bleibt, bis jede Sicht umgestellt ist. |
+
+Beide neuen Dateien liegen in der Wurzel, aus demselben Grund wie `monatsausblick.ts`: sie
+rechnen über alle Bereiche.
+
+**Die Einordnung ist abgeleitet, nicht gespeichert.** Sie folgt aus Kategorie, Vertrag,
+Budget, `budgetrelevant` und der Klasse des Gegenkontos. Ein gespeicherter Wert könnte
+jedem davon widersprechen.
+
+**Was die Ergebnisrechnung noch nicht kann**, steht in ihrem Kopf und hier, damit niemand
+es für fertig hält: Einnahmen werden nicht periodisiert, die Vorsorge zählt mit der
+tatsächlichen Umbuchung statt mit der Rate eines Ziels, und eine Entnahme aus einer
+RÜCKLAGE wird nicht gegen ihren Stand geprüft (beim aufbauenden Budget schon).
 
 ## Kontostands-Anker
 

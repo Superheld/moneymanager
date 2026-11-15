@@ -83,6 +83,19 @@ export function istRuecklagenkonto(konto: Pick<Zahlungskonto, "klasse">): boolea
 }
 
 /**
+ * Dient das Konto der Vorsorge? Die DRITTE Grenze zwischen den Klassen, seit 2026-11-15:
+ * was auf ein solches Konto umgebucht wird, ordnet `core/einordnung.ts` als Vorsorge ein
+ * — Kosten des Monats, obwohl das Geld das eigene Vermögen nicht verlässt.
+ *
+ * `vorsorge` UND `investment`: wer fürs Alter anlegt, tut es meist in einem Depot, und
+ * dessen Verrechnungskonto trägt die Klasse Investment. `sparen` gehört NICHT dazu —
+ * Geld ohne Zweck beiseitezulegen ist keine Verpflichtung, es bleibt Überschuss.
+ */
+export function istVorsorgekonto(konto: Pick<Zahlungskonto, "klasse">): boolean {
+  return konto.klasse === "vorsorge" || konto.klasse === "investment";
+}
+
+/**
  * Wird dieses Konto noch geführt?
  *
  * Ein stillgelegtes Konto gibt es nicht mehr — aufgelöst bei der Bank, oder eine Kasse,
