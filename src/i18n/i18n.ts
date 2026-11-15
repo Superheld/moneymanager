@@ -555,15 +555,15 @@ const de = {
     statusOffen: "offen",
     zeile: {
       einnahmen: "Einnahmen",
-      fixkosten: "Fixkosten",
-      laufend: "Laufende Kosten",
+      fixkosten: "Verträge",
+      laufend: "Monatliche Budgets",
       ungeplant: "Ungeplant",
       abschreibungen: "Rücklagen",
       wagnisse: "Aufbauende Budgets",
       vorsorge: "Vorsorge und Anlage",
     },
     stufe: {
-      nachPflichten: "Nach den Pflichten",
+      nachPflichten: "Nach den Verträgen",
       nachAlltag: "Was der Alltag übrig lässt",
       ergebnis: "Bleibt wirklich frei",
     },
@@ -576,7 +576,7 @@ const de = {
       vorsorge: "weitere Umbuchung",
     },
     anteil: "1/{{teile}} der Zahlung",
-    entnommen: "bezahlt aus dem Topf: {{betrag}}",
+    entnommen: "daraus bezahlt: {{betrag}}",
     ueberleitung: {
       titel: "Und auf dem Konto?",
       ergebnis: "Bleibt wirklich frei",
@@ -592,7 +592,7 @@ const de = {
     },
     hinweisKeineEinnahmen:
       "Für keinen der drei Monate sind Einnahmen geplant. Einnahmen kommen aus Verträgen — leg unter Verträge einen mit Charakter „Ertrag“ an, dann rechnen die Karten sie mit.",
-    leer: "Für die Monatskarten fehlen die Plan-Daten: sie rechnen Einnahmen und Fixkosten (beides aus Verträgen) gegen Budgets und Rücklagen auf. Gepflegt wird das unter Verträge, Budgets und Rücklagen — aus den Buchungen allein wird hier nichts geschätzt.",
+    leer: "Für die Monatskarten fehlen die Plan-Daten: sie rechnen Einnahmen und Ausgaben aus Verträgen gegen Budgets und Rücklagen auf. Gepflegt wird das unter Verträge, Budgets und Rücklagen — aus den Buchungen allein wird hier nichts geschätzt.",
     leerUntertitel: "Die nächsten drei Monate",
   },
   loeschen: {
@@ -627,7 +627,7 @@ const de = {
       },
       vertraege: {
         frage: "Was kommt und geht jeden Monat fest?",
-        warum: "Miete, Strom, Versicherungen, dein Gehalt: was regelmäßig und in fester Höhe fließt, ist ein Vertrag. Daraus rechnet die App, was dir nach den Pflichten bleibt.",
+        warum: "Miete, Strom, Versicherungen, dein Gehalt: was regelmäßig und in fester Höhe fließt, ist ein Vertrag. Daraus rechnet die App, was dir nach den Verträgen bleibt.",
       },
       budgets: {
         frage: "Was darf der Alltag kosten?",
@@ -717,10 +717,10 @@ const de = {
       ansicht: { diagramm: "Diagramm", tabelle: "Tabelle" },
       diagrammName: "Kosten je Monat, gestapelt nach Art, mit den Einnahmen als Linie",
       kpiKosten: "Ø Kosten / Monat",
-      kpiFixkostenquote: "Fixkostenquote",
+      kpiFixkostenquote: "Anteil der Verträge",
       kpiSparquote: "Sparquote",
       kpiErgebnis: "Ø bleibt frei / Monat",
-      metaFixkostenquote: "Fixkosten ÷ Einnahmen",
+      metaFixkostenquote: "Ausgaben aus Verträgen ÷ Einnahmen",
       metaSparquote: "Rücklagen, aufbauende Budgets und Vorsorge ÷ Einnahmen",
       tooltip: "{{monat}}: Kosten {{kosten}}, Einnahmen {{ein}}, bleibt frei {{frei}}",
       legendeLaufend: "blass: laufender Monat",
@@ -1587,8 +1587,8 @@ const de = {
     geteilt: "Diese Buchung ist aufgeteilt, und ihre Teile zählen verschieden:",
     pille: {
       einnahme: "Einnahme",
-      fixkosten: "Fixkosten",
-      laufend: "Laufende Kosten",
+      fixkosten: "Vertrag",
+      laufend: "Monatliches Budget",
       topf: "aus Budget {{budget}}",
       ruecklage: "aus Rücklage",
       vorsorge: "Vorsorge",
@@ -1597,9 +1597,9 @@ const de = {
     },
     grund: {
       einnahme: "Zählt als Einnahme: Geld, das neu hereinkommt und nicht von einem deiner eigenen Konten stammt.",
-      fixkosten: "Zählt als Fixkosten, weil sie dem Vertrag {{vertrag}} zugeordnet ist.",
-      fixkostenOhneName: "Zählt als Fixkosten, weil sie einem Vertrag zugeordnet ist.",
-      laufend: "Zählt als laufende Kosten: ihre Kategorie gehört zum monatlichen Budget {{budget}}.",
+      fixkosten: "Gehört zum Vertrag {{vertrag}}.",
+      fixkostenOhneName: "Gehört zu einem Vertrag.",
+      laufend: "Gehört zum monatlichen Budget {{budget}}: ihre Kategorie liegt darin.",
       topf: "Kommt aus dem aufbauenden Budget {{budget}}: kostet den Monat nicht noch einmal. Gekostet haben schon die Monatsbeträge, mit denen das Budget angespart wurde — nur was darüber hinausgeht, zählt zusätzlich.",
       ruecklage: "Aus einer Rücklage bezahlt: kostet den Monat nicht noch einmal. Gekostet haben schon die Raten, mit denen die Rücklage gebildet wurde.",
       vorsorgeKonto: "Zählt als Vorsorge: das Geld geht auf ein Vorsorgekonto. Es bleibt dein Vermögen, ist aber für später bestimmt.",
@@ -2063,7 +2063,7 @@ const de = {
     betragFest: "fest",
     betragSchwankt: "schwankt",
     kpiAnzahl: "Verträge",
-    kpiFixkosten: "Fixkosten / Monat",
+    kpiFixkosten: "Geplante Ausgaben / Monat",
     kpiEinnahmen: "Geplante Einnahmen / Monat",
     spalteJeMonat: "je Monat",
     kpiBald: "Kündigung bald",
@@ -2101,7 +2101,7 @@ const de = {
     kandidaten: {
       titel: "Könnte dazugehören",
       hinweis:
-        "Buchungen ohne Vertrag, die nach Kategorie, Betrag und Termin zu diesem passen — die Erkennungsregel hat sie nicht gegriffen. Zugeordnet wird nichts von selbst: du bestätigst jede Zeile einzeln. Eine bestätigte Zahlung zählt in der Übersicht zu den Fixkosten statt zu „Ungeplant“ und dient als Beleg, aus dem sich die Regel verbessern lässt.",
+        "Buchungen ohne Vertrag, die nach Kategorie, Betrag und Termin zu diesem passen — die Erkennungsregel hat sie nicht gegriffen. Zugeordnet wird nichts von selbst: du bestätigst jede Zeile einzeln. Eine bestätigte Zahlung zählt in der Übersicht zu den Verträgen statt zu „Ungeplant“ und dient als Beleg, aus dem sich die Regel verbessern lässt.",
       spalteGegenpartei: "Empfänger / Sender",
       zuordnen: "zuordnen",
       keinVertrag: "gehört zu keinem Vertrag",
@@ -2904,15 +2904,15 @@ const en: typeof de = {
     statusOffen: "open",
     zeile: {
       einnahmen: "Income",
-      fixkosten: "Fixed costs",
-      laufend: "Running costs",
+      fixkosten: "Contracts",
+      laufend: "Monthly budgets",
       ungeplant: "Unplanned",
       abschreibungen: "Reserves",
       wagnisse: "Building budgets",
       vorsorge: "Provision and investment",
     },
     stufe: {
-      nachPflichten: "After obligations",
+      nachPflichten: "After contracts",
       nachAlltag: "What everyday life leaves",
       ergebnis: "Truly free",
     },
@@ -2924,7 +2924,7 @@ const en: typeof de = {
       vorsorge: "other transfer",
     },
     anteil: "1/{{teile}} of the payment",
-    entnommen: "paid from the pot: {{betrag}}",
+    entnommen: "paid from it: {{betrag}}",
     ueberleitung: {
       titel: "And on the account?",
       ergebnis: "Truly free",
@@ -2940,7 +2940,7 @@ const en: typeof de = {
     },
     hinweisKeineEinnahmen:
       "No income is planned for any of the three months. Income comes from contracts — add one with character “Ertrag” under Contracts and the cards will include it.",
-    leer: "The monthly cards need plan data: they offset income and fixed costs (both from contracts) against budgets and reserves. These live under Contracts, Budgets and Reserves — nothing here is estimated from posted transactions.",
+    leer: "The monthly cards need plan data: they offset income and expenses from contracts against budgets and reserves. These live under Contracts, Budgets and Reserves — nothing here is estimated from posted transactions.",
     leerUntertitel: "The next three months",
   },
   loeschen: {
@@ -2975,7 +2975,7 @@ const en: typeof de = {
       },
       vertraege: {
         frage: "What comes in and goes out every month?",
-        warum: "Rent, electricity, insurance, your salary: whatever flows regularly at a fixed amount is a contract. From these the app works out what is left after your obligations.",
+        warum: "Rent, electricity, insurance, your salary: whatever flows regularly at a fixed amount is a contract. From these the app works out what is left after your contracts.",
       },
       budgets: {
         frage: "What may everyday life cost?",
@@ -3061,10 +3061,10 @@ const en: typeof de = {
       ansicht: { diagramm: "Chart", tabelle: "Table" },
       diagrammName: "Costs per month, stacked by kind, with income as a line",
       kpiKosten: "Avg. costs / month",
-      kpiFixkostenquote: "Fixed-cost ratio",
+      kpiFixkostenquote: "Share of contracts",
       kpiSparquote: "Savings ratio",
       kpiErgebnis: "Avg. truly free / month",
-      metaFixkostenquote: "Fixed costs ÷ income",
+      metaFixkostenquote: "Expenses from contracts ÷ income",
       metaSparquote: "Reserves, building budgets and provision ÷ income",
       tooltip: "{{monat}}: costs {{kosten}}, income {{ein}}, truly free {{frei}}",
       legendeLaufend: "faded: current month",
@@ -3887,8 +3887,8 @@ const en: typeof de = {
     geteilt: "This transaction is split, and its parts count differently:",
     pille: {
       einnahme: "Income",
-      fixkosten: "Fixed costs",
-      laufend: "Running costs",
+      fixkosten: "Contract",
+      laufend: "Monthly budget",
       topf: "from budget {{budget}}",
       ruecklage: "from reserve",
       vorsorge: "Provision",
@@ -3897,9 +3897,9 @@ const en: typeof de = {
     },
     grund: {
       einnahme: "Counts as income: money that comes in new and not from one of your own accounts.",
-      fixkosten: "Counts as fixed costs because it is assigned to the contract {{vertrag}}.",
-      fixkostenOhneName: "Counts as fixed costs because it is assigned to a contract.",
-      laufend: "Counts as running costs: its category belongs to the monthly budget {{budget}}.",
+      fixkosten: "Belongs to the contract {{vertrag}}.",
+      fixkostenOhneName: "Belongs to a contract.",
+      laufend: "Belongs to the monthly budget {{budget}}: its category is part of it.",
       topf: "Comes from the building budget {{budget}}: it does not cost the month a second time. The monthly amounts that built up the budget were the cost already — only what goes beyond them counts on top.",
       ruecklage: "Paid from a reserve: it does not cost the month a second time. The instalments that built up the reserve were the cost already.",
       vorsorgeKonto: "Counts as provision: the money goes to a provision account. It remains your wealth but is meant for later.",
@@ -4353,7 +4353,7 @@ const en: typeof de = {
     betragFest: "fixed",
     betragSchwankt: "varies",
     kpiAnzahl: "Contracts",
-    kpiFixkosten: "Fixed costs / month",
+    kpiFixkosten: "Planned expenses / month",
     kpiEinnahmen: "Planned income / month",
     spalteJeMonat: "per month",
     kpiBald: "Cancel soon",
@@ -4391,7 +4391,7 @@ const en: typeof de = {
     kandidaten: {
       titel: "Might belong here",
       hinweis:
-        "Bookings without a contract that fit this one by category, amount and date — the matching rule did not pick them up. Nothing is assigned automatically: you confirm each row yourself. A confirmed payment counts as a fixed cost in the overview instead of “Unplanned”, and serves as evidence for improving the rule.",
+        "Bookings without a contract that fit this one by category, amount and date — the matching rule did not pick them up. Nothing is assigned automatically: you confirm each row yourself. A confirmed payment counts towards the contracts in the overview instead of “Unplanned”, and serves as evidence for improving the rule.",
       spalteGegenpartei: "Payee / Payer",
       zuordnen: "assign",
       keinVertrag: "belongs to no contract",
