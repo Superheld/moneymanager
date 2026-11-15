@@ -100,6 +100,14 @@ export interface DataTableProps<T> {
   rows: readonly T[];
   /** Macht Zeilen anklickbar — und mit der Tastatur erreichbar (Tab, Enter, Leertaste). */
   onRowClick?: (row: T) => void;
+  /**
+   * Nur diese Zeilen sind klickbar; ohne Angabe alle (sobald `onRowClick` steht).
+   *
+   * Für Tabellen, in denen nicht jede Zeile etwas zu öffnen hat — eine Ausbuchung ohne
+   * verknüpfte Buchung etwa. Eine Zeile, die nach Klick aussieht und nichts tut, wäre
+   * schlechter als keine; sie bleibt deshalb ganz Text, ohne Fokus und ohne Link-Stil.
+   */
+  istKlickbar?: (row: T) => boolean;
   /** Markiert die aktive Zeile (Hervorhebung, `aria-current`). */
   istAktiv?: (row: T) => boolean;
   /**
@@ -200,6 +208,7 @@ export function DataTable<T>({
   columns,
   rows,
   onRowClick,
+  istKlickbar,
   istAktiv,
   rowStyle,
   sortable = false,
@@ -274,8 +283,10 @@ export function DataTable<T>({
   }
 
   /** Was eine klickbare Zeile braucht: Fokus, Klick, Enter und Leertaste. */
+  const klickbar = (row: T) => !!onRowClick && (istKlickbar ? istKlickbar(row) : true);
+
   function zeilenBedienung(row: T) {
-    if (!onRowClick) return {};
+    if (!onRowClick || !klickbar(row)) return {};
     return {
       tabIndex: 0,
       className: "datentabelle-zeile--klickbar",
@@ -336,12 +347,12 @@ export function DataTable<T>({
               // `rowStyle` liegt ZULETZT drauf, damit eine Zeile sich auch gegen die
               // Vorgaben stellen kann (siehe Prop).
               const zeilenStil: CSSProperties = {
-                cursor: onRowClick ? "pointer" : "default",
+                cursor: klickbar(row) ? "pointer" : "default",
                 background: zeileAktiv ? "var(--accent-soft)" : "transparent",
                 ...(rowStyle ? rowStyle(row) : undefined),
               };
               const bedienung = zeilenBedienung(row);
-              const ausgewaehlt = onRowClick && zeileAktiv ? true : undefined;
+              const ausgewaehlt = klickbar(row) && zeileAktiv ? true : undefined;
 
               if (rollen) {
                 const tv = zellwert(rollen.titel.c, row);
@@ -349,7 +360,7 @@ export function DataTable<T>({
                 return (
                   <tr key={ri} {...bedienung} aria-current={ausgewaehlt} style={zeilenStil}>
                     <td style={{ padding: "10px", borderBottom: "1px solid var(--line-soft)", textAlign: "left", color: "var(--ink)", overflow: "hidden" }}>
-                      <div title={alsText(tv)} className={onRowClick ? BEZEICHNER : undefined} style={{ fontWeight: "var(--fw-bold)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tv}</div>
+                      <div title={alsText(tv)} className={klickbar(row) ? BEZEICHNER : undefined} style={{ fontWeight: "var(--fw-bold)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tv}</div>
                       {zelleZweitzeile(row)}
                     </td>
                     {rollen.wert && (
@@ -364,7 +375,7 @@ export function DataTable<T>({
               return (
                 <tr key={ri} {...bedienung} aria-current={ausgewaehlt} style={zeilenStil}>
                   {columns.map((c, ci) => {
-                    const istBezeichner = onRowClick && ci === bezeichnerSpalte;
+                    const istBezeichner = klickbar(row) && ci === bezeichnerSpalte;
                     const v = zellwert(c, row);
                     const rechts = c.align === "right";
                     return (

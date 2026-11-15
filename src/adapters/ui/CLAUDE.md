@@ -68,7 +68,7 @@ Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlic
 |---|---|
 | Fläche um einen Inhalt | `Card` (nie eine Karte IN einer Karte, unten) |
 | Seitenkopf mit Aktion | `PageHead`; Bereich mit Reitern: `Bereich`, die Reiter allein `Registerleiste` |
-| Tabelle | `DataTable` — Sortierung, Seiten, Zeilenklick (auch per Tastatur), schmale Form. Ist eine Zeile klickbar, dann die GANZE, und ihr Bezeichner steht als Link da — kein eigener Link in einer Spalte |
+| Tabelle | `DataTable` — Sortierung, Seiten, Zeilenklick (auch per Tastatur), schmale Form. Ist eine Zeile klickbar, dann die GANZE, und ihr Bezeichner steht als Link da — kein eigener Link in einer Spalte. Haben nur manche Zeilen etwas zu öffnen: `istKlickbar`, die übrigen bleiben ganz Text |
 | Bezeichner in einer Zeile, der aufklappt | `Zeilenlink` |
 | Liste, die unter einer Zeile aufklappt | `Aufklapptabelle`; nur die Fläche: `Aufklappflaeche`; Höhe: `aufklappen.ts` |
 | Buchungen unter einer Auswertung (Budget, Kategorie) | `Buchungsliste` (auf `Aufklapptabelle`), Zeilen als `Buchungszeile` aus `application` |

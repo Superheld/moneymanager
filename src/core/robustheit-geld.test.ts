@@ -308,6 +308,7 @@ describe("Rücklagen — Validierung vor Rundung", () => {
     const gespeichert: Ruecklage[] = [];
     const repo: RuecklagenRepository = {
       alle: async () => gespeichert,
+      beendete: async () => [],
       speichern: async (g: Ruecklage) => { gespeichert.push(g); },
       loeschen: async () => {},
       ausbuchungSpeichern: async () => {},

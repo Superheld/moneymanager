@@ -21,6 +21,7 @@ function memRuecklagen() {
   const ausgebucht: RuecklagenAusbuchung[] = [];
   const repo: RuecklagenRepository = {
     alle: async () => daten,
+    beendete: async () => daten.filter((r) => r.beendetAm),
     speichern: async (r) => {
       const i = daten.findIndex((x) => x.id === r.id);
       if (i >= 0) daten[i] = r;

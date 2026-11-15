@@ -123,7 +123,14 @@ export interface RuecklagenAusbuchung extends Ruecklagenzyklus {
 }
 
 export interface RuecklagenRepository {
+  /** Die LAUFENDEN Rücklagen — beendete liefert es nicht aus. */
   alle(): Promise<Ruecklage[]>;
+  /**
+   * Die beendeten Rücklagen (`beendetAm` gesetzt), jüngste zuerst. Ein eigener Weg und
+   * kein Schalter an `alle()`: jede laufende Rechnung soll sie nicht sehen können, ohne
+   * es zu wollen — gebraucht werden sie nur für die Geschichte.
+   */
+  beendete(): Promise<Ruecklage[]>;
   speichern(ruecklage: Ruecklage): Promise<void>;
   loeschen(id: string): Promise<void>;
   ausbuchungSpeichern(a: RuecklagenAusbuchung): Promise<void>;

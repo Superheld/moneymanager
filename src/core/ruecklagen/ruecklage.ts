@@ -277,3 +277,21 @@ export function zyklusSoll(z: Ruecklagenzyklus, am: string): Cent {
     am < z.datum ? am : z.datum,
   );
 }
+
+/**
+ * Was von einer Ausgabe aus der Rücklage NICHT vom Angesparten gedeckt war.
+ *
+ * Bis zur Höhe des Zyklus-Solls am Tag des Ausbuchens trägt die Rücklage die Ausgabe,
+ * was darüber liegt, ist ungedeckt. Ohne festgehaltenen Zyklus ist die Geschichte
+ * unbekannt, und dann gilt — wie in der Ergebnisrechnung — der Kauf als gedeckt: `null`
+ * heisst hier „weiss man nicht", nicht „null Cent".
+ *
+ * `ausgabe` ist positiv (was ausgegeben wurde). Eine Rückbuchung deckt nichts auf.
+ *
+ * Dieselbe Regel steht in `ergebnis.ts` noch einmal inline (`zyklusPosten`); wer eine
+ * der beiden ändert, ändert beide — oder zieht die dortige auf diese Funktion um.
+ */
+export function zyklusUngedeckt(z: Ruecklagenzyklus, ausgabe: Cent): Cent | null {
+  if (!hatGeschichte(z)) return null;
+  return Math.max(0, Math.max(0, ausgabe) - zyklusSoll(z, z.datum));
+}
