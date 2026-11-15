@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { hatZiel, minorZuMajor, type Ruecklage, type Ruecklagensicht } from "../../../application";
+import { hatZiel, minorZuMajor, type Buchungsvorschlag, type Ruecklage } from "../../../application";
 import { ruecklageAusbuchen } from "../../dienste";
 import { Button, FormField } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
@@ -23,7 +23,8 @@ export function AusbuchungDialog({
 }: {
   ruecklage: Ruecklage;
   heute: string;
-  buchungswahl: Ruecklagensicht["buchungswahl"];
+  /** Fertig sortiert aus `buchungswahlFuer`: was zur Kategorie der Rücklage passt, zuerst. */
+  buchungswahl: readonly Buchungsvorschlag[];
   onClose: () => void;
   onGespeichert: () => void | Promise<void>;
 }) {
@@ -67,7 +68,7 @@ export function AusbuchungDialog({
         {/* Die Verknüpfung leistet zweierlei: sie hält fest, wofür die Rücklage
             draufging, UND sie nimmt die Ausgabe aus der Budgetbewertung. Deshalb
             steht der zweite Teil im Hinweis — sonst überrascht er später. */}
-        <FormField label={t("ruecklagen.feldAusBuchung")} hint={t("ruecklagen.feldAusBuchungHinweis")}>
+        <FormField label={t("ruecklagen.feldAusBuchung")} hint={`${t("ruecklagen.feldAusBuchungHinweis")}${buchungswahl.some((b) => b.passt) ? ` ${t("ruecklagen.feldAusBuchungPasst")}` : ""}`}>
           <Auswahl
             ariaLabel={t("ruecklagen.feldAusBuchung")}
             wert={buchungId}
@@ -76,7 +77,9 @@ export function AusbuchungDialog({
               { wert: "", text: t("ruecklagen.buchungKeine") },
               ...buchungswahl.map((b) => ({
                 wert: b.id,
-                text: `${b.datum} · ${geld.format(b.betrag)} ${geld.symbol}${b.bezeichnung ? ` · ${b.bezeichnung}` : ""}`,
+                // Der Stern markiert, was in der Kategorie der Rücklage liegt — ein Wort
+                // dafür stünde in jeder dieser Zeilen und schöbe den Empfänger aus dem Feld.
+                text: `${b.passt ? "★ " : ""}${b.datum} · ${geld.format(b.betrag)} ${geld.symbol}${b.bezeichnung ? ` · ${b.bezeichnung}` : ""}`,
               })),
             ]}
           />

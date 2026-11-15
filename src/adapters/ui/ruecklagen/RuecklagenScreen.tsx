@@ -21,6 +21,7 @@ import {
   type RuecklagenDeckung,
   type Ruecklagenfluss,
   type Ruecklagensicht,
+  buchungswahlFuer,
 } from "../../../application";
 import {
   ruecklageLoeschen,
@@ -77,7 +78,6 @@ export function RuecklagenScreen() {
   const deckung = sicht?.deckung ?? LEERE_DECKUNG;
   const zielwert = sicht?.zielwert ?? 0;
   const mindest = sicht?.mindest ?? 0;
-  const buchungswahl = sicht?.buchungswahl ?? LEERE_LISTE;
   const fluss = sicht?.fluss ?? LEERER_FLUSS;
 
   const neu = () => setBearbeitet("neu");
@@ -325,6 +325,7 @@ export function RuecklagenScreen() {
           ruecklage={bearbeitet === "neu" ? null : bearbeitet}
           heute={heute}
           konten={konten}
+          kategorien={sicht?.kategorien ?? []}
           onClose={() => setBearbeitet(null)}
           onGespeichert={async () => { setBearbeitet(null); await laden(); }}
         />
@@ -333,7 +334,7 @@ export function RuecklagenScreen() {
         <AusbuchungDialog
           ruecklage={ausbuchen}
           heute={heute}
-          buchungswahl={buchungswahl}
+          buchungswahl={sicht ? buchungswahlFuer(sicht, ausbuchen) : []}
           onClose={() => setAusbuchen(null)}
           onGespeichert={async () => { setAusbuchen(null); await laden(); }}
         />

@@ -33,6 +33,25 @@ steht deshalb auf `SET NULL` und nicht auf `CASCADE` — dieselbe Überlegung wi
 und weil die Deckung gegen den REALEN Kontostand rechnet, fällt sie durch die Abbuchung von
 selbst. Eine zweite, kalkulatorische Buchung zeigte dieselbe Bewegung doppelt.
 
+## Rücklage oder aufbauendes Budget — und was die Kategorie einer Rücklage tut
+
+Beide legen Monat für Monat etwas zurück, und in der Ergebnisrechnung kosten beide ihre
+Rate (`src/core/CLAUDE.md`, „Auszahlung und Kosten"). Sie unterscheiden sich darin, WIE
+eine Ausgabe zu ihnen findet:
+
+| | findet seine Ausgaben | passt für |
+|---|---|---|
+| **aufbauendes Budget** | von selbst, über die Kategorie samt Unterkategorien | viele Ausgaben über die Zeit: Urlaub, Reparaturen |
+| **Rücklage** | von Hand, eine Buchung je Ausbuchen | ein Gegenstand, ein Kauf: das Gerät, das Auto |
+
+Die Spalte `kategorie_id` der Rücklage war bis 2026-11-15 gespeichert und nirgends
+benutzt; ein Feld dafür gab es in keiner Maske. Seitdem trägt der Dialog sie, und sie
+tut genau eines: **beim Ausbuchen stehen die Buchungen dieser Kategorie zuerst**
+(`buchungswahlFuer` in `application/ruecklagen/ruecklagensichten.ts`). Sie ist ein
+Vorschlag und keine Regel. Zählte sie von selbst wie beim Budget, wüsste die Rücklage
+mit Ziel nach der ersten kleinen Ausgabe nicht, ob ihr Zyklus neu beginnt — und zwei
+Töpfe auf derselben Kategorie stritten um dieselbe Buchung.
+
 ## Der Rücklagenfluss ist DREI Zahlen, nicht eine
 
 `core/ruecklagen/fluss.ts` beantwortet „was wird zurückgelegt" mit drei Werten, und keiner
