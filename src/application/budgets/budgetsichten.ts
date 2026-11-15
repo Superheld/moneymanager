@@ -36,11 +36,13 @@ import {
   type Zahlungskonto,
 } from "../../core";
 import { budgetvorschlaegeLaden, ignorierteBudgetvorschlaege } from "./budgetvorschlaege";
+import { belegungssicht } from "../konten/kontobelegung";
 import type {
   BudgetRepository,
   EinstellungenRepository,
   KategorieRepository,
   LedgerPort,
+  RuecklagenRepository,
   UmsatzRepository,
   VertragRepository,
   VertragszuordnungRepository,
@@ -228,6 +230,16 @@ export interface BudgetbereichDeps extends BudgetsichtDeps {
   readonly vertragRepo: VertragRepository;
   readonly umsatzRepo: UmsatzRepository;
   readonly einstellungenRepo: EinstellungenRepository;
+  /** Rücklagen beanspruchen dieselben Konten — ohne sie sähe die Deckung besser aus, als sie ist. */
+  readonly ruecklagenRepo: RuecklagenRepository;
+}
+
+/** Wie viel vom Rest eines aufbauenden Budgets auf seinem Konto tatsächlich liegt. */
+export interface Budgetdeckung {
+  /** Der Rest, den das Budget auf seinem Konto beansprucht. */
+  readonly anspruch: Cent;
+  /** Was davon gedeckt ist — bei Unterdeckung anteilig, wie in der Kontobelegung. */
+  readonly gedeckt: Cent;
 }
 
 export interface Budgetbereich extends Budgetuebersicht {
@@ -240,15 +252,24 @@ export interface Budgetbereich extends Budgetuebersicht {
   readonly zeilenkontext: Zeilenkontext;
   /** Rahmenvorschläge für Hauptkategorien ohne Budget. */
   readonly vorschlaege: readonly Budgetvorschlag[];
+  /**
+   * Budget-ID → Deckung, nur für aufbauende Budgets mit einem Rest über null.
+   *
+   * Aus der Kontobelegung gelesen und nicht hier gerechnet: dieselbe Zahl steht in der
+   * Übersicht unter „Was da ist" und im Kontoauszug, und eine zweite Rechnung liefe
+   * von ihnen weg, sobald ein dritter Anspruch dazukommt.
+   */
+  readonly deckung: ReadonlyMap<string, Budgetdeckung>;
 }
 
 export async function budgetbereichLaden(
   deps: BudgetbereichDeps,
   heute: string,
 ): Promise<Budgetbereich> {
-  const [uebersicht, konten, ignoriert, umsaetze, vertragsnamen] = await Promise.all([
+  const [uebersicht, konten, ruecklagen, ignoriert, umsaetze, vertragsnamen] = await Promise.all([
     budgetuebersichtLaden(deps, heute),
     deps.kontoRepo.alle(),
+    deps.ruecklagenRepo.alle(),
     ignorierteBudgetvorschlaege(deps.einstellungenRepo),
     deps.umsatzRepo.alle(),
     vertragsnamenLaden(deps.zuordnungRepo, deps.vertragRepo),
@@ -257,8 +278,17 @@ export async function budgetbereichLaden(
     deps.ledger, deps.umsatzRepo, deps.kategorieRepo, deps.budgetRepo,
     heute.slice(0, 7), heute, ignoriert, deps.zuordnungRepo,
   );
+  const belegung = belegungssicht(
+    { konten, buchungen: [...uebersicht.sicht.buchungen], ruecklagen, sicht: uebersicht.sicht },
+    heute,
+  );
+  const deckung = new Map<string, Budgetdeckung>();
+  for (const b of belegung.jeKonto.values()) {
+    for (const p of b.posten) if (p.art === "budget") deckung.set(p.id, { anspruch: p.betrag, gedeckt: p.gedeckt });
+  }
   return {
     ...uebersicht,
+    deckung,
     kategorien: uebersicht.sicht.kategorien,
     konten,
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),

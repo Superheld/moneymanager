@@ -235,6 +235,7 @@ export function budgetbereich(heute: string): Promise<Budgetbereich> {
       umsatzRepo: sqliteUmsatzRepository,
       einstellungenRepo: sqliteEinstellungenRepository,
       vertragRepo: sqliteVertragRepository,
+      ruecklagenRepo: sqliteRuecklagenRepository,
     },
     heute,
   );
