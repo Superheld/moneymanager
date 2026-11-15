@@ -45,6 +45,7 @@ ein Baustein; was einer benutzt, gehört in dessen Ordner** — auch wenn es all
 | `analyse/` | „wie war es über einen Zeitraum": Register Verlauf, Kategorien, Ausblick, Befunde, Depot |
 | `budgets/` | Budgetliste, Verlauf eines Budgets, Vorschläge |
 | `ruecklagen/` | Rücklagen, Fluss, Tacho |
+| `vermoegen/` | Nettovermögen mit Verlauf, Vermögenswerte und Schulden als Werte zum Stichtag |
 | `vertraege/` | Verträge und ihre Erkennung |
 | `konten/` | der Kontoauszug („Buchungen", `ScreenId` `konten`), Kontenverwaltung, Bankzugänge, Abgleich, Depotauszug |
 | `buchung/` | der Buchungsdialog in Teilen (unten) — er wird aus mehreren Bereichen geöffnet |

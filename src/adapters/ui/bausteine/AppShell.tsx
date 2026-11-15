@@ -26,6 +26,7 @@ export type ScreenId =
   | "analyse"
   | "konten"
   | "ruecklagen"
+  | "vermoegen"
   | "budgets"
   | "vertraege"
   | "kontenverwaltung"
@@ -62,6 +63,11 @@ const GRUPPEN: NavGroup[] = [
       { id: "budgets", labelKey: "shell.navBudgets" },
       { id: "vertraege", labelKey: "shell.navVertraege" },
       { id: "ruecklagen", labelKey: "shell.navRuecklagen" },
+      // Hinter den Rücklagen: erst was der Monat kostet und wofür zurückgelegt wird,
+      // dann was insgesamt da ist. Der Schlüssel ist der TITEL des Bereichs und kein
+      // eigener unter `shell` — so können Navigation und Seitenkopf nicht verschieden
+      // heissen.
+      { id: "vermoegen", labelKey: "vermoegen.titel" },
       { id: "analyse", labelKey: "shell.navAnalyse" },
     ],
   },

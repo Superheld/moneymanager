@@ -47,6 +47,7 @@ export type IconName =
   | "budgets"
   | "analyse"
   | "ruecklagen"
+  | "vermoegen"
   | "vertraege"
   | "kontenverwaltung"
   | "import"
@@ -91,6 +92,8 @@ const PFADE: Record<IconName, ReactElement> = {
   analyse: <><path d="M4 18l5-6 4 3 7-8" /><path d="M4 4v16h16" /></>,
   // Kiste in Schraegsicht.
   ruecklagen: <><path d="M3 8l9-4 9 4v8l-9 4-9-4V8Z" /><path d="M3 8l9 4 9-4" /><path d="M12 12v8" /></>,
+  // Waage: was da ist gegen was geschuldet wird.
+  vermoegen: <><path d="M12 4v16" /><path d="M8 20h8" /><path d="M5 7h14" /><path d="M5 7l-2.6 6a2.6 2.6 0 0 0 5.2 0L5 7Z" /><path d="M19 7l-2.6 6a2.6 2.6 0 0 0 5.2 0L19 7Z" /></>,
   // Blatt mit umgeknickter Ecke.
   vertraege: <><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v4h4" /><path d="M9 12h6M9 16h6" /></>,
   // Gebaeude mit Saeulen.
