@@ -33,6 +33,15 @@ zwölf Monate. Wählbar ist nur, was ganz erfasst ist.
 
 ### Geändert
 
+**Aufbauende Budgets heissen jetzt Rücklagen** und stehen im Bereich Rücklagen, als
+„Rücklage über die Kategorie": was in ihrer Kategorie ausgegeben wird, zählt von selbst
+gegen sie. Daneben stehen die bisherigen Rücklagen, deren Ausgabe man beim Ausbuchen
+wählt. Anlegen, Bearbeiten, Verlauf und Löschen gehen von dort. Der Bereich Budgets
+zeigt nur noch die monatlichen; liegt eine Rücklage auf einer Unterkategorie, sagt die
+Zeile darüber, dass sie abgezogen ist. In den Monatskarten, der Kostensicht, dem Bericht
+und der Reichweite stehen beide in einer Zeile „Rücklagen". Gerechnet wird wie vorher —
+jede Summe bleibt dieselbe.
+
 **Kein „Alpha" mehr neben der Version.** Dass die App noch nicht stabil ist, sagt die 0
 vorne. Das Datenschema ändert sich weiter, aber eine Migration überführt den Bestand,
 statt etwas wegzunehmen.

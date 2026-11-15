@@ -29,8 +29,15 @@
 //
 //     Einnahmen − Fixkosten                       = nach den Pflichten
 //     − laufende Kosten − Ungeplantes             = was der Alltag übrig lässt
-//     − Abschreibungen − Wagnisse − Vorsorge
-//     − Tilgung                                   = Ergebnis
+//     − Rücklagen − Vorsorge − Tilgung            = Ergebnis
+//
+// „Rücklagen" ist EINE Zeile für zwei Dinge (seit 2026-11-15): die Rücklagen selbst und
+// die aufbauenden Budgets. Für den Nutzer sind beide dasselbe — Geld, das Monat für Monat
+// für etwas Späteres zurückgelegt wird —, und die Oberfläche nennt beide so. Gerechnet
+// wird jedes weiter nach seiner eigenen Regel (Rücklage: Zuwachs des Solls; Budget:
+// `topfKosten`); zusammengeführt werden nur die Posten, und zwar HIER, damit Monatskarten,
+// Kostensicht, Bericht, Reichweite und Kennzahlen dieselbe Zeile lesen und keine Sicht
+// selbst addiert. Die Zeilen-ID bleibt `abschreibungen`.
 //
 // Die Tilgung steht unten und nicht als blosse Verwendung des Überschusses — aus
 // demselben Grund wie die Vorsorge (`core/CLAUDE.md`): sonst sähe ein Monat, in dem
@@ -69,7 +76,6 @@ export type ErgebnisZeileId =
   | "laufend"
   | "ungeplant"
   | "abschreibungen"
-  | "wagnisse"
   | "vorsorge"
   | "tilgung";
 
@@ -439,8 +445,7 @@ export function monatsErgebnis(basis: Ergebnisbasis, monatAb: string): MonatsErg
   );
 
   const topfEntnahmen = basis.einordnungen.filter((x) => x.art === "topf");
-  const wagnisse = zeile(
-    "wagnisse",
+  const topfPosten =
     e.budgets
       .filter((b) => b.art === "aufbauend")
       .map((b): ErgebnisPosten => {
@@ -457,10 +462,7 @@ export function monatsErgebnis(basis: Ergebnisbasis, monatAb: string): MonatsErg
           entnahme: zukunft ? undefined : entnahme,
         };
       })
-      .filter((p) => p.plan !== 0 || (p.ist ?? 0) !== 0 || (p.entnahme ?? 0) !== 0)
-      .sort((a, b) => a.plan - b.plan),
-    zukunft,
-  );
+      .filter((p) => p.plan !== 0 || (p.ist ?? 0) !== 0 || (p.entnahme ?? 0) !== 0);
 
   // Beendete Zyklen: was eine Rücklage in einem VERGANGENEN Monat gekostet hat, bevor
   // sie ausgebucht wurde — und der Kauf selbst, gegen das Angesparte geprüft. Dieselbe
@@ -497,9 +499,11 @@ export function monatsErgebnis(basis: Ergebnisbasis, monatAb: string): MonatsErg
         }];
       });
 
+  // Rücklagen und aufbauende Budgets in EINER Zeile (Kopf der Datei). Jeder Posten trägt
+  // weiter, woher er kommt (`ruecklageId` bzw. `budgetId`); nur die Summe ist gemeinsam.
   const abschreibungen = zeile(
     "abschreibungen",
-    [...zyklusPosten, ...e.ruecklagen
+    [...zyklusPosten, ...topfPosten, ...e.ruecklagen
       .map((r): ErgebnisPosten => {
         // Der Zuwachs des Solls und nicht die blosse Rate: vor dem Beginn steht nichts,
         // und eine Rücklage, deren Ziel erreicht ist, kostet nichts mehr — bis sie
@@ -531,7 +535,7 @@ export function monatsErgebnis(basis: Ergebnisbasis, monatAb: string): MonatsErg
   // Die drei ersten Zeilen stehen immer da: ein Monat ohne Einnahmen, Fixkosten oder
   // Alltag ist eine Aussage. Die übrigen nur, wenn es sie gibt — Zeilen voller Nullen
   // wären bei einem Haushalt ohne Töpfe Lärm.
-  const zeilen = [einnahmen, fixkosten, laufendeKosten, ungeplant, abschreibungen, wagnisse, vorsorge, tilgung].filter(
+  const zeilen = [einnahmen, fixkosten, laufendeKosten, ungeplant, abschreibungen, vorsorge, tilgung].filter(
     (z, i) => i < 3 || z.posten.length > 0,
   );
 
@@ -541,7 +545,7 @@ export function monatsErgebnis(basis: Ergebnisbasis, monatAb: string): MonatsErg
   });
   const nachPflichten = stufe(einnahmen, fixkosten);
   const nachAlltag = stufe(einnahmen, fixkosten, laufendeKosten, ungeplant);
-  const ergebnis = stufe(einnahmen, fixkosten, laufendeKosten, ungeplant, abschreibungen, wagnisse, vorsorge, tilgung);
+  const ergebnis = stufe(einnahmen, fixkosten, laufendeKosten, ungeplant, abschreibungen, vorsorge, tilgung);
 
   return {
     jahr: start.y,
@@ -559,7 +563,7 @@ export function monatsErgebnis(basis: Ergebnisbasis, monatAb: string): MonatsErg
     ueberleitung: zukunft
       ? undefined
       : ueberleitung(ergebnis.ist ?? 0, {
-          raten: -((abschreibungen.ist ?? 0) + (wagnisse.ist ?? 0) + (mitZiel ? vorsorge.ist ?? 0 : 0)) || 0,
+          raten: -((abschreibungen.ist ?? 0) + (mitZiel ? vorsorge.ist ?? 0 : 0)) || 0,
           entnahmen: summe([...derArt("topf"), ...derArt("ruecklage")].map((x) => x.betrag)),
           // Gegen die Verträge VOR der Teilung: die Tilgung ist mit der Rate vom Konto
           // gegangen, sie ist kein Unterschied zwischen Kosten und Auszahlung.
@@ -826,7 +830,7 @@ export function monatsErgebnisse(basis: Ergebnisbasis, anzahl = 3): MonatsErgebn
 // in die Kennzahlen eingehen muss.
 
 /** Die Zeilen, die KOSTEN sind — alle ausser den Einnahmen, in der Reihenfolge der Stufen. */
-export const KOSTENZEILEN = ["fixkosten", "laufend", "ungeplant", "abschreibungen", "wagnisse", "vorsorge", "tilgung"] as const;
+export const KOSTENZEILEN = ["fixkosten", "laufend", "ungeplant", "abschreibungen", "vorsorge", "tilgung"] as const;
 export type KostenZeileId = (typeof KOSTENZEILEN)[number];
 
 /**
@@ -854,7 +858,7 @@ export interface ErgebnisKennzahlen {
    * einem Kredit zählen nur seine Zinsen — die Tilgung baut Vermögen auf.
    */
   readonly fixkostenquote: number | null;
-  /** (Rücklagen + aufbauende Budgets + Vorsorge + Tilgung) ÷ Einnahmen. `null` ohne Einnahmen. */
+  /** (Rücklagen + Vorsorge + Tilgung) ÷ Einnahmen. `null` ohne Einnahmen. Rücklagen samt aufbauender Budgets. */
   readonly sparquote: number | null;
 }
 
@@ -888,7 +892,7 @@ export function ergebnisKennzahlen(monate: readonly MonatsErgebnis[]): ErgebnisK
   const fix = -ueberAlle("fixkosten");
   // Die Tilgung zählt mit: sie baut Vermögen auf wie eine Rücklagenrate, nur auf der
   // anderen Seite der Bilanz — die Schuld sinkt, statt dass ein Topf wächst.
-  const gespart = -(ueberAlle("abschreibungen") + ueberAlle("wagnisse") + ueberAlle("vorsorge") + ueberAlle("tilgung"));
+  const gespart = -(ueberAlle("abschreibungen") + ueberAlle("vorsorge") + ueberAlle("tilgung"));
 
   return {
     monate: n,

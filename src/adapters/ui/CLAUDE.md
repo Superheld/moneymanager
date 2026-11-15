@@ -43,8 +43,8 @@ ein Baustein; was einer benutzt, gehört in dessen Ordner** — auch wenn es all
 |---|---|
 | `uebersicht/` | „wie stehe ich gerade da": Monatskarten, Budgets, Was da ist, Depotstand (Regeln in `uebersicht/CLAUDE.md`) |
 | `analyse/` | „wie war es über einen Zeitraum": Register Verlauf, Kategorien, Ausblick, Befunde, Depot, Bericht |
-| `budgets/` | Budgetliste, Verlauf eines Budgets, Vorschläge |
-| `ruecklagen/` | Rücklagen, Fluss, Tacho |
+| `budgets/` | die monatlichen Budgets, Vorschläge (Tabelle, Dialog und Verlauf liegen in `bausteine/`) |
+| `ruecklagen/` | Rücklagen — von Hand ausgebucht und über die Kategorie (die aufbauenden Budgets) —, Fluss, Tacho |
 | `vermoegen/` | Nettovermögen mit Verlauf, Vermögenswerte und Schulden als Werte zum Stichtag |
 | `vertraege/` | Verträge und ihre Erkennung |
 | `konten/` | der Kontoauszug („Buchungen", `ScreenId` `konten`), Kontenverwaltung, Bankzugänge, Abgleich, Depotauszug |
@@ -95,9 +95,33 @@ Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlic
 | Hervorhebung in Fliesstext | `betonung` mit `<Trans>` |
 | Ein Bereich, in dem noch nichts steht | `LeererZustand` — Satz, Erklärung, Knöpfe; keine Karte (unten, „Leere Zustände") |
 | Ein Schritt der Einrichtung samt Knopf in seinen Bereich | `Einrichtungsschritt` (`EinrichtungsschrittZeile`, `EINRICHTUNG_ZIEL`) |
+| Budgets einer Art: Liste, Anlegen/Bearbeiten, Verlauf | `BudgetTabelle`, `BudgetDialog`, `BudgetVerlauf` — die Wörter je Art aus `budgetTexte` (unten, „Rücklagen und Budgets") |
 
 Was nicht in der Tabelle steht und an zwei Stellen gebraucht wird, ist ein Kandidat für
 einen neuen Eintrag — und gehört dann auch hier hinein.
+
+## Rücklagen und Budgets — eine Sache, ein Wort
+
+Seit 2026-11-15 heisst ein aufbauendes Budget in der Oberfläche **Rücklage** (über die
+Kategorie) und steht im Bereich Rücklagen; der Bereich Budgets zeigt nur die monatlichen.
+Die Regel dahinter ist die des Nutzers: eine Sache heisst überall wie ihr Bereich. Im
+Modell bleibt es ein Budget (Gründe in `src/core/ruecklagen/CLAUDE.md`).
+
+Was das für den Code hier heisst:
+
+- **Tabelle, Dialog und Verlauf liegen in `bausteine/`**, weil beide Bereiche sie
+  benutzen (`BudgetTabelle`, `BudgetDialog`, `BudgetVerlauf`, `BudgetVerlaufChart`).
+  Nachgebaut wird nichts; der Bereich Rücklagen lädt dafür `budgetbereich` mit.
+- **Die Art entscheidet der Bereich, nicht ein Feld.** `BudgetDialog` bekommt sie vom
+  Aufrufer; beim Bearbeiten gilt die des Budgets.
+- **Sätze mit dem Wort „Budget" kommen beim aufbauenden aus `ruecklagen.kategorie.*`**
+  (`budgetTexte.ts`, ausdrücklich aufgezählt). Wer in Tabelle, Dialog oder Verlauf einen
+  Satz ergänzt, in dem „Budget" steht, trägt ihn dort ein — `budgetTexte.test.ts` prüft
+  nur, was in der Liste steht.
+- **Gerechnet und getrennt wird nicht hier.** Die Zeile „Rücklagen" der
+  Ergebnisrechnung ist schon im Kern die Summe beider; welche Budgets in welchen Bereich
+  gehören, sagt `nachArtGetrennt`, und was aus einem Dach herausgerechnet ist, sagt
+  `abgezogen` daran.
 
 ## Leere Zustände
 
@@ -827,7 +851,7 @@ daran sind Entscheidungen:
 - **Der laufende Monat erscheint, zählt aber in keine Kennzahl.** Er steht blass bzw. mit
   Pille da, weil die Übersicht dieselbe Zahl zeigt und der Verlauf beim Wechsel der Frage
   keinen Monat verlieren soll. Aus Durchschnitt und Quoten bleibt er heraus: Rücklagen
-  und aufbauende Budgets stehen schon mit der ganzen Rate da, das Gehalt vom Monatsende
+  stehen schon mit der ganzen Rate da, das Gehalt vom Monatsende
   noch nicht. Der Satz dazu ist eine Einschränkung und steht offen unter den Zahlen.
 - **Quoten sind ungerichtet und haben KEINE Schwelle.** Fixkosten- und Sparquote bleiben
   neutral; welche Quote „zu hoch" ist, hängt am Haushalt, und eine erfundene Grenze wäre
@@ -919,7 +943,7 @@ FREIE Geld der liquiden Konten die Kosten eines Monats trägt. Was daran Entsche
   Ein Jahr, weil Ungeplantes jahreszeitlich schwankt; Verträge sind ohnehin periodisiert.
   Unter drei Monaten gibt es keine Zahl, sondern den Satz, ab wann es eine gibt.
 - **Zwei Zahlen, höchstens.** Ohne das Zurücklegen (Verträge, monatliche Budgets,
-  Ungeplantes) und mit ihm (dazu Rücklagen, aufbauende Budgets und Vorsorge). Wer im
+  Ungeplantes) und mit ihm (dazu Rücklagen und Vorsorge). Wer im
   Notfall das Zurücklegen aussetzt, kommt länger aus; welche Annahme gilt, entscheidet,
   wer liest.
 - **Keine Farbe.** Monate sind ungerichtet, und eine Schwelle „zu wenig" gibt es im

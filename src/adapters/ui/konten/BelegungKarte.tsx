@@ -1,4 +1,4 @@
-// Was auf einem Konto gebunden ist — Rücklagen und aufbauende Budgets, und was frei bleibt.
+// Was auf einem Konto gebunden ist — Rücklagen (samt aufbauender Budgets), und was frei bleibt.
 //
 // Die Karte zeigt die Kontobelegung (`core/konten/kontobelegung`) und rechnet nichts
 // selbst. Sie steht NEBEN der Kontenliste und nicht darin, und sie fehlt, wenn auf dem
@@ -7,7 +7,7 @@
 
 import { useTranslation } from "react-i18next";
 import type { Kontobelegung } from "../../../application";
-import { Card, DataTable, Pill } from "../bausteine";
+import { Card, DataTable } from "../bausteine";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 
@@ -36,12 +36,9 @@ export function BelegungKarte({
           {
             key: "name",
             label: t("konten.belegung.spalteWofuer"),
-            render: (p) => (
-              <span style={{ display: "inline-flex", gap: "var(--sp-2)", alignItems: "center" }}>
-                {namen.get(p.id) ?? p.id}
-                <Pill variant="neutral">{t(`konten.belegung.art.${p.art}`)}</Pill>
-              </span>
-            ),
+            // Ohne Pille für die Art: Rücklage und aufbauendes Budget heissen seit
+            // 2026-11-15 beide „Rücklage", die Pille sagte an jeder Zeile dasselbe.
+            render: (p) => namen.get(p.id) ?? p.id,
           },
           {
             key: "betrag",

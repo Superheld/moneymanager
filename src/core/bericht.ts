@@ -121,7 +121,7 @@ export interface Berichtsergebnis {
 
 /** Dieselbe Reihenfolge wie in `monatsErgebnis`, die ersten drei stehen immer da. */
 const ZEILEN: readonly ErgebnisZeileId[] = [
-  "einnahmen", "fixkosten", "laufend", "ungeplant", "abschreibungen", "wagnisse", "vorsorge", "tilgung",
+  "einnahmen", "fixkosten", "laufend", "ungeplant", "abschreibungen", "vorsorge", "tilgung",
 ];
 
 const summe = (werte: readonly Cent[]): Cent => werte.reduce((s, w) => s + w, 0) || 0;

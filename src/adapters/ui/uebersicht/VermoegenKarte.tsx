@@ -18,7 +18,7 @@
 
 import { useTranslation } from "react-i18next";
 import type { Klassenbilanz } from "../../../application";
-import { Card, Pill } from "../bausteine";
+import { Card } from "../bausteine";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { warnFarbe } from "../bausteine/geldFarbe";
 import { Stapel } from "../bausteine/Anordnung";
@@ -58,10 +58,9 @@ export function VermoegenKarte({
               <div className="muted" style={{ marginTop: 2 }}>
                 {k.posten.map((p) => (
                   <div key={`${p.art}:${p.id}`} style={unterzeile}>
-                    <span style={{ display: "inline-flex", gap: "var(--sp-2)", alignItems: "center" }}>
-                      {namen.get(p.id) ?? p.id}
-                      <Pill variant="neutral">{t(`konten.belegung.art.${p.art}`)}</Pill>
-                    </span>
+                    {/* Ohne Pille: seit 2026-11-15 heisst beides „Rücklage", und eine
+                        Pille, die an jeder Zeile dasselbe sagt, sagt nichts. */}
+                    <span>{namen.get(p.id) ?? p.id}</span>
                     <span className="num">{geld.format(p.betrag)}</span>
                   </div>
                 ))}

@@ -28,8 +28,9 @@
 
 import { useTranslation } from "react-i18next";
 import type { Budgetmonat } from "../../../application";
-import { useGeld } from "../bausteine/einstellungenKontext";
-import { flussFarbe, warnFlaeche } from "../bausteine/geldFarbe";
+import { useGeld } from "./einstellungenKontext";
+import { flussFarbe, warnFlaeche } from "./geldFarbe";
+import { budgetText } from "./budgetTexte";
 
 interface Props {
   monate: readonly Budgetmonat[];
@@ -134,7 +135,7 @@ export function BudgetVerlaufChart({ monate, art, width = 1000, height = 220, on
                   Minusbetrag liest sich trotzdem als ausgegeben — das Wort gewinnt gegen
                   das Vorzeichen. Also das Wort wechseln und den Betrag ohne zeigen. */}
               <title>{m.ohnePlan
-                ? `${m.monat} · ${t(m.verbraucht < 0 ? "budgets.verlaufOhnePlanKurzZurueck" : "budgets.verlaufOhnePlanKurz", { verbraucht: geld.formatMitSymbol(Math.abs(m.verbraucht)) })}`
+                ? `${m.monat} · ${t(budgetText(art, m.verbraucht < 0 ? "verlaufOhnePlanKurzZurueck" : "verlaufOhnePlanKurz"), { verbraucht: geld.formatMitSymbol(Math.abs(m.verbraucht)) })}`
                 : `${m.monat} · ${t(m.verbraucht < 0 ? "budgets.verlaufTooltipZurueck" : "budgets.verlaufTooltip", {
                     verfuegbar: geld.formatMitSymbol(m.verfuegbar),
                     verbraucht: geld.formatMitSymbol(Math.abs(m.verbraucht)),
@@ -178,7 +179,7 @@ export function BudgetVerlaufChart({ monate, art, width = 1000, height = 220, on
         <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "var(--ink)", opacity: 0.78, verticalAlign: "middle", marginRight: 6 }} />{t("budgets.legendeVerbraucht")}</span>
         <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: warnFlaeche(true), verticalAlign: "middle", marginRight: 6 }} />{t("budgets.legendeUeberzogen")}</span>
         {monate.some((m) => m.ohnePlan) && (
-          <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "var(--ink)", opacity: 0.3, verticalAlign: "middle", marginRight: 6 }} />{t("budgets.legendeOhnePlan")}</span>
+          <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "var(--ink)", opacity: 0.3, verticalAlign: "middle", marginRight: 6 }} />{t(budgetText(art, "legendeOhnePlan"))}</span>
         )}
         {monate.some((m) => m.zufuehrungVorher != null) && (
           <span><span style={{ display: "inline-block", width: 2, height: 11, background: "var(--accent-deep)", verticalAlign: "middle", marginRight: 8, marginLeft: 4 }} />{t("budgets.legendeAenderung")}</span>

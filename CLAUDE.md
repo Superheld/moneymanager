@@ -32,6 +32,15 @@ Nettovermögen. Sein Verlauf steht im Bereich selbst und nicht in der Analyse: e
 Geschichte einer einzigen Zahl, und die Einträge, aus denen er entsteht, pflegt man
 daneben. Regeln in `src/core/vermoegen/CLAUDE.md`.
 
+**Rücklagen und Budgets** trennen seit 2026-11-15 nach dem, was der Nutzer meint, nicht
+nach dem Datenmodell: Geld, das Monat für Monat für etwas Späteres zurückgelegt wird, ist
+eine **Rücklage** — gleich, ob sie ihre Ausgabe beim Ausbuchen von Hand bekommt (Tabelle
+`ruecklage`) oder über ihre Kategorie von selbst (Tabelle `budget` mit Art aufbauend).
+Beides steht im Bereich Rücklagen und in EINER Zeile der Ergebnisrechnung; der Bereich
+Budgets zeigt nur noch die monatlichen. Das ist eine Stufe der Oberfläche: die zwei
+Tabellen und ihre Rechenregeln bleiben bewusst, warum, steht in
+`src/core/ruecklagen/CLAUDE.md`.
+
 ### Die Schichten
 
 ```

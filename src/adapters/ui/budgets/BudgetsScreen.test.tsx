@@ -5,9 +5,10 @@
 // Use-Cases, Kern) läuft echt. Ein falsches Spalten-Mapping fällt hier deshalb genauso
 // auf wie eine kaputte Anzeige.
 //
-// Seit der Zusammenlegung zu EINEM Aggregat (2026-08-19) prüft diese Datei beide Arten
-// an einem Screen — inklusive der Verrechnung, die dabei neu dazugekommen ist: ein
-// Budget, das in einem anderen liegt, wird aus dessen Betrag herausgerechnet.
+// Seit 2026-11-15 zeigt der Bereich Budgets nur die monatlichen; die aufbauenden stehen
+// als „Rücklage über die Kategorie" im Bereich Rücklagen. Tabelle, Dialog und Verlauf
+// sind dieselben Bausteine — die Tests der aufbauenden laufen deshalb hier weiter, nur
+// über den Screen, in dem sie jetzt stehen.
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
@@ -23,6 +24,7 @@ vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 import { klickbareZeile, auswahlWaehlen, frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import { BudgetsScreen } from "./BudgetsScreen";
+import { RuecklagenScreen } from "../ruecklagen/RuecklagenScreen";
 import { sqliteBudgetRepository } from "../../persistence/sqliteBudgetRepository";
 import { sqliteLedgerRepository } from "../../persistence/sqliteLedgerRepository";
 import { sqliteUmsatzRepository } from "../../persistence/sqliteImportRepositories";
@@ -69,8 +71,8 @@ describe("BudgetsScreen", () => {
     expect(document.body.textContent).not.toMatch(/Auslastung/);
   });
 
-  /** Der Punkt der Zusammenlegung: beide Arten stehen in EINER Liste. */
-  it("zeigt monatliche und aufbauende Budgets nebeneinander", async () => {
+  /** Seit 2026-11-15: die monatlichen hier, die aufbauenden unter Rücklagen. */
+  it("zeigt nur die monatlichen Budgets — das aufbauende steht unter Rücklagen", async () => {
     await stammdatenBasis();
     await sqliteKategorieRepository.speichern({ id: "kat1", name: "Lebensmittel", defaultCharakter: "Aufwand" });
     await sqliteKategorieRepository.speichern({ id: "kat2", name: "Urlaubskasse", defaultCharakter: "Aufwand" });
@@ -81,12 +83,20 @@ describe("BudgetsScreen", () => {
       id: "b2", kategorieId: "kat2", kontoId: "k2", betraege: [{ abMonat: "2026-01", betrag: 10000 }], art: "aufbauend", start: "2026-01-01",
     });
 
-    rendere(<BudgetsScreen />);
+    const budgets = rendere(<BudgetsScreen />);
     expect(await screen.findByText(/Lebensmittel/)).toBeInTheDocument();
+    await waitFor(() => expect(document.body.textContent).toMatch(/400,00/));
+    expect(screen.queryByText("Urlaubskasse")).toBeNull();
+    // Die Wahl der Art gibt es nicht mehr — und das Wort auch nicht.
+    expect(document.body.textContent).not.toMatch(/aufbauend/i);
+    budgets.unmount();
+
+    rendere(<RuecklagenScreen />);
     expect(await screen.findByText("Urlaubskasse")).toBeInTheDocument();
+    expect(screen.getByText(i18n.t("ruecklagen.abschnittKategorie"))).toBeInTheDocument();
     // Das Konto steht in der Zeile — es ist die Deckung hinter der Zahl.
     expect(screen.getAllByText("Tagesgeldkonto").length).toBeGreaterThan(0);
-    await waitFor(() => expect(document.body.textContent).toMatch(/400,00/));
+    expect(screen.queryByText(/Lebensmittel/)).toBeNull();
   });
 
   /**
@@ -104,7 +114,7 @@ describe("BudgetsScreen", () => {
       art: "aufbauend", start: `${monatVersetzt(-1)}-01`,
     });
 
-    rendere(<BudgetsScreen />);
+    rendere(<RuecklagenScreen />);
     await screen.findByText("Urlaubskasse");
     expect(await screen.findByText(new RegExp(i18n.t("budgets.deckungFehlt", { betrag: "150,00 €" })))).toBeInTheDocument();
   });
@@ -117,7 +127,7 @@ describe("BudgetsScreen", () => {
       art: "aufbauend", start: `${monatVersetzt(-1)}-01`,
     });
 
-    rendere(<BudgetsScreen />);
+    rendere(<RuecklagenScreen />);
     await screen.findByText("Urlaubskasse");
     expect(document.body.textContent).not.toMatch(/fehlen/);
   });
@@ -133,12 +143,20 @@ describe("BudgetsScreen", () => {
       id: "kind", kategorieId: "urlaub", kontoId: "k2", betraege: [{ abMonat: "2026-01", betrag: 8000 }], art: "aufbauend", start: "2026-01-01",
     });
 
-    rendere(<BudgetsScreen />);
+    const budgets = rendere(<BudgetsScreen />);
     await screen.findByText("Freizeit");
     // Das Dach behält seine 200,00 — die 80,00 des Kindes sind ein eigener Topf.
     await waitFor(() => expect(document.body.textContent).toMatch(/200,00/));
     expect(document.body.textContent).not.toMatch(/120,00/);
-    // Das aufbauende Kind steht bei den aufbauenden — und sagt, unter welchem Dach.
+    // Das Kind steht hier nicht mehr — also sagt das Dach, was aus ihm herausgerechnet
+    // ist. Ohne den Satz wäre sein Verbrauch kleiner als die Ausgaben der Kategorie.
+    expect(screen.queryByText("Urlaub")).toBeNull();
+    expect(screen.getByText(new RegExp(i18n.t("budgets.ruecklageAbgezogen", { count: 1, namen: "Urlaub" })))).toBeInTheDocument();
+    budgets.unmount();
+
+    // Unter Rücklagen steht es — und sagt, unter welchem Budget es liegt.
+    rendere(<RuecklagenScreen />);
+    await screen.findByText("Urlaub");
     expect(screen.getByText(/unter Freizeit/)).toBeInTheDocument();
   });
 
@@ -161,22 +179,43 @@ describe("BudgetsScreen", () => {
     await waitFor(() => expect(document.body.textContent).toMatch(/250,00/));
   });
 
-  it("legt über den Dialog ein aufbauendes Budget an", async () => {
+  it("legt unter Budgets ein monatliches an — ohne Wahl der Art", async () => {
     await stammdatenBasis();
-    await sqliteKategorieRepository.speichern({ id: "kat2", name: "Urlaub", defaultCharakter: "Aufwand" });
+    await sqliteKategorieRepository.speichern({ id: "kat2", name: "Lebensmittel", defaultCharakter: "Aufwand" });
 
     const nutzer = userEvent.setup();
     rendere(<BudgetsScreen />);
     await nutzer.click(await screen.findByRole("button", { name: /budget anlegen/i }));
+    expect(screen.queryByRole("combobox", { name: "Art" })).toBeNull();
 
-    // Beim Anlegen heisst das Feld „Gilt ab" und steht bei BEIDEN Arten: es sagt, ab
-    // welchem Monat der erste Betrag zaehlt. „Sammelt ab" ist der Anker und gehoert ins
-    // Bearbeiten — hier waeren es zwei Felder fuer denselben Zeitpunkt.
+    await nutzer.click(screen.getByRole("button", { name: /Kategorie wählen|—|▾/ }));
+    await nutzer.click(await screen.findByRole("button", { name: /Lebensmittel/ }));
+    const betrag = screen.getAllByRole("textbox").find((f) => f.getAttribute("inputmode") === "decimal");
+    await nutzer.type(betrag!, "100");
+    const alle = screen.getAllByRole("button", { name: /speichern/i });
+    await nutzer.click(alle[alle.length - 1]);
+
+    await waitFor(async () => {
+      const gespeichert = await sqliteBudgetRepository.alle();
+      expect(gespeichert.map((b) => b.art)).toEqual(["monatlich"]);
+    });
+  });
+
+  it("legt unter Rücklagen ein aufbauendes Budget über die Kategorie an", async () => {
+    await stammdatenBasis();
+    await sqliteKategorieRepository.speichern({ id: "kat2", name: "Urlaub", defaultCharakter: "Aufwand" });
+
+    const nutzer = userEvent.setup();
+    rendere(<RuecklagenScreen />);
+    // Im leeren Bereich steht der Knopf zweimal (Kopf und leerer Zustand) — einer genügt.
+    await nutzer.click((await screen.findAllByRole("button", { name: new RegExp(i18n.t("ruecklagen.kategorie.knopf")) }))[0]);
+    await screen.findByText(i18n.t("ruecklagen.kategorie.anlegen"));
+
+    // Beim Anlegen heisst das Feld „Gilt ab": es sagt, ab welchem Monat der erste Betrag
+    // zaehlt. „Sammelt ab" ist der Anker und gehoert ins Bearbeiten — hier waeren es
+    // zwei Felder fuer denselben Zeitpunkt.
     expect(document.body.textContent).not.toMatch(/Sammelt ab/);
     expect(screen.getByRole("textbox", { name: "Gilt ab" })).toBeTruthy();
-    await auswahlWaehlen(nutzer, "Art", /aufbauend/);
-    await waitFor(() => expect(screen.getByRole("textbox", { name: "Gilt ab" })).toBeTruthy());
-    expect(document.body.textContent).not.toMatch(/Sammelt ab/);
 
     await nutzer.click(screen.getByRole("button", { name: /Kategorie wählen|—|▾/ }));
     await nutzer.click(await screen.findByRole("button", { name: /Urlaub/ }));
@@ -306,16 +345,22 @@ describe("BudgetsScreen — Vorschläge", () => {
     rendere(<BudgetsScreen />);
     await screen.findByText("Aus deinen Ausgaben abgeleitet");
     const zeile = (await screen.findByText("Wohnen")).closest("tr");
-    expect(zeile?.textContent).toMatch(/aufbauend/);
+    // Die Art heisst wie der Bereich, in dem das Ergebnis landet: Rücklage.
+    expect(zeile?.textContent).toMatch(i18n.t("budgets.art.aufbauend"));
     // Die Schwankung sagt beim aufbauenden Budget nichts — der eine teure Monat ist
     // dort der Zweck. Eine Warnpille stünde als Warnung vor dem Erwarteten da.
     expect(zeile?.textContent).not.toMatch(/schwankend|stabil/i);
 
     // Und die Art wandert in die Maske mit: ein monatlicher Rahmen wäre hier die
-    // falsche Zusage, und niemand würde ihn im Dialog von Hand umstellen.
-    await userEvent.click(zeile!.querySelector("button[aria-label*='bernehmen']")!);
-    const artFeld = await screen.findByRole("combobox", { name: /Art/i });
-    expect(artFeld.textContent).toMatch(/aufbauend/i);
+    // falsche Zusage. Der Dialog sagt es im Titel, gespeichert wird ein aufbauendes.
+    const nutzer = userEvent.setup();
+    await nutzer.click(zeile!.querySelector("button[aria-label*='bernehmen']")!);
+    await screen.findByText(i18n.t("ruecklagen.kategorie.anlegen"));
+    const alle = screen.getAllByRole("button", { name: /speichern/i });
+    await nutzer.click(alle[alle.length - 1]);
+    await waitFor(async () => {
+      expect((await sqliteBudgetRepository.alle()).map((b) => b.art)).toEqual(["aufbauend"]);
+    });
   });
 
   it("zeigt ohne Buchungen keine Vorschlagskarte", async () => {
@@ -345,8 +390,7 @@ describe("BudgetsScreen — Vorschläge", () => {
     await screen.findByText("Lebenshaltung");
 
     const text = document.body.textContent ?? "";
-    // Die Liste heisst seit der Trennung nach Art nach ihrer Art — hier die monatliche.
-    const liste = text.indexOf("Monatlich");
+    const liste = text.indexOf(i18n.t("budgets.abschnittListe"));
     const vorschlaege = text.indexOf("Aus deinen Ausgaben abgeleitet");
     expect(liste, "Überschrift der Budgetliste steht im Text").toBeGreaterThanOrEqual(0);
     expect(vorschlaege, "Überschrift der Vorschläge steht im Text").toBeGreaterThanOrEqual(0);
@@ -436,7 +480,7 @@ describe("BudgetsScreen — Vorschläge", () => {
  * Liste die Zahlen DIESES Monats, nicht die Summe seit Start. Vorher stand dort der
  * Betrag, der hineingegangen wäre, hätte man nie etwas ausgegeben.
  */
-describe("BudgetsScreen · Verlauf", () => {
+describe("Rücklage über die Kategorie · Verlauf", () => {
   /** Ein aufbauendes Budget, das vor drei Monaten angefangen hat, mit einer Ausgabe. */
   async function aufbauendMitHistorie() {
     await stammdatenBasis();
@@ -455,7 +499,7 @@ describe("BudgetsScreen · Verlauf", () => {
 
   it("zeigt beim aufbauenden Budget die Zahlen DIESES Monats, nicht die Summe seit Start", async () => {
     await aufbauendMitHistorie();
-    rendere(<BudgetsScreen />);
+    rendere(<RuecklagenScreen />);
     await screen.findByText(/Urlaubskasse/);
 
     // 170,00 Übertrag + 100,00 Rate = 270,00 verfügbar, davon in diesem Monat nichts weg.
@@ -467,14 +511,14 @@ describe("BudgetsScreen · Verlauf", () => {
   it("klappt über den Namen den Verlauf auf und zeigt die Buchungen des gewählten Monats", async () => {
     await aufbauendMitHistorie();
     const nutzer = userEvent.setup();
-    rendere(<BudgetsScreen />);
+    rendere(<RuecklagenScreen />);
 
     const link = await klickbareZeile("Urlaubskasse");
     await nutzer.click(link);
 
     await screen.findByText(/Verlauf · Urlaubskasse/);
     // Vorbelegt ist der laufende Monat — dort ist nichts gebucht.
-    await waitFor(() => expect(document.body.textContent).toMatch(/nichts gebucht/));
+    await waitFor(() => expect(document.body.textContent).toMatch(i18n.t("ruecklagen.kategorie.verlaufMonatLeer", { monat: monatVersetzt(0) })));
 
     // Den Vormonat wählen: jetzt steht die Buchung da, die ihn belastet hat.
     await auswahlWaehlen(nutzer, "Monat", monatVersetzt(-1));
@@ -490,7 +534,7 @@ describe("BudgetsScreen · Verlauf", () => {
   it("gibt der Monatsliste Spaltenköpfe und lässt sie über die Monatszeile zuklappen", async () => {
     await aufbauendMitHistorie();
     const nutzer = userEvent.setup();
-    rendere(<BudgetsScreen />);
+    rendere(<RuecklagenScreen />);
 
     await nutzer.click(await klickbareZeile("Urlaubskasse"));
     await screen.findByText(/Verlauf · Urlaubskasse/);
@@ -528,7 +572,7 @@ describe("BudgetsScreen · Verlauf", () => {
       charakter: "Aufwand", quelle: "manuell", kategorieId: "kat2", notiz: "Ruecksendung",
     });
     const nutzer = userEvent.setup();
-    rendere(<BudgetsScreen />);
+    rendere(<RuecklagenScreen />);
 
     await nutzer.click(await klickbareZeile("Urlaubskasse"));
     await screen.findByText(/Verlauf · Urlaubskasse/);
@@ -550,7 +594,7 @@ describe("BudgetsScreen · Verlauf", () => {
   it("hält die Verlaufskarte NEBEN der Liste, nicht darin", async () => {
     await aufbauendMitHistorie();
     const nutzer = userEvent.setup();
-    rendere(<BudgetsScreen />);
+    rendere(<RuecklagenScreen />);
 
     const link = await klickbareZeile("Urlaubskasse");
     await nutzer.click(link);
@@ -572,7 +616,7 @@ describe("BudgetsScreen · Verlauf", () => {
   it("öffnet den Verlauf auch aus der Zeile heraus — und nicht zweimal", async () => {
     await aufbauendMitHistorie();
     const nutzer = userEvent.setup();
-    rendere(<BudgetsScreen />);
+    rendere(<RuecklagenScreen />);
     await screen.findByText(/Urlaubskasse/);
 
     // Irgendwo in der Zeile, aber nicht auf dem Namen: die Konto-Zelle daneben.
@@ -588,16 +632,16 @@ describe("BudgetsScreen · Verlauf", () => {
   it("lässt die Zeilen-Icons den Verlauf in Ruhe", async () => {
     await aufbauendMitHistorie();
     const nutzer = userEvent.setup();
-    rendere(<BudgetsScreen />);
+    rendere(<RuecklagenScreen />);
     await screen.findByText(/Urlaubskasse/);
 
     // „bearbeiten" öffnet den Dialog — und nicht nebenbei ein Diagramm.
     await nutzer.click(screen.getByRole("button", { name: "bearbeiten" }));
-    await screen.findByText(/Budget bearbeiten/);
+    await screen.findByText(i18n.t("ruecklagen.kategorie.modalBearbeiten"));
     expect(screen.queryByText(/Verlauf · Urlaubskasse/)).toBeNull();
   });
 
-  it("sagt es, wenn ein aufbauendes Budget erst später anfängt zu sammeln", async () => {
+  it("sagt es, wenn eine Rücklage über die Kategorie erst später anfängt", async () => {
     await stammdatenBasis();
     await sqliteKategorieRepository.speichern({ id: "kat3", name: "Rennrad", defaultCharakter: "Aufwand" });
     await sqliteBudgetRepository.speichern({
@@ -606,18 +650,18 @@ describe("BudgetsScreen · Verlauf", () => {
     });
 
     const nutzer = userEvent.setup();
-    rendere(<BudgetsScreen />);
+    rendere(<RuecklagenScreen />);
     await nutzer.click(await klickbareZeile("Rennrad"));
 
     // Leere Balken für Monate vor dem Start zeigten Ausgaben, die das Budget nie
     // belastet haben — hier steht stattdessen, warum nichts da ist.
-    await waitFor(() => expect(document.body.textContent).toMatch(/fängt erst später an/));
+    await waitFor(() => expect(document.body.textContent).toMatch(i18n.t("ruecklagen.kategorie.verlaufVorStart")));
   });
 
   it("schliesst den Verlauf beim zweiten Klick auf denselben Namen wieder", async () => {
     await aufbauendMitHistorie();
     const nutzer = userEvent.setup();
-    rendere(<BudgetsScreen />);
+    rendere(<RuecklagenScreen />);
 
     const link = await klickbareZeile("Urlaubskasse");
     await nutzer.click(link);

@@ -158,22 +158,22 @@ describe("Fixkosten — der Jahresbeitrag", () => {
   });
 });
 
-describe("Wagnisse — das aufbauende Budget", () => {
+describe("Das aufbauende Budget — in der Zeile der Rücklagen", () => {
   const topf = budget({ id: "reise", kategorieId: "reise", art: "aufbauend", rate: 10000, start: "2025-01-01" });
 
   it("kostet die Rate, auch wenn im Monat viel entnommen wird", () => {
     // Zwölf Raten bis Dezember = 1.200; im Dezember gehen 1.200 raus.
     const e = eingabe({ budgets: [topf], ist: [ist("2025-12-05", -120000, { kategorieId: "flug" })] });
     const r = erwarteAufgang(e, "2025-12");
-    expect(zeile(r, "wagnisse")?.ist).toBe(-10000);
-    expect(zeile(r, "wagnisse")?.posten[0].entnahme).toBe(-120000);
+    expect(zeile(r, "abschreibungen")?.ist).toBe(-10000);
+    expect(zeile(r, "abschreibungen")?.posten[0].entnahme).toBe(-120000);
     expect(posten(r, "raten")).toBe(10000);
     expect(posten(r, "entnahmen")).toBe(-120000);
   });
 
   it("kostet die Rate in einem Monat ohne Entnahme", () => {
     const r = erwarteAufgang(eingabe({ budgets: [topf] }), "2025-05");
-    expect(zeile(r, "wagnisse")?.ist).toBe(-10000);
+    expect(zeile(r, "abschreibungen")?.ist).toBe(-10000);
     expect(r.ueberleitung?.kontoaenderung).toBe(0);
   });
 
@@ -181,23 +181,55 @@ describe("Wagnisse — das aufbauende Budget", () => {
     // Bis Juni sind 600 im Topf, entnommen werden 900: 300 sind ungedeckt.
     const e = eingabe({ budgets: [topf], ist: [ist("2025-06-20", -90000, { kategorieId: "reise" })] });
     const r = erwarteAufgang(e, "2025-06");
-    expect(zeile(r, "wagnisse")?.ist).toBe(-40000);
+    expect(zeile(r, "abschreibungen")?.ist).toBe(-40000);
   });
 
   it("zählt die Rate nicht noch einmal, solange sie nur das Loch füllt", () => {
     const e = eingabe({ budgets: [topf], ist: [ist("2025-06-20", -90000, { kategorieId: "reise" })] });
-    expect(zeile(erwarteAufgang(e, "2025-07"), "wagnisse")?.ist ?? 0).toBe(0);
-    expect(zeile(erwarteAufgang(e, "2025-08"), "wagnisse")?.ist ?? 0).toBe(0);
+    expect(zeile(erwarteAufgang(e, "2025-07"), "abschreibungen")?.ist ?? 0).toBe(0);
+    expect(zeile(erwarteAufgang(e, "2025-08"), "abschreibungen")?.ist ?? 0).toBe(0);
     // Ende September ist das Loch gefüllt (900 Raten gegen 900 Ausgaben), ab Oktober
     // kostet der Topf wieder seine Rate.
-    expect(zeile(erwarteAufgang(e, "2025-10"), "wagnisse")?.ist).toBe(-10000);
+    expect(zeile(erwarteAufgang(e, "2025-10"), "abschreibungen")?.ist).toBe(-10000);
   });
 
   it("kostet über die ganze Zeit nie weniger als ausgegeben und nie weniger als die Raten", () => {
     const e = eingabe({ budgets: [topf], ist: [ist("2025-06-20", -90000, { kategorieId: "reise" })] });
     const monate = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
-    const gesamt = monate.reduce((s, m) => s + (zeile(rechne(e, `2025-${m}`), "wagnisse")?.ist ?? 0), 0);
+    const gesamt = monate.reduce((s, m) => s + (zeile(rechne(e, `2025-${m}`), "abschreibungen")?.ist ?? 0), 0);
     expect(gesamt).toBe(-120000);
+  });
+});
+
+describe("Rücklagen und aufbauende Budgets — EINE Zeile", () => {
+  // Seit 2026-11-15 heissen beide in der Oberfläche „Rücklagen"; die Ergebnisrechnung
+  // führt sie deshalb in einer Zeile. Jeder Posten rechnet weiter nach seiner Regel —
+  // die Probe hier ist, dass die Zeile die Summe beider ist und am Ergebnis nichts rückt.
+  const topf = budget({ id: "ferien", kategorieId: "ferien", art: "aufbauend", rate: 7000, start: "2025-01-01" });
+  const geraet: Ruecklage = { id: "g", bezeichnung: "Gerät", ziel: 96000, fristMonate: 96, beginn: "2025-01-01" };
+  const entnahme = ist("2025-06-20", -90000, { kategorieId: "ferien" });
+
+  it("ist die Summe aus Rücklage und aufbauendem Budget", () => {
+    const nurTopf = rechne(eingabe({ budgets: [topf], ist: [entnahme] }), "2025-06");
+    const nurRuecklage = rechne(eingabe({ ruecklagen: [geraet], ist: [entnahme] }), "2025-06");
+    const beide = erwarteAufgang(eingabe({ budgets: [topf], ruecklagen: [geraet], ist: [entnahme] }), "2025-06");
+
+    const z = zeile(beide, "abschreibungen")!;
+    expect(z.posten.map((p) => p.budgetId ?? p.ruecklageId).sort()).toEqual(["ferien", "g"]);
+    expect(z.ist).toBe((zeile(nurTopf, "abschreibungen")?.ist ?? 0) + (zeile(nurRuecklage, "abschreibungen")?.ist ?? 0));
+    expect(z.plan).toBe((zeile(nurTopf, "abschreibungen")?.plan ?? 0) + (zeile(nurRuecklage, "abschreibungen")?.plan ?? 0));
+    expect(beide.zeilen.map((x) => x.id)).not.toContain("wagnisse");
+  });
+
+  it("lässt Ergebnis und Überleitung unverändert", () => {
+    const beide = erwarteAufgang(eingabe({ budgets: [topf], ruecklagen: [geraet], ist: [entnahme] }), "2025-06");
+    // Von Hand gerechnet: Rate des Topfs 70, bis Juni 420 angespart gegen 900 Ausgaben —
+    // der Monat kostet 70 + 410 (bis Mai 350 angespart, also max(420, 900) − max(350, 0)
+    // = 550); die Rücklage kostet 10. Zusammen 560.
+    expect(zeile(beide, "abschreibungen")?.ist).toBe(-56000);
+    expect(beide.ergebnis.ist).toBe(-56000);
+    expect(posten(beide, "raten")).toBe(56000);
+    expect(posten(beide, "entnahmen")).toBe(-90000);
   });
 });
 

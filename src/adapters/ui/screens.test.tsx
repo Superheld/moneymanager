@@ -13,6 +13,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Database } from "sql.js";
+import i18n from "../../i18n/i18n";
 
 const halter = vi.hoisted(() => {
   let aktuell: unknown = null;
@@ -343,12 +344,12 @@ describe("UebersichtScreen", () => {
   });
 
   /**
-   * Der Punkt, um den es beim Aufbauenden geht: dort stand vorher „x von 300" — der
-   * Betrag, der hineingegangen wäre, hätte man nie etwas ausgegeben. Er wächst jeden
-   * Monat weiter und sagt über den laufenden nichts. An seiner Stelle steht jetzt die
-   * Aufrechnung dieses Monats.
+   * Seit 2026-11-15 ist ein aufbauendes Budget in der Oberfläche eine Rücklage. In der
+   * Karte „Budgets" steht es deshalb nicht mehr; es zählt in der Zeile „Rücklagen" der
+   * Monatskarten und unter „Was da ist" als gebunden. Seine Fortschreibung (Übertrag,
+   * Rate, Verbrauch) zeigt der Bereich Rücklagen (`budgets/BudgetsScreen.test.tsx`).
    */
-  it("zeigt beim aufbauenden Budget die Fortschreibung statt der Summe seit Start", async () => {
+  it("zeigt ein aufbauendes Budget nicht in der Karte Budgets, sondern als Rücklage", async () => {
     await grunddaten();
     await sqliteBudgetRepository.speichern({
       id: "b1", kategorieId: "kat1", kontoId: "k1", betraege: [{ abMonat: monat(2), betrag: 10000 }],
@@ -360,21 +361,20 @@ describe("UebersichtScreen", () => {
     });
 
     rendere(<UebersichtScreen />);
-    // Der Name steht zweimal da: in der Budgetliste und, weil ein aufbauendes Budget
-    // Geld auf seinem Konto bindet, in der Karte „Was da ist".
-    await screen.findAllByText(/Lebensmittel/);
-    // Übertrag 170,00 + Rate 100,00, in diesem Monat nichts weg → Rest 270,00.
-    await waitFor(() => expect(document.body.textContent).toMatch(/Übertrag 170,00/));
-    expect(document.body.textContent).toMatch(/270,00/);
-    // Der kumulierte Rahmen (3 × 100,00) steht nicht mehr als Anzeigewert daneben.
-    expect(document.body.textContent).not.toMatch(/von 300,00/);
+    // Die Karte „Budgets" ist leer — sie zeigt nur monatliche.
+    expect(await screen.findByText(i18n.t("uebersicht.budgetsLeer"))).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/Übertrag 170,00/);
+    // In den Monatskarten steht es in der Zeile „Rücklagen" — eine Zeile für beides.
+    expect(screen.getAllByText(i18n.t("ergebnis.zeile.abschreibungen")).length).toBeGreaterThan(0);
+    // Und weil es Geld auf seinem Konto bindet, unter „Was da ist".
+    expect(screen.getAllByText(/Lebensmittel/).length).toBeGreaterThan(0);
   });
 
   it("zeigt beim aufgeklappten Budget die Buchungen DIESES Monats, nicht alle seit Start", async () => {
     await grunddaten();
     await sqliteBudgetRepository.speichern({
       id: "b1", kategorieId: "kat1", kontoId: "k1", betraege: [{ abMonat: monat(2), betrag: 10000 }],
-      art: "aufbauend", start: `${monat(2)}-01`,
+      art: "monatlich", start: `${monat(2)}-01`,
     });
     await sqliteLedgerRepository.speichern({
       id: "alt", datum: `${monat(1)}-05`, betrag: -3000, kontoId: "k1",

@@ -1,62 +1,48 @@
-// Budgets — EIN Bereich, EINE Liste, zwei Arten.
+// Budgets — die MONATLICHEN, und nur die.
 //
-// Vorher standen hier zwei Abschnitte („Jeden Monat neu" / „Baut sich auf") über zwei
-// Aggregaten (Budget und Topf) mit drei Arten und vier Zielwert-Begriffen. Jetzt trägt
-// ein Budget nur noch seine Art, und die beiden Arten dürfen ineinander liegen: eine
-// Hauptkategorie monatlich, eine Unterkategorie darin aufbauend. Was das Kind
-// beansprucht, rechnet der Kern automatisch aus dem Dach heraus (core/budget) — die
-// Liste zeigt die Verschachtelung deshalb als Einrückung, damit die Zahlen erklärbar
-// bleiben.
+// Bis 2026-11-15 standen hier zwei Arten nebeneinander: monatlich (der Rest verfällt) und
+// aufbauend (der Rest bleibt). Ein aufbauendes Budget ist für den Nutzer aber dasselbe wie
+// eine Rücklage — Geld, das Monat für Monat für etwas Späteres zurückgelegt wird —, und es
+// steht seitdem dort, im Bereich Rücklagen, als „Rücklage über die Kategorie". Im
+// Datenmodell ist es weiter ein Budget (`budget.art = aufbauend`); die Rechnung ist
+// dieselbe geblieben.
+//
+// Die Verschachtelung gilt weiter: ein Budget auf einer Unterkategorie nimmt dem Dach
+// seinen Verbrauch weg (core/budget). Liegt dort eine Rücklage, sieht man sie hier nicht
+// mehr — die Zeile des Dachs sagt deshalb, was abgezogen ist (`abgezogen` an
+// `GruppierterStand`).
 //
 // Die Kennzahlen stehen als eigene Reihe ÜBER den Karten, nicht darin — wie auf der
 // Übersicht. In der Karte konkurrierten sie mit der Tabelle um dieselbe Fläche.
 //
-// **Die Zahlen der Liste gelten für den laufenden MONAT, auch beim Aufbauenden.** Vorher
-// standen dort Rahmen und Verbrauch kumuliert („seit Start"), und dieselbe Zeile trug
-// damit zwei Zeitbegriffe nebeneinander: eine Spalte über Jahre, die daneben über den
-// Monat. Der Rest ändert sich dadurch nicht — `verfügbar − verbraucht` ist in beiden
-// Lesarten derselbe Betrag (Herleitung in `core/budgets/budgetverlauf`). Was sich ändert,
-// ist, dass die Zahlen daneben etwas über DIESEN Monat sagen.
+// Tabelle, Dialog und Verlauf liegen in `bausteine/` (`BudgetTabelle`, `BudgetDialog`,
+// `BudgetVerlauf`): der Bereich Rücklagen benutzt dieselben für die aufbauenden.
 //
 // PILOT für ADR-0004: alle sichtbaren Strings über t()/<Trans>, alles Geld über useGeld().
 
-import { Datumsfeld } from "../bausteine/Datumsfeld";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
   nachArtGetrennt,
-  waehlbareKonten,
-  minorZuMajor,
-  type Budgetart,
   type Budgetbereich,
-  type Budgetstand,
   type GruppierterStand,
   type Budgetvorschlag,
   type IstBuchung,
 } from "../../../application";
-import {
-  budgetAnlegen as budgetSpeichern,
-  budgetbereich,
-  budgetBetragLoeschen,
-  budgetLoeschen,
-  vorschlagIgnorieren,
-} from "../../dienste";
-import { Button, Card, CoverageTrack, DataTable, FormField, KPIStat, Pill } from "../bausteine";
+import { budgetbereich, budgetLoeschen, vorschlagIgnorieren } from "../../dienste";
+import { Button, Card, DataTable, KPIStat, Pill } from "../bausteine";
 import { BuchungDetail } from "../buchung/BuchungDetail";
-import { BudgetVerlauf } from "./BudgetVerlauf";
+import { BudgetVerlauf } from "../bausteine/BudgetVerlauf";
+import { BudgetDialog, type BudgetVorbelegung } from "../bausteine/BudgetDialog";
+import { BudgetTabelle } from "../bausteine/BudgetTabelle";
 import { IconButton, IconLeiste } from "../bausteine/IconButton";
 import { betont } from "../bausteine/betonung";
 import { PageHead } from "../bausteine/PageHead";
-import { Modal } from "../bausteine/Modal";
-import { Auswahl } from "../bausteine/Auswahl";
-import { CategoryPicker } from "../bausteine/CategoryPicker";
-import { geldFarbe, warnFarbe, warnTon } from "../bausteine/geldFarbe";
-import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
+import { warnTon } from "../bausteine/geldFarbe";
+import { useGeld } from "../bausteine/einstellungenKontext";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
 import { LeererZustand } from "../bausteine/LeererZustand";
 import type { ScreenId } from "../bausteine/AppShell";
-
-const ARTEN: Budgetart[] = ["monatlich", "aufbauend"];
 
 /** Stabile leere Karte — eine frisch erzeugte Map liesse jedes Memo neu rechnen. */
 const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
@@ -108,24 +94,15 @@ export function BudgetsScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => v
     setOffenesBudget((cur) => (cur === id ? null : id));
   }
 
-  // Anlege-/Bearbeiten-Dialog
-  const [offen, setOffen] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [art, setArt] = useState<Budgetart>("monatlich");
-  const [kategorieId, setKategorieId] = useState("");
-  const [kontoId, setKontoId] = useState("");
-  const [betragText, setBetragText] = useState("");
-  const [start, setStart] = useState(heute);
   /**
-   * Der Monat, für den der eingetippte Betrag gilt.
-   *
-   * Beim Anlegen der Startmonat, beim Bearbeiten der LAUFENDE: ein geänderter Rahmen gilt
-   * ab jetzt, die Monate davor behalten ihre Planung. Über die Liste im Dialog lässt er
-   * sich auf einen früheren Monat umstellen — dann wird dort korrigiert statt eine neue
-   * Version anzulegen.
+   * Der Dialog: `null` zu, `"neu"` zum Anlegen (mit Art und Vorbelegung aus einem
+   * Vorschlag), sonst die ID des bearbeiteten Budgets. Sein Zustand gehört ihm
+   * (`BudgetDialog`); der aktuelle Stand wird bei jedem Render aus der Liste gesucht, damit
+   * er nach dem Entfernen einer Version die neue Reihe zeigt.
    */
-  const [zielMonat, setZielMonat] = useState(heute.slice(0, 7));
-  const [fehler, setFehler] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<
+    { neu: true; art: Budgetvorschlag["art"]; vorbelegung?: BudgetVorbelegung } | { neu: false; id: string } | null
+  >(null);
 
   // EIN Ladevorgang, EIN setState: gestaffelte await/setState-Paare lassen abgeleitete
   // Werte kurz gegen leere Listen rechnen (ein Kategorie-Lookup meldet dann für einen
@@ -143,8 +120,10 @@ export function BudgetsScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => v
    * Geordnet und gerechnet wird das in
    * `budgetstaende` (Anwendungsschicht), nicht hier.
    */
-  const zeilen: readonly Budgetstand[] = bereich?.staende ?? [];
-  const gruppen = useMemo(() => nachArtGetrennt(zeilen), [zeilen]);
+  const alle = bereich?.staende ?? [];
+  // Nur die monatlichen — die aufbauenden stehen unter Rücklagen. Getrennt wird in der
+  // Anwendungsschicht, dieselbe Trennung liest der Bereich Rücklagen.
+  const zeilen = useMemo(() => nachArtGetrennt(alle).monatlich, [alle]);
   const kategorien = bereich?.kategorien ?? [];
   const konten = bereich?.konten ?? [];
   const vorschlaege = bereich?.vorschlaege ?? [];
@@ -156,12 +135,12 @@ export function BudgetsScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => v
   };
   /** Die Zeile, deren Verlauf offen ist — sie kann nach einem Löschen weg sein. */
   const offenesZeile = zeilen.find((z) => z.budget.id === offenesBudget);
-  /** Das Budget, das der Dialog gerade bearbeitet — für die Liste seiner Beträge. */
-  const bearbeitetesBudget = zeilen.find((z) => z.budget.id === editId)?.budget;
+  /** Das Budget, das der Dialog gerade bearbeitet, im aktuellen Stand. */
+  const bearbeitet = dialog && !dialog.neu ? alle.find((z) => z.budget.id === dialog.id) ?? null : null;
 
   /**
-   * Die Kennzahlen summieren über alle Budgets. Doppelt zählt dabei nichts: ein Dach gilt
-   * für alles ausser seinen Unterbudgets, Betrag wie Verbrauch sind getrennte Töpfe.
+   * Die Kennzahlen summieren über die monatlichen Budgets. Doppelt zählt dabei nichts: ein
+   * Dach gilt für alles ausser seinen Unterbudgets, Betrag wie Verbrauch sind getrennt.
    */
   const summe = useMemo(() => {
     let proMonat = 0, rahmen = 0, verbraucht = 0;
@@ -178,88 +157,26 @@ export function BudgetsScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => v
     };
   }, [zeilen]);
 
-  function neu() {
-    setEditId(null);
-    setArt("monatlich");
-    setKategorieId("");
-    // Ein Konto ist Pflicht — der erste Eintrag ist eine Vorbelegung, keine Aussage.
-    setKontoId(konten[0]?.id ?? "");
-    setBetragText("");
-    setStart(heute);
-    setZielMonat(heute.slice(0, 7));
-    setFehler(null);
-    setOffen(true);
-  }
+  // Neue Budgets sind monatlich: die Wahl der Art ist mit dem Umzug der aufbauenden in
+  // den Bereich Rücklagen entfallen.
+  const neu = () => setDialog({ neu: true, art: "monatlich" });
+  const bearbeiten = (z: GruppierterStand) => setDialog({ neu: false, id: z.budget.id });
 
-  function bearbeiten(z: Budgetstand) {
-    const b = z.budget;
-    neu();
-    setEditId(b.id);
-    setArt(b.art);
-    setKategorieId(b.kategorieId);
-    setKontoId(b.kontoId);
-    // Der Betrag DIESES Monats, nicht „der Betrag" — es gibt eine Reihe davon, und was
-    // im Feld steht, ist der Ausgangspunkt für die nächste Version.
-    setBetragText(String(minorZuMajor(z.proMonat, geld.waehrung)));
-    setStart(b.start);
-    setZielMonat(heute.slice(0, 7));
-  }
-
-  /** Eine bestehende Version zum Korrigieren ins Feld holen. */
-  function versionBearbeiten(abMonat: string, betrag: number) {
-    setZielMonat(abMonat);
-    setBetragText(String(minorZuMajor(betrag, geld.waehrung)));
-    setFehler(null);
-  }
-
-  async function versionLoeschen(abMonat: string) {
-    if (!editId) return;
-    setFehler(null);
-    try {
-      await budgetBetragLoeschen(editId, abMonat);
-      await laden();
-      // Stand der gelöschte Monat gerade im Feld, zeigt es sonst auf etwas, das es nicht
-      // mehr gibt — zurück auf den laufenden Monat.
-      if (zielMonat === abMonat) setZielMonat(heute.slice(0, 7));
-    } catch (e) {
-      setFehler(fehlerNachricht(t, e));
-    }
-  }
-
-  /** Übernimmt einen Vorschlag in die Anlege-Maske — bestätigt wird dort. */
+  /**
+   * Übernimmt einen Vorschlag in die Anlege-Maske — bestätigt wird dort.
+   *
+   * Die Art gehört zum Vorschlag: bei einer Kategorie, in der zweimal im Jahr etwas
+   * passiert, wäre ein monatlicher Rahmen die falsche Zusage. Ein aufbauender Vorschlag
+   * legt deshalb eine Rücklage über die Kategorie an; der Dialog sagt das im Titel, und
+   * die Pille in der Tabelle sagt es vorher.
+   */
   function vorschlagUebernehmen(v: Budgetvorschlag) {
-    neu();
-    setKategorieId(v.kategorieId);
-    // Die Art gehört zum Vorschlag: bei einer Kategorie, in der zweimal im Jahr etwas
-    // passiert, wäre ein monatlicher Rahmen die falsche Zusage. `neu()` setzt sie
-    // zurück, deshalb hier danach.
-    setArt(v.art);
-    setBetragText(String(minorZuMajor(v.vorschlag, geld.waehrung)));
+    setDialog({ neu: true, art: v.art, vorbelegung: { kategorieId: v.kategorieId, betrag: v.vorschlag } });
   }
 
   async function vorschlagVerwerfen(v: Budgetvorschlag) {
     await vorschlagIgnorieren(v.kategorieId);
     await laden();
-  }
-
-  async function speichern() {
-    setFehler(null);
-    try {
-      await budgetSpeichern(
-        // `abMonat`: beim Anlegen der Monat aus „gilt ab", beim Bearbeiten der
-        // laufende (bzw. die angetippte Version). Ein geänderter Rahmen gilt ab jetzt —
-        // die Monate davor behalten ihre Planung.
-        {
-          kategorieId, kontoId, betragProMonat: geld.parse(betragText) ?? 0, art, start,
-          abMonat: editId ? zielMonat : start.slice(0, 7),
-        },
-        editId ?? undefined,
-      );
-      setOffen(false);
-      await laden();
-    } catch (e) {
-      setFehler(fehlerNachricht(t, e));
-    }
   }
 
   return (
@@ -331,130 +248,19 @@ export function BudgetsScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => v
         </Card>
       ) : (
         <Card title={t("budgets.abschnittListe")} subtitle={t("budgets.verbrauchHinweis")}>
-          <div className="budget-spalten">
-            {([["monatlich", gruppen.monatlich], ["aufbauend", gruppen.aufbauend]] as const)
-              .filter(([, rows]) => rows.length > 0)
-              .map(([art, rows]) => (
-                <section key={art} style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semi)", marginBottom: "var(--sp-2)" }}>
-                    {t(art === "monatlich" ? "budgets.abschnittMonatlich" : "budgets.abschnittAufbauend")}
-                    <span className="muted" style={{ fontWeight: "var(--fw-regular)" }}>
-                      {" · "}
-                      {t(art === "monatlich" ? "budgets.abschnittMonatlichHinweis" : "budgets.abschnittAufbauendHinweis")}
-                    </span>
-                  </div>
-                  <DataTable
-                    pageSize={30}
-                    columns={[
-                      {
-                        key: "kategorie",
-                        label: t("budgets.spalteKategorie"),
-                        render: (z: GruppierterStand) => (
-                          // Einrückung statt eigener Spalte: die Verschachtelung ist eine
-                          // Eigenschaft der Kategorie. Den Verlauf öffnet die Zeile; der
-                          // Name zeigt es an (`DataTable`, Bezeichner).
-                          <span style={{ paddingLeft: z.tiefe * 14, display: "inline-block" }}>
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                              {z.tiefe > 0 && <span style={{ color: "var(--ink-3)" }}>└</span>}
-                              <span style={{ fontWeight: z.tiefe === 0 ? "var(--fw-bold)" : "var(--fw-semi)" }}>
-                                <span className="zeilenname">{z.kategorieName}</span>
-                              </span>
-                            </span>
-                            {/* Zweite Zeile: worauf das Geld liegt und, wenn das Budget unter
-                                einem der anderen Art hängt, unter welchem. */}
-                            <span className="muted" style={{ display: "block", fontSize: "var(--fs-2xs)" }}>
-                              {kontoName.get(z.budget.kontoId) ?? t("budgets.kontoFehlt")}
-                              {z.unter && ` · ${t("budgets.unter", { name: z.unter })}`}
-                              {/* Nur, wenn etwas fehlt: der Rest steht rechts als verfügbar da,
-                                  und das stimmt nur, wenn er auf dem Konto auch liegt. Eine
-                                  Einschränkung, deshalb offen in der Zeile und in Worten. */}
-                              {fehlt(z.budget.id) > 0 && (
-                                <span style={{ color: warnFarbe(true) }}>
-                                  {" · "}
-                                  {t("budgets.deckungFehlt", { betrag: geld.formatMitSymbol(fehlt(z.budget.id)) })}
-                                </span>
-                              )}
-                            </span>
-                          </span>
-                        ),
-                      },
-                      {
-                        // Was in DIESEM Monat zur Verfügung steht: beim Monatlichen der
-                        // Monatsbetrag, beim Aufbauenden Übertrag plus Rate. Der Titel legt
-                        // die Aufrechnung offen.
-                        key: "rahmen",
-                        label: `${t("budgets.spalteRahmen")} ${geld.symbol}`,
-                        align: "right",
-                        sortValue: (z: GruppierterStand) => z.monat.verfuegbar,
-                        render: (z: GruppierterStand) => (
-                          <span
-                            title={
-                              z.budget.art === "aufbauend"
-                                ? t("budgets.verfuegbarHinweis", {
-                                    uebertrag: geld.formatMitSymbol(z.monat.uebertrag),
-                                    zufuehrung: geld.formatMitSymbol(z.monat.zufuehrung),
-                                    gesamt: geld.formatMitSymbol(z.rahmen),
-                                  })
-                                : undefined
-                            }
-                          >
-                            {geld.format(z.monat.verfuegbar)}
-                          </span>
-                        ),
-                      },
-                      {
-                        // Verbrauch und Balken in einer Zelle: der Balken IST der Verbrauch,
-                        // die Zahl darüber sagt, wie viel.
-                        key: "verbraucht",
-                        label: `${t("budgets.spalteVerbraucht")} ${geld.symbol}`,
-                        align: "right",
-                        sortValue: (z: GruppierterStand) => z.monat.verbraucht,
-                        render: (z: GruppierterStand) => (
-                          <span style={{ display: "block", minWidth: 80 }}>
-                            <span className="num">{geld.format(z.monat.verbraucht)}</span>
-                            <CoverageTrack name={z.kategorieName} value={Math.max(0, z.monat.verbraucht)} max={Math.max(1, z.monat.verfuegbar)} over={z.rest < 0} label="" right="" style={{ marginTop: 4 }} />
-                          </span>
-                        ),
-                      },
-                      {
-                        key: "rest",
-                        label: `${t("budgets.spalteRest")} ${geld.symbol}`,
-                        align: "right",
-                        render: (z: GruppierterStand) => (
-                          <span style={{ fontWeight: "var(--fw-bold)", color: geldFarbe(z.rest) }}>{geld.format(z.rest)}</span>
-                        ),
-                      },
-                    {
-                        key: "_a",
-                        label: "",
-                        align: "right",
-                        sortable: false,
-                        render: (z: GruppierterStand) => (
-                          // Der Klick auf ein Zeilen-Icon darf nicht zusätzlich den Verlauf
-                          // umschalten: er blubberte sonst zur Zeile hoch, und „löschen" öffnete
-                          // nebenbei ein Diagramm zu einem Budget, das es nicht mehr gibt.
-                          <span onClick={(e) => e.stopPropagation()}>
-                            <IconLeiste>
-                              <IconButton icon="bearbeiten" label={t("budgets.bearbeiten")} onClick={() => bearbeiten(z)} />
-                              <IconButton icon="loeschen" ton="gefahr" label={t("budgets.loeschen")} onClick={() => loeschfrage.stellen({
-                                name: z.kategorieName,
-                                folgen: t("budgets.loeschenFolgen"),
-                                ausfuehren: async () => { await budgetLoeschen(z.budget.id); await laden(); },
-                              })} />
-                            </IconLeiste>
-                          </span>
-                        ),
-                      },
-                    ]}
-                    rows={[...rows]}
-                    // Der Name TRÄGT die Möglichkeit sichtbar; die ganze Zeile als Ziel kommt
-                    // dazu, weil man nach dem ersten Mal die Trefferfläche will.
-                    onRowClick={(z: GruppierterStand) => verlaufUmschalten(z.budget.id)}
-                    istAktiv={(z: GruppierterStand) => z.budget.id === offenesBudget}
-                  />
-                </section>
-              ))}
-          </div>
+          <BudgetTabelle
+            zeilen={zeilen}
+            kontoNamen={kontoName}
+            fehlt={fehlt}
+            offen={offenesBudget}
+            onZeile={(z) => verlaufUmschalten(z.budget.id)}
+            onBearbeiten={bearbeiten}
+            onLoeschen={(z) => loeschfrage.stellen({
+              name: z.kategorieName,
+              folgen: t("budgets.loeschenFolgen"),
+              ausfuehren: async () => { await budgetLoeschen(z.budget.id); await laden(); },
+            })}
+          />
           {zeilen.some((z) => z.tiefe > 0) && (
             <div className="muted" style={{ fontSize: "var(--fs-2xs)", marginTop: "var(--sp-2)" }}>
               <div>{t("budgets.abschnittListeHinweis")}</div>
@@ -579,131 +385,18 @@ export function BudgetsScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => v
         </Card>
       )}
 
-      {offen && (
-        <Modal
-          title={editId ? t("budgets.modalBearbeiten") : t("budgets.anlegen")}
-          subtitle={t("budgets.modalUntertitel")}
-          onClose={() => setOffen(false)}
-          footer={
-            <>
-              <Button variant="primary" onClick={speichern}>
-                {t("budgets.speichern")}
-              </Button>
-              <Button variant="link" onClick={() => setOffen(false)}>
-                {t("budgets.abbrechen")}
-              </Button>
-              {fehler && <span className="err">{fehler}</span>}
-            </>
-          }
-        >
-          <div className="form-grid">
-            {/* Die Art ist jetzt jederzeit umstellbar — beide liegen in derselben
-                Tabelle, ein Wechsel ist kein Aggregatwechsel mehr. */}
-            <FormField label={t("budgets.feldArt")} hint={t(`budgets.artHinweis.${art}`)}>
-              <Auswahl
-                ariaLabel={t("budgets.feldArt")}
-                wert={art}
-                aufAenderung={(v) => setArt(v as Budgetart)}
-                optionen={ARTEN.map((a) => ({ wert: a, text: t(`budgets.art.${a}`) }))}
-              />
-            </FormField>
-
-            <FormField label={t("budgets.feldKategorie")} required hint={t("budgets.feldKategorieHinweis")}>
-              <CategoryPicker kategorien={[...kategorien]} value={kategorieId} onChange={setKategorieId} />
-            </FormField>
-
-            <FormField label={t("budgets.feldKonto")} required hint={t("budgets.feldKontoHinweis")}>
-              <Auswahl
-                ariaLabel={t("budgets.feldKonto")}
-                wert={kontoId}
-                aufAenderung={setKontoId}
-                platzhalter={t("budgets.kontoWaehlen")}
-                optionen={[{ wert: "", text: t("budgets.kontoWaehlen") }, ...waehlbareKonten(konten, kontoId).map((k) => ({ wert: k.id, text: k.bezeichnung }))]}
-              />
-            </FormField>
-
-            <FormField
-              label={`${t("budgets.feldBetrag")} ${geld.symbol}`}
-              required
-              hint={editId ? t("budgets.giltAbHinweis", { monat: zielMonat }) : t("budgets.feldBetragHinweis")}
-            >
-              <input className="field" inputMode="decimal" value={betragText} onChange={(e) => setBetragText(e.target.value)} placeholder={geld.format(0)} />
-            </FormField>
-
-            {/* Die Reihe der bisherigen Beträge — nur beim Bearbeiten, beim Anlegen gibt
-                es sie noch nicht. Sie steht hier und nicht auf dem Screen, weil sie die
-                Frage beantwortet, die man genau hier hat: „was habe ich zuletzt geplant,
-                und wo greift meine Eingabe hinein?" */}
-            {editId && bearbeitetesBudget && (
-              <div style={{ gridColumn: "1 / -1" }}>
-                <div style={{ fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: ".04em", color: "var(--ink-3)", marginBottom: "var(--sp-2)" }}>
-                  {t("budgets.versionenTitel")}
-                </div>
-                {bearbeitetesBudget.betraege.map((v) => {
-                  const aktiv = v.abMonat === zielMonat;
-                  return (
-                    <div
-                      key={v.abMonat}
-                      style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", padding: "5px 8px", borderRadius: "var(--r-md)", background: aktiv ? "var(--accent-soft)" : "transparent", fontSize: "var(--fs-ui)" }}
-                    >
-                      <span className="num" style={{ color: "var(--ink-3)", fontWeight: "var(--fw-bold)", flex: "0 0 auto" }}>
-                        {t("budgets.versionAb", { monat: v.abMonat })}
-                      </span>
-                      <span className="num" style={{ marginLeft: "auto", fontWeight: "var(--fw-semi)" }}>
-                        {geld.formatMitSymbol(v.betrag)}
-                      </span>
-                      <IconLeiste>
-                        <IconButton icon="bearbeiten" label={t("budgets.versionAendern", { monat: v.abMonat })} onClick={() => versionBearbeiten(v.abMonat, v.betrag)} />
-                        {/* Die letzte Version bleibt: ein Budget ohne Betrag wäre eine
-                            Kategorie mit einem Etikett. Der Use-Case weist es ohnehin ab —
-                            der Knopf verschwindet, damit man nicht erst dagegen läuft. */}
-                        {bearbeitetesBudget.betraege.length > 1 && (
-                          <IconButton icon="loeschen" ton="gefahr" label={t("budgets.versionLoeschen", { monat: v.abMonat })} onClick={() => loeschfrage.stellen({
-                              name: t("budgets.versionName", { monat: v.abMonat }),
-                              folgen: t("budgets.versionLoeschenFolgen"),
-                              ausfuehren: () => versionLoeschen(v.abMonat),
-                            })} />
-                        )}
-                      </IconLeiste>
-                    </div>
-                  );
-                })}
-                {/* Zurück auf „ab jetzt", wenn gerade eine alte Version im Feld steht. */}
-                {!bearbeitetesBudget.betraege.some((v) => v.abMonat === zielMonat) ? null : zielMonat !== heute.slice(0, 7) && (
-                  <Button variant="link" type="button" onClick={() => setZielMonat(heute.slice(0, 7))}>
-                    {t("budgets.wiederAbLaufend", { monat: heute.slice(0, 7) })}
-                  </Button>
-                )}
-              </div>
-            )}
-
-            {/* Beim ANLEGEN für beide Arten, und das ist der Punkt: das Feld sagt, ab
-                welchem Monat der erste Betrag gilt. Ohne es landete er zwangsläufig im
-                laufenden Monat, und wer ein Budget für etwas anlegt, das seit dem Frühjahr
-                läuft, sähe jeden Monat davor mit Rahmen 0 — die Auswertung zeigte dann
-                lauter Überziehungen, die nie welche waren. Rückwirkend ERFUNDEN wird
-                dabei nichts: der Monat ist eine Angabe und keine Annahme.
-
-                EIN Feld für beide Arten, nicht zwei: beim Aufbauenden setzt derselbe
-                Monat zugleich den Sammelanker. Zwei Felder für einen Zeitpunkt wären zwei
-                Wahrheiten, und die erste Abweichung fiele niemandem auf.
-
-                Beim BEARBEITEN bleibt es der Anker und damit nur beim Aufbauenden: ab
-                wann ein GEÄNDERTER Betrag gilt, sagt dort die Betragsreihe darüber. */}
-            {(!editId || art === "aufbauend") && (
-              <FormField
-                label={editId ? t("budgets.feldStart") : t("budgets.feldGiltAb")}
-                hint={editId ? t("budgets.feldStartHinweis") : t(`budgets.feldGiltAbHinweis.${art}`)}
-              >
-                <Datumsfeld
-                  ariaLabel={editId ? t("budgets.feldStart") : t("budgets.feldGiltAb")}
-                  wert={start}
-                  aufAenderung={setStart}
-                />
-              </FormField>
-            )}
-          </div>
-        </Modal>
+      {dialog && (dialog.neu || bearbeitet) && (
+        <BudgetDialog
+          art={dialog.neu ? dialog.art : "monatlich"}
+          stand={bearbeitet}
+          vorbelegung={dialog.neu ? dialog.vorbelegung : undefined}
+          heute={heute}
+          kategorien={kategorien}
+          konten={konten}
+          onClose={() => setDialog(null)}
+          onGespeichert={async () => { setDialog(null); await laden(); }}
+          onGeaendert={laden}
+        />
       )}
 
       {/* Nach einer Änderung den ganzen Bereich neu rechnen: eine geänderte Kategorie

@@ -233,10 +233,22 @@ describe("ErgebnisKarten", () => {
     rendere(<ErgebnisKarten {...props({ budgets: [...BUDGETS, topf], ist: [...IST, reise] })} />);
     const august = await karte("August 2026");
 
-    await nutzer.click(within(august).getByText(text("ergebnis.zeile.wagnisse")));
+    // Seit 2026-11-15 steht es in der Zeile der Rücklagen — für den Nutzer dasselbe.
+    await nutzer.click(within(august).getByText(text("ergebnis.zeile.abschreibungen")));
     // Acht Raten sind im Topf, 600 gehen raus: der Monat kostet die Rate.
     expect(within(august).getAllByText("−100,00").length).toBeGreaterThan(0);
     expect(within(august).getByText(new RegExp("600,00"))).toBeInTheDocument();
+  });
+
+  it("führt Rücklage und aufbauendes Budget in EINER Zeile, als Summe beider", async () => {
+    const topf: Budget = { id: "b-urlaub", kategorieId: "urlaub", kontoId: "giro", betraege: [{ abMonat: "2026-01", betrag: 10000 }], art: "aufbauend", start: "2026-01-01" };
+    rendere(<ErgebnisKarten {...props({ ruecklagen: RUECKLAGEN, budgets: [...BUDGETS, topf] })} />);
+    const august = await karte("August 2026");
+    // Eine Zeile „Rücklagen", keine zweite daneben.
+    expect(within(august).getAllByText(text("ergebnis.zeile.abschreibungen"))).toHaveLength(1);
+    // Ihre Summe: die Rücklagen (120,00, siehe oben) plus die Rate des Budgets (100,00).
+    const zeile = within(august).getByText(text("ergebnis.zeile.abschreibungen")).closest("[aria-expanded]") as HTMLElement;
+    expect(zeile.textContent).toMatch(/−220,00/);
   });
 
   it("zeigt am Vorsorgeziel die Rate als Kosten und daneben, was überwiesen wurde", async () => {

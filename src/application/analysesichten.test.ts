@@ -251,7 +251,7 @@ describe("analyseKostenverlauf", () => {
     expect(monate.map((m) => m.monat)).toEqual(["2026-06", "2026-07", "2026-08"]);
     expect(monate[0]).toMatchObject({
       einnahmen: 300000,
-      kosten: { fixkosten: 90000, laufend: 30000, ungeplant: 0, abschreibungen: 10000, wagnisse: 0, vorsorge: 0 },
+      kosten: { fixkosten: 90000, laufend: 30000, ungeplant: 0, abschreibungen: 10000, vorsorge: 0 },
       kostenGesamt: 130000,
       ergebnis: 170000,
       laufend: false,

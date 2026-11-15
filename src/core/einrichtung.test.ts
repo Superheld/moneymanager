@@ -84,6 +84,8 @@ describe("einrichtungsstand", () => {
 
   it("nimmt ein aufbauendes Budget als Rücklage", () => {
     expect(status(eingabe({ budgets: [budget("aufbauend")] }), "ruecklagen").status).toBe("erledigt");
+    // … und nicht als Budget: der Bereich Budgets zeigt es nicht mehr.
+    expect(status(eingabe({ budgets: [budget("aufbauend")] }), "budgets").status).toBe("offen");
     expect(status(eingabe({ ruecklagenAnzahl: 1 }), "ruecklagen").status).toBe("erledigt");
   });
 
