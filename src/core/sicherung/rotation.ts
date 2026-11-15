@@ -10,7 +10,7 @@
 // Entfernen ist Sache des Adapters. Deshalb keine Uhr und kein Dateisystem — `heute`
 // steckt in den Stichtagen selbst, denn eine Sicherung von heute gibt es immer.
 
-import { ord, parseIso } from "../basis/datum";
+import { tageBis } from "../basis/datum";
 
 // **Eine Stufe zählt VORHANDENE Stände, keine Kalendereinheiten.** „Vier wöchentlich"
 // heisst: die vier jüngsten Sieben-Tage-Blöcke, IN DENEN ES EINE SICHERUNG GIBT — nicht
@@ -76,7 +76,11 @@ export const AUFBEWAHRUNG: Aufbewahrung = {
 /** Ein Sieben-Tage-Block. Bewusst NICHT die ISO-Woche: für eine Staffelung zählt der
  *  gleichmässige Abstand, nicht welcher Wochentag ein Jahr beginnt. */
 function wochenschluessel(iso: string): string {
-  return String(Math.floor(ord(parseIso(iso)) / 7));
+  // Gezählt werden echte Tage seit einem festen Anfang. Bis 2026-11-16 stand hier `ord`,
+  // und das ist ein Sortierschlüssel (YYYYMMDD), kein Tageszähler: an jedem Monatswechsel
+  // sprang er, der Block davor und der danach waren kürzer als sieben Tage, und „vier
+  // wöchentlich" reichte entsprechend weniger weit zurück.
+  return String(Math.floor(tageBis("1970-01-01", iso) / 7));
 }
 
 /** Kalenderquartal: `2026-08-26` -> `2026-Q3`. */
