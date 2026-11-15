@@ -65,7 +65,8 @@ Drei Regeln, wohin eine neue Datei gehört:
 
 Was **keinem** Bereich gehört, bleibt in der Wurzel der Schicht: die Fassaden (`index.ts`,
 `ports.ts`), der Start (`bootstrap.ts`) und die bewusst querliegenden Sichten
-(`uebersicht.ts`, `analysesichten.ts`, `core/monatsausblick.ts`, `core/auswertung.ts`) —
+(`uebersicht.ts`, `analysesichten.ts`, `core/monatsausblick.ts`, `core/auswertung.ts`,
+`core/einordnung.ts`, `core/ergebnis.ts`) —
 sie rechnen über mehrere Bereiche hinweg, und das ist ihre Aufgabe, kein Fehler. In `ui/` liegen aus demselben Grund
 die bereichsübergreifenden Tests oben (`screens`, `interaktion`, `formulare`).
 
@@ -476,6 +477,12 @@ Vier Dinge gelten überall und stehen deshalb hier:
   Monatskarten hingen einen Tag lang auch an dieser Grenze und tun es seit 2026-11-09
   nicht mehr: dort fällt jede Umbuchung zwischen erfassten Konten heraus. Wer eine dritte
   Grenze zieht, ändert wieder die Bedeutung des Feldes und schreibt es hierher.
+
+  **Seit 2026-11-15 gibt es die dritte:** `istVorsorgekonto` fragt nach `vorsorge` oder
+  `investment` und entscheidet, ob eine Umbuchung auf das Konto in der Ergebnisrechnung
+  als Vorsorge zählt (`core/einordnung.ts`). `sparen` gehört nicht dazu — Geld ohne Zweck
+  beiseitezulegen ist Überschuss, keine Verpflichtung. Damit sind Vorsorge und Investment
+  für diese eine Rechnung dasselbe, und Sparen ist die einzige Klasse ohne eigene Grenze.
 
   Was für jede Auswahl von Konten gilt: **Saldo und Buchungen filtern mit derselben
   Liste.** Sonst zeigt ein Verlauf einen Stand, den es nie gab.

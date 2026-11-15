@@ -35,6 +35,8 @@ export * from "./konten/kontobelegung";
 export * from "./buchung/historie";
 export * from "./buchung/journal";
 export * from "./monatsausblick";
+export * from "./einordnung";
+export * from "./ergebnis";
 export * from "./auswertung";
 export * from "./klassifikator/merkmale";
 export * from "./klassifikator/modell";
