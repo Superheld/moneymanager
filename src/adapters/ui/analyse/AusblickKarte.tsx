@@ -29,7 +29,8 @@ export function AusblickKarte({ punkte }: { punkte: readonly Verlaufspunkt[] }) 
 
   // Der tiefste Punkt der Vorschau. Er ist die Aussage, auf die es ankommt: ein Monat, der
   // bei plus endet, kann zwischendurch unten gewesen sein — und der Endstand verschweigt
-  // genau das. Monatsgenau ist das noch grob; taggenau wird es erst der Liquiditätsplan.
+  // genau das. Monatsgenau ist das noch grob; taggenau und je Konto steht es in der
+  // Karte darunter (`LiquiditaetKarte`).
   const tief = punkte
     .filter((p) => p.plan)
     .reduce<Verlaufspunkt | null>((t2, p) => (t2 == null || p.saldo < t2.saldo ? p : t2), null);

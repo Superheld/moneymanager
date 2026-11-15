@@ -80,6 +80,9 @@ export {
   // Aufzählungen, die die UI als Auswahl anbietet
   KONTOTYPEN,
   KONTOKLASSEN,
+  // Die Kostenarten der Ergebnisrechnung in ihrer Reihenfolge — eine Aufzählung, über
+  // die Tabelle und Diagramm der Kostensicht laufen, keine Entscheidung.
+  KOSTENZEILEN,
   // Ein Vorschlag ist keine Entscheidung: `klasseVorschlag` leitet aus dem Typ ab, was
   // beim Anlegen sinnvoll voreingestellt ist. Ändern kann der Nutzer es immer.
   klasseVorschlag,
@@ -244,6 +247,13 @@ export {
   type Kategorienreihen,
   type Befunde,
   type Verlaufspunkt,
+  analyseKostenverlauf,
+  type KostenMonat,
+  type Kostenverlauf,
+  analyseLiquiditaet,
+  LIQUIDITAET_TAGE,
+  type Liquiditaetssicht,
+  type Liquiditaetszeile,
 } from "./analysesichten";
 export {
   depotsLaden,

@@ -9,6 +9,9 @@ import { einordnen } from "./einordnung";
 import {
   einordnungskontext,
   ergebnisbasis,
+  ergebnisKennzahlen,
+  monatsKosten,
+  ruecklagenrateFehlt,
   monatsanteil,
   monatsErgebnis,
   type ErgebnisEingabe,
@@ -321,5 +324,85 @@ describe("Einordnung", () => {
     const r = erwarteAufgang(e, "2025-06");
     expect(zeile(r, "laufend")?.ist).toBe(1200);
     expect(zeile(r, "einnahmen")?.ist).toBe(0);
+  });
+});
+
+const ruecklage = (over: Partial<Ruecklage>): Ruecklage => ({ id: "rl", bezeichnung: "Vibora", beginn: "2025-01-01", ...over });
+
+describe("Kennzahlen über mehrere Monate", () => {
+  // Ein Haushalt mit je einer Zeile jeder Art, damit keine Quote zufällig stimmt.
+  const haushalt = (over: Partial<ErgebnisEingabe> = {}) =>
+    eingabe({
+      regeln: [regel({ id: "miete", bezeichnung: "Ohlert", betrag: -100000, rhythmus: "monatlich", startdatum: "2025-01-03", vertragId: "v-miete" })],
+      budgets: [
+        budget({ id: "alltag", rate: 50000 }),
+        budget({ id: "reise", kategorieId: "reise", art: "aufbauend", rate: 20000 }),
+      ],
+      ruecklagen: [ruecklage({ rate: 10000 })],
+      ...over,
+    });
+  const monat = (m: string, gehalt: number) => {
+    const miete = ist(`${m}-03`, -100000, { kategorieId: "absicherung" });
+    return {
+      buchungen: [ist(`${m}-01`, gehalt, { kategorieId: "gehalt" }), miete, ist(`${m}-12`, -40000, { kategorieId: "markt" })],
+      vertrag: [miete.id, "v-miete"] as const,
+    };
+  };
+
+  it("mittelt Kosten und Ergebnis und bildet die Quoten über die Summen", () => {
+    const a = monat("2025-05", 300000);
+    const b = monat("2025-06", 100000);
+    const e = haushalt({ ist: [...a.buchungen, ...b.buchungen], vertragJeBuchung: new Map([a.vertrag, b.vertrag]) });
+    const monate = [rechne(e, "2025-05"), rechne(e, "2025-06")];
+
+    // Je Monat: 1000 fix + 400 Alltag + 100 Rücklage + 200 Topf.
+    expect(monate.map(monatsKosten)).toEqual([170000, 170000]);
+    const k = ergebnisKennzahlen(monate);
+    expect(k).toMatchObject({ monate: 2, kostenJeMonat: 170000, ergebnisJeMonat: 30000 });
+    // Über die Summen: 2000 von 4000 — nicht das Mittel aus einem Drittel und dem Ganzen.
+    expect(k.fixkostenquote).toBeCloseTo(0.5, 10);
+    expect(k.sparquote).toBeCloseTo(60000 / 400000, 10);
+  });
+
+  it("nennt ohne Einnahmen keine Quote statt einer Null", () => {
+    const a = monat("2025-05", 0);
+    const e = haushalt({ ist: a.buchungen.slice(1), vertragJeBuchung: new Map([a.vertrag]) });
+    const k = ergebnisKennzahlen([rechne(e, "2025-05")]);
+    expect(k.fixkostenquote).toBeNull();
+    expect(k.sparquote).toBeNull();
+    expect(k.kostenJeMonat).toBe(170000);
+  });
+
+  it("lässt eine Erstattung die Kosten senken", () => {
+    const e = eingabe({
+      budgets: [budget({ id: "alltag", rate: 50000 })],
+      ist: [ist("2025-05-07", -30000, { kategorieId: "markt" }), ist("2025-05-20", 5000, { charakter: "Aufwand", kategorieId: "markt" })],
+    });
+    expect(monatsKosten(rechne(e, "2025-05"))).toBe(25000);
+  });
+
+  it("zählt künftige Monate nicht mit und bleibt ohne Monate bei null", () => {
+    const e = haushalt({ heute: "2025-05-31" });
+    expect(ergebnisKennzahlen([rechne(e, "2025-07")])).toEqual({
+      monate: 0, kostenJeMonat: 0, ergebnisJeMonat: 0, fixkostenquote: null, sparquote: null,
+    });
+    expect(ergebnisKennzahlen([]).monate).toBe(0);
+  });
+});
+
+describe("Die Grenze nach hinten: ausgebuchte Rücklagen", () => {
+  it("zeigt vor dem neuen Beginn keine Rate — und sagt, welche Monate das trifft", () => {
+    // Die Rücklage lief seit Jahren und wurde im Juni ausgebucht: `beginn` steht auf dem
+    // Tag der Ausgabe. Im Mai wurde zurückgelegt, die Rechnung weiss es nicht mehr.
+    const e = eingabe({ ruecklagen: [ruecklage({ rate: 10000, beginn: "2025-06-14" })] });
+    expect(zeile(rechne(e, "2025-05"), "abschreibungen")).toBeUndefined();
+    expect(zeile(rechne(e, "2025-06"), "abschreibungen")?.ist).toBe(-10000);
+
+    const ausbuchungen = ["2025-06-14"];
+    expect(ruecklagenrateFehlt("2025-05", ausbuchungen)).toBe(true);
+    // Der Monat der Ausbuchung trägt schon die erste Rate des neuen Zyklus.
+    expect(ruecklagenrateFehlt("2025-06", ausbuchungen)).toBe(false);
+    expect(ruecklagenrateFehlt("2025-07", ausbuchungen)).toBe(false);
+    expect(ruecklagenrateFehlt("2025-05", [])).toBe(false);
   });
 });

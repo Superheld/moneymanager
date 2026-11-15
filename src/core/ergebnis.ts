@@ -508,3 +508,100 @@ export function monatsErgebnisse(basis: Ergebnisbasis, anzahl = 3): MonatsErgebn
     monatsErgebnis(basis, toIso({ ...addMonate(start, i), d: 1 })),
   );
 }
+
+// ------------------------------------------------------------------ über mehrere Monate
+//
+// Was folgt, wertet eine REIHE von Monatsergebnissen aus — die Kostensicht der Analyse.
+// Es steht hier und nicht in `auswertung.ts`, weil es auf den Zeilen dieser Rechnung
+// aufbaut und nicht auf Buchungen: wer eine Zeile ergänzt, sieht die Stelle, an der sie
+// in die Kennzahlen eingehen muss.
+
+/** Die Zeilen, die KOSTEN sind — alle ausser den Einnahmen, in der Reihenfolge der Stufen. */
+export const KOSTENZEILEN = ["fixkosten", "laufend", "ungeplant", "abschreibungen", "wagnisse", "vorsorge"] as const;
+export type KostenZeileId = (typeof KOSTENZEILEN)[number];
+
+/**
+ * Das Ist einer Zeile, vorzeichenbehaftet. Eine Zeile, die im Monat fehlt (siehe
+ * `monatsErgebnis`: nur die ersten drei stehen immer da), ist 0 — nicht „unbekannt".
+ */
+export function zeilenIst(m: MonatsErgebnis, id: ErgebnisZeileId): Cent {
+  return m.zeilen.find((z) => z.id === id)?.ist ?? 0;
+}
+
+/** Die Kosten eines Monats, POSITIV: die negierte Summe der Kostenzeilen. */
+export function monatsKosten(m: MonatsErgebnis): Cent {
+  return -summe(KOSTENZEILEN.map((id) => zeilenIst(m, id))) || 0;
+}
+
+export interface ErgebnisKennzahlen {
+  /** Über wie viele Monate gemittelt wurde. */
+  readonly monate: number;
+  /** Durchschnitt je Monat, positiv. */
+  readonly kostenJeMonat: Cent;
+  /** Durchschnitt je Monat, vorzeichenbehaftet — „bleibt wirklich frei". */
+  readonly ergebnisJeMonat: Cent;
+  /** Fixkosten ÷ Einnahmen (0…1, bei Überdeckung darüber). `null` ohne Einnahmen. */
+  readonly fixkostenquote: number | null;
+  /** (Rücklagen + aufbauende Budgets + Vorsorge) ÷ Einnahmen. `null` ohne Einnahmen. */
+  readonly sparquote: number | null;
+}
+
+/**
+ * Die Kennzahlen der Kostensicht über eine Reihe von Monaten.
+ *
+ * Drei Entscheidungen stecken darin:
+ *
+ *   • Die Quoten rechnen über die SUMMEN des Zeitraums, nicht als Mittel der
+ *     Monatsquoten. Ein Monat mit kleinen Einnahmen (Gehalt verschoben) hätte sonst
+ *     dasselbe Gewicht wie alle anderen und zöge die Quote hoch, obwohl über das Jahr
+ *     nichts anders war.
+ *   • Ohne Einnahmen gibt es keine Quote (`null`). Eine 0 hiesse „nichts ist fix", ein
+ *     Unendlich wäre keine Zahl, die jemand lesen kann.
+ *   • Kosten werden durch Negieren der Summe positiv, nie mit `Math.abs` je Zeile — eine
+ *     Erstattung, die eine Zeile ins Plus dreht, muss die Kosten SENKEN (dieselbe Regel
+ *     wie im Kopf von `auswertung.ts`).
+ *
+ * Künftige Monate haben kein Ist und zählen nicht mit. Ob der LAUFENDE Monat hineingehört,
+ * entscheidet der Aufrufer über die Liste, die er hereingibt — hier wird nicht gefiltert,
+ * damit die Funktion für einen einzelnen Monat dasselbe sagt wie für zwölf.
+ */
+export function ergebnisKennzahlen(monate: readonly MonatsErgebnis[]): ErgebnisKennzahlen {
+  const gewesen = monate.filter((m) => !m.zukunft);
+  const n = gewesen.length;
+  const ueberAlle = (id: ErgebnisZeileId) => summe(gewesen.map((m) => zeilenIst(m, id)));
+
+  const einnahmen = ueberAlle("einnahmen");
+  const kosten = summe(gewesen.map(monatsKosten));
+  const ergebnis = summe(gewesen.map((m) => m.ergebnis.ist ?? 0));
+  const fix = -ueberAlle("fixkosten");
+  const gespart = -(ueberAlle("abschreibungen") + ueberAlle("wagnisse") + ueberAlle("vorsorge"));
+
+  return {
+    monate: n,
+    kostenJeMonat: n > 0 ? Math.round(kosten / n) : 0,
+    ergebnisJeMonat: n > 0 ? Math.round(ergebnis / n) : 0,
+    fixkostenquote: einnahmen > 0 ? fix / einnahmen : null,
+    sparquote: einnahmen > 0 ? gespart / einnahmen : null,
+  };
+}
+
+/**
+ * Fehlt in diesem Monat die Rate einer Rücklage, die es damals gab?
+ *
+ * DIE GRENZE DER KOSTENSICHT NACH HINTEN. Eine Rücklage kennt nur ihren laufenden Zyklus:
+ * `sollRuecklage` zählt ab `beginn`, und das Ausbuchen setzt `beginn` auf den Tag der
+ * Ausgabe (mit Ziel) oder löscht die Rücklage (ohne). Für jeden Monat VOR dem Monat einer
+ * Ausbuchung liefert die Rechnung deshalb keine Rate mehr für sie — obwohl in diesen
+ * Monaten zurückgelegt wurde. Die Kosten dieser Monate stehen zu niedrig da, das Ergebnis
+ * zu hoch.
+ *
+ * Reparieren liesse sich das nur mit einer Geschichte der Zyklen, die es nicht gibt. Was
+ * sich sagen lässt, ist, WELCHE Monate betroffen sind — und das gehört neben die Zahl.
+ * Der Monat der Ausbuchung selbst ist nicht betroffen: in ihm zählt schon die erste Rate
+ * des neuen Zyklus.
+ *
+ * `ausbuchungsdaten` sind die ISO-Tage aller Ausbuchungen; `monat` ist „YYYY-MM".
+ */
+export function ruecklagenrateFehlt(monat: string, ausbuchungsdaten: readonly string[]): boolean {
+  return ausbuchungsdaten.some((d) => monatVon(d) > monat);
+}

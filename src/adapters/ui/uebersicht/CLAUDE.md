@@ -68,8 +68,12 @@ nur im Kontoauszug, je Konto. Drei Dinge daran:
 gerahmt, und meldete Konten, die im Vorschaufenster ins Minus laufen, dazu einen zu lange
 zurückliegenden Abruf. Im Gebrauch war das zu laut für eine Seite, die sagen soll, wie man
 dasteht. Die Rechnung dahinter (`liquiditaetsvorschau` in `core/konten/liquiditaet.ts`)
-ist geblieben und getestet, hat aber keine Oberfläche mehr; ebenso `veraltet` am
-Abrufstand. Wer sie wieder zeigt, sucht ihr einen leiseren Ort.
+hat **seit 2026-11-15 ihren leiseren Ort**: das Register „Ausblick" der Analyse, als
+Tabelle „Reicht das Geld?" (`../analyse/LiquiditaetKarte.tsx`). Sie gehört dorthin und
+nicht zurück in die Übersicht — „reicht es in den nächsten Wochen" ist eine Frage nach
+vorn über einen Zeitraum, und eine Warnung, die nur erscheint, wenn etwas brennt, war
+genau das, was hier zu laut war. `veraltet` am Abrufstand hat weiterhin keine Oberfläche;
+dass die Vorschau nur den letzten Abruf kennt, steht dort als Satz unter der Tabelle.
 
 **Umbuchungen zwischen erfassten Konten stehen in keiner Zeile** — sie bewegen eigenes
 Geld. Zwei Ausnahmen, und beide sind Vorsorge: die Umbuchung auf ein Konto der Klasse

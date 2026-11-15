@@ -3,9 +3,11 @@
 // Das ist die eine Frage, aus der Handlungsbedarf entsteht. Alles andere in der Übersicht
 // sagt, wie es steht; hier steht, ob etwas zu tun ist.
 //
-// **Seit 2026-11-08 ohne Oberfläche.** Die Karte „Da ist etwas zu tun", die das hier
-// zeigte, war für die Übersicht zu laut und ist entfallen. Die Rechnung bleibt, bis sie
-// einen leiseren Ort bekommt.
+// **Gezeigt wird sie im Register „Ausblick" der Analyse** („Reicht das Geld?", seit
+// 2026-11-15). Bis 2026-11-08 stand sie als Karte „Da ist etwas zu tun" ganz oben in der
+// Übersicht; dort war sie zu laut und ist entfallen. Der neue Ort ist eine Tabelle über
+// alle liquiden Konten, die immer dasteht — `handlungsbedarf` unten, das nur die Konten
+// im Minus herausgreift, benutzt sie nicht.
 //
 // ZWEI LINIEN, und der Unterschied zwischen ihnen ist die eigentliche Auskunft:
 //
@@ -193,9 +195,8 @@ export function liquiditaetsvorschau(e: LiquiditaetsEingabe): Kontovorschau[] {
   // nicht, und der Unterschied ist die Zeitrichtung: ein Bestand lässt sich sinnvoll mit
   // und ohne stillgelegte Konten bilden („was ist da" gegen „was kann ich ausgeben"), eine
   // VORAUSSCHAU nicht. Ein Konto, das niemand mehr führt, hat keine nächsten 90 Tage; es
-  // mitzurechnen ergäbe eine Warnung über ein Konto, an dem man nichts mehr tun kann —
-  // und die Karte oben ist die einzige, die verschwindet, wenn nichts anliegt. Sie mit so
-  // einer Zeile dauerhaft sichtbar zu halten nähme ihr genau das, was sie wirksam macht.
+  // mitzurechnen ergäbe eine Zeile über ein Konto, an dem man nichts mehr tun kann —
+  // und ein Minus dort stünde neben den Konten, an denen sich etwas ändern lässt.
   return e.konten.filter(istAktiv).map((konto): Kontovorschau => {
     // Der reale Stand MINUS dessen, was schon feststeht und noch nicht gebucht ist. Eine
     // Vormerkung ohne Datum wirkt ab sofort — was die Bank bereits kennt, ist näher als
