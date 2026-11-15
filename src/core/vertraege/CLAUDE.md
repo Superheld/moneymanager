@@ -2,6 +2,33 @@
 
 Gilt für die Zuordnung von Buchungen zu Verträgen und für die Erkennungsregeln. Was überall gilt, steht in der Wurzel-`CLAUDE.md`.
 
+## Ein Vertrag hat zwei Beträge: was abgeht und was er kostet
+
+Die Zahlungsregel trägt den Betrag **je Fälligkeit** — die Auszahlung. Daneben steht, was
+der Vertrag **den Monat kostet**: derselbe Betrag auf die Monate des Rhythmus verteilt
+(`kostenJeMonat` in `vertrag.ts`). Das sind die beiden Sichten aus `src/core/CLAUDE.md`
+(„Auszahlung und Kosten"), und der Bereich zeigt beide, weil erst die zweite einen
+Jahresbeitrag mit einem Monatsabo vergleichbar macht.
+
+Die Kennzahlen über der Liste (`pflichtenJeMonat`) sind die erste Stufe der
+Ergebnisrechnung, über die Verträge als Plan: Fixkosten, geplante Einnahmen, und was
+**nach den Pflichten** bleibt. Drei Dinge daran:
+
+- **Sortiert wird nach dem Charakter der Regel**, wie in `core/ergebnis.ts`: Aufwand sind
+  Fixkosten, Ertrag Einnahmen. Das Wort „nach den Pflichten" steht auch in der Übersicht,
+  und zwei Bereiche, die darunter Verschiedenes rechnen, wären zwei Wahrheiten.
+- **Ein Umbuchungsvertrag zählt in keine der beiden Summen.** Er bewegt eigenes Geld und
+  kostet nichts. Eine Summe „pro Monat" über alle Regeln — die hier lange stand — mischte
+  Einnahmen, Ausgaben und Sparraten und beantwortete keine Frage.
+- **Nur `beendet` nimmt einen Vertrag heraus** (`vertragLaeuft`). Ein gekündigter läuft
+  bis zu seinem Ende und kostet bis dahin; ihn mit der Kündigung herauszunehmen zeigte
+  Geld als frei, das noch abgeht.
+
+`kostenJeMonat` RUNDET, `monatsanteil` in `core/ergebnis.ts` nicht — und beides ist
+richtig. Dort wird eine einzelne Zahlung auf ihre Monate verteilt und muss auf den Cent
+aufgehen (der Rest fällt in den ersten Monat), weil die Überleitung sonst nicht gegen die
+Bank stimmt. Hier ist die Dauerrate gefragt, die für jeden Monat gilt.
+
 ## Zuordnungen stehen an der Buchung
 
 `kategorie_id` und `vertrag_id` sind **Spalten von `ist_buchung`**, nicht eigene Tabellen.
@@ -51,6 +78,42 @@ aus wie eine Messung; was die drei gegeneinander wiegen, hängt am Fall.
 je nach Bank die eigene IBAN, den eigenen Namen oder nichts. Zuordnen darf man sie (ein
 Umbuchungsvertrag ist genau das), als Beleg wäre sie ein Nenner, den kein Kandidat je
 erreicht. Durchgesetzt an einer Stelle: `belegspuren`.
+
+## Was die Regel nicht greift, wird VORGESCHLAGEN — nie zugeordnet
+
+Die Erkennung hängt am Empfänger. Greift sie nicht — der Name im Auszug weicht ab, die
+Spanne ist zu eng, die Buchung wurde von Hand erfasst und hat keinen Beleg —, bleibt die
+Zahlung ohne Vertrag. Das hat eine sichtbare Folge, seit die Ergebnisrechnung Fixkosten
+über die Zuordnung findet: der Vertrag steht in der Übersicht als „offen", seine Zahlung
+unter „Ungeplant".
+
+`core/vertraege/zuordnungsvorschlag.ts` sucht deshalb von der anderen Seite: nicht nach
+dem Namen, sondern nach dem, was die Zahlungsregel über die Zahlung weiss — Kategorie
+(über `kategorieAnteile`), Richtung, Höhe, Termin. Sichtbar am einzelnen Vertrag unter
+seinen Zahlungen („Könnte dazugehören"), herausgegeben über `Vertragszeile.kandidaten`.
+
+- **Es ist ein Vorschlag, und das ist die Entscheidung.** Dieselbe Messung hat in der
+  früheren Monatskarte selbsttätig gepaart; dort ist sie abgelöst worden, weil ein Betrag,
+  der zufällig passt, keine Aussage ist. Zur Aussage wird er erst durch die Bestätigung —
+  geschrieben wird also nur auf einen Klick, mit Herkunft `manuell`. Wer hieraus eine
+  Automatik macht, baut die Betragsnähe wieder ein, nur an anderer Stelle.
+- **Die Bestätigung ist zugleich ein Beleg.** Eine Handzuordnung ist genau das, woraus
+  die Merkmalsableitung (unten) die Regel verbessert. Der Vorschlag repariert damit nicht
+  nur die eine Zahlung, sondern führt dahin, dass die nächste von selbst erkannt wird.
+- **Über eine entschiedene Buchung wird nicht noch einmal gefragt.** Kandidat ist nur die
+  erste Zeile der Tabelle unten. Vor allem das Nein von Hand (zweite Zeile) bleibt
+  draussen: sonst stünde dieselbe Frage bei jedem Öffnen wieder da.
+- **„Gehört nicht dazu" heisst hier „gehört zu KEINEM Vertrag".** Das Schema kennt kein
+  Nein zu einem einzelnen Vertrag, nur das zu allen. Der Knopf sagt deshalb, was er
+  schreibt. Für eine Zahlung, die zu einem ANDEREN Vertrag gehört, ist er der falsche —
+  die ordnet man dort zu.
+- **Die Toleranzen sind auf „lieber zu viel" gestellt.** Was zu viel vorgeschlagen wird,
+  sieht man und klickt es weg; was fehlt, sieht niemand. Beim Termin heisst das: bei
+  monatlichem Takt schränkt er praktisch nichts ein (die erste Fälligkeit einer Regel ist
+  oft geschätzt), erst bei längerem Takt trennt er.
+- **Für einen Umbuchungsvertrag gibt es keine Vorschläge.** Er wird am Weg erkannt
+  (unten), und das ist eine harte Übereinstimmung; eine weiche daneben wären zwei
+  Antworten auf dieselbe Frage.
 
 ## Ein Merkmal kann MUSS sein, und die Regel hat ein Fälligkeitsfenster
 

@@ -13,17 +13,19 @@ import {
   type Vertragskandidat,
   type Vertragssicht,
   type Zahlungsregel,
+  type Zuordnungsvorschlag,
 } from "../../../application";
 import {
   vertraege as vertraegeLaden,
   vertragLoeschen,
+  vertragZuordnenVonHand,
   vertragsvorschlagIgnorieren,
 } from "../../dienste";
 import { Button, Card, DataTable, KPIStat, Pill } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
 import type { DataColumn } from "../bausteine/DataTable";
 import { PageHead } from "../bausteine/PageHead";
-import { geldFarbe } from "../bausteine/geldFarbe";
+import { geldFarbe, geldTon, warnTon } from "../bausteine/geldFarbe";
 import { IconButton } from "../bausteine/IconButton";
 import { VertragModal } from "./VertragModal";
 import {
@@ -39,7 +41,7 @@ import { ErkennungsDialog } from "./ErkennungsDialog";
 
 /** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
 const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
-const LEERE_KENNZAHLEN = { proMonat: 0, proJahr: 0, baldKuendbar: 0, ruecklage: 0 } as const;
+const LEERE_KENNZAHLEN = { fixkostenJeMonat: 0, einnahmenJeMonat: 0, nachPflichten: 0, baldKuendbar: 0, ruecklage: 0 } as const;
 
 /** Die Turnus-Ansicht zeigt je Rhythmus eine Gruppe — in dieser Reihenfolge. */
 const RHYTHMEN: Rhythmus[] = ["monatlich", "quartalsweise", "halbjaehrlich", "jaehrlich"];
@@ -145,6 +147,18 @@ export function VertraegeScreen() {
     setMaske({ editId: null, start: formularAusKandidat(k, heute, geld) });
   }
 
+  /**
+   * Einen Kandidaten entscheiden: `vertragId` ordnet zu, `null` sagt „gehört zu keinem
+   * Vertrag". Beides ist eine Handentscheidung (Herkunft `manuell`) und überlebt jeden
+   * Abgleich — und beides nimmt die Zeile aus der Liste, weil über sie entschieden ist.
+   * Danach neu laden: die Zahl in der Tabelle, die Zahlungsliste und die Kandidaten der
+   * ANDEREN Verträge hängen alle an derselben Buchung.
+   */
+  async function kandidatEntscheiden(k: Zuordnungsvorschlag, vertragId: string | null) {
+    await vertragZuordnenVonHand(k.buchung.id, vertragId);
+    await laden();
+  }
+
   async function vorschlagVerwerfen(k: Vertragskandidat) {
     await vertragsvorschlagIgnorieren(k.schluessel);
     await laden();
@@ -236,13 +250,34 @@ export function VertraegeScreen() {
         },
       },
       {
+        // Was der Vertrag den Monat KOSTET, neben dem, was bei Fälligkeit abgeht. Bei
+        // monatlichem Takt dieselbe Zahl — sie steht trotzdem da, weil die Spalte sonst
+        // Lücken hätte und sich nicht mehr von oben nach unten lesen liesse.
+        key: "jeMonat",
+        label: `${t("vertraege.spalteJeMonat")} ${geld.symbol}`,
+        align: "right",
+        render: (v) => {
+          const wert = zeileZu.get(v.id)?.jeMonat ?? 0;
+          return wert !== 0 ? geld.format(wert) : <span className="muted">—</span>;
+        },
+      },
+      {
         // Greift die Erkennung? Eine Null heißt: die Regel findet nichts.
         key: "zahlungen",
         label: t("vertraege.spalteZugeordnet"),
         align: "right",
         render: (v) => {
           const n = zeileZu.get(v.id)?.zahlungen ?? 0;
-          return n > 0 ? String(n) : <Pill variant="warn">{t("vertraege.keineZuordnung")}</Pill>;
+          const moeglich = zeileZu.get(v.id)?.kandidaten.length ?? 0;
+          return (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+              {/* Dass es etwas zu bestätigen gibt, muss in der ZEILE stehen: die Liste
+                  dazu liegt aufgeklappt unter der Tabelle, und wer nicht weiss, dass
+                  dort etwas wartet, klappt nicht auf. */}
+              {moeglich > 0 && <Pill variant="neutral">{t("vertraege.kandidaten.pille", { count: moeglich })}</Pill>}
+              {n > 0 ? String(n) : <Pill variant="warn">{t("vertraege.keineZuordnung")}</Pill>}
+            </span>
+          );
         },
       },
     ];
@@ -448,15 +483,21 @@ export function VertraegeScreen() {
       {alleVertraege.length > 0 && (
         <div className="kpis">
           <KPIStat size="chip" label={t("vertraege.kpiAnzahl")} value={String(alleVertraege.length)} />
-          <KPIStat size="chip" label={t("vertraege.kpiProMonat")} value={geld.format(summe.proMonat, { mitVorzeichen: true })} unit={geld.symbol} tone={summe.proMonat < 0 ? "warn" : "ok"} />
-          <KPIStat size="chip" label={t("vertraege.kpiProJahr")} value={geld.format(summe.proJahr, { mitVorzeichen: true })} unit={geld.symbol} tone={summe.proJahr < 0 ? "warn" : "ok"} />
+          {/* Die erste Stufe der Ergebnisrechnung, über die Verträge als Plan: was sie
+              kosten, was sie einbringen, was danach bleibt. Alle drei sind gerichtetes
+              Geld, die Farbe kommt deshalb aus dem Vorzeichen (`geldTon`) — und das Wort
+              für die dritte ist dasselbe wie in der Übersicht, weil es dieselbe Zahl
+              meint. */}
+          <KPIStat size="chip" label={t("vertraege.kpiFixkosten")} value={geld.format(summe.fixkostenJeMonat, { mitVorzeichen: true })} unit={geld.symbol} tone={geldTon(summe.fixkostenJeMonat)} />
+          <KPIStat size="chip" label={t("vertraege.kpiEinnahmen")} value={geld.format(summe.einnahmenJeMonat, { mitVorzeichen: true })} unit={geld.symbol} tone={geldTon(summe.einnahmenJeMonat)} />
+          <KPIStat size="chip" label={t("ergebnis.stufe.nachPflichten")} value={geld.format(summe.nachPflichten, { mitVorzeichen: true })} unit={geld.symbol} tone={geldTon(summe.nachPflichten)} />
           {summe.ruecklage > 0 && (
             // Ohne meta-Zeile: sie machte genau diese Karte eine Zeile höher als ihre
             // Nachbarn, und die Reihe stand sichtbar schief. Was sie erklärte, steht
             // jetzt im Label.
             <KPIStat size="chip" label={t("vertraege.kpiRuecklage")} value={geld.format(summe.ruecklage)} unit={geld.symbol} />
           )}
-          {summe.baldKuendbar > 0 && <KPIStat size="chip" label={t("vertraege.kpiBald")} value={String(summe.baldKuendbar)} tone="warn" />}
+          {summe.baldKuendbar > 0 && <KPIStat size="chip" label={t("vertraege.kpiBald")} value={String(summe.baldKuendbar)} tone={warnTon(true)} />}
         </div>
       )}
 
@@ -645,6 +686,73 @@ export function VertraegeScreen() {
               ]}
               rows={[...zahlungsdetail.zahlungsliste]}
             />
+          )}
+
+          {/* Was die Erkennungsregel NICHT gegriffen hat und trotzdem passen könnte. Es
+              steht hier, direkt unter den zugeordneten Zahlungen, weil es dieselbe Frage
+              von der anderen Seite ist: oben „was gehört dazu", hier „was fehlt noch".
+              Die App fragt und ordnet nichts selbst zu — ein passender Betrag ist keine
+              Aussage, bis jemand ihn bestätigt. */}
+          {zahlungsdetail.kandidaten.length > 0 && (
+            <div data-testid="zuordnungskandidaten" style={{ borderTop: "1px solid var(--line)", marginTop: "var(--sp-5)", paddingTop: "var(--sp-5)" }}>
+              <div style={{ fontSize: "var(--fs-title)", fontWeight: "var(--fw-bold)", letterSpacing: "var(--ls-h)" }}>
+                {t("vertraege.kandidaten.titel")}
+              </div>
+              <p className="hinweis" style={{ maxWidth: 660, margin: "3px 0 var(--sp-3)" }}>
+                {t("vertraege.kandidaten.hinweis")}
+              </p>
+              <DataTable
+                pageSize={10}
+                columns={[
+                  { key: "datum", label: t("konten.spalteDatum"), render: (k: Zuordnungsvorschlag) => k.buchung.datum },
+                  {
+                    key: "gegenpartei",
+                    label: t("vertraege.kandidaten.spalteGegenpartei"),
+                    // Eine von Hand erfasste Buchung hat keinen Beleg; dann trägt die Notiz
+                    // den Namen, unter dem man sie kennt.
+                    render: (k: Zuordnungsvorschlag) => (
+                      <span>
+                        {k.gegenpartei || k.buchung.notiz || <span className="muted">—</span>}
+                        {k.verwendungszweck && <span className="muted"> · {k.verwendungszweck}</span>}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: "betrag",
+                    label: `${t("konten.spalteBetrag")} ${geld.symbol}`,
+                    align: "right" as const,
+                    render: (k: Zuordnungsvorschlag) => (
+                      <span style={{ color: geldFarbe(k.buchung.betrag) }}>{geld.format(k.buchung.betrag)}</span>
+                    ),
+                  },
+                  {
+                    key: "_z",
+                    label: "",
+                    align: "right" as const,
+                    render: (k: Zuordnungsvorschlag) => (
+                      <IconButton
+                        icon="uebernehmen"
+                        label={t("vertraege.kandidaten.zuordnen")}
+                        onClick={() => kandidatEntscheiden(k, zahlungsdetail.vertrag.id)}
+                      />
+                    ),
+                  },
+                  {
+                    key: "_n",
+                    label: "",
+                    align: "right" as const,
+                    render: (k: Zuordnungsvorschlag) => (
+                      <IconButton
+                        icon="verwerfen"
+                        label={t("vertraege.kandidaten.keinVertrag")}
+                        onClick={() => kandidatEntscheiden(k, null)}
+                      />
+                    ),
+                  },
+                ]}
+                rows={[...zahlungsdetail.kandidaten]}
+              />
+            </div>
           )}
         </Card>
       )}

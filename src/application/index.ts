@@ -148,6 +148,7 @@ export {
   type Vertragssicht,
   type Vertragszeile,
   type Vertragskennzahlen,
+  type Zuordnungsvorschlag,
   type VertragsichtDeps,
   erkennungProbieren,
   erkennungsentwurf,
