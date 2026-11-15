@@ -151,6 +151,14 @@ es für fertig hält: Einnahmen werden nicht periodisiert, die Vorsorge zählt m
 tatsächlichen Umbuchung statt mit der Rate eines Ziels, und eine Entnahme aus einer
 RÜCKLAGE wird nicht gegen ihren Stand geprüft (beim aufbauenden Budget schon).
 
+**Und sie ist nach HINTEN nicht vollständig.** Eine Rücklage kennt nur ihren laufenden
+Zyklus (`sollRuecklage` ab `beginn`); das Ausbuchen setzt ihn zurück oder löscht sie. Für
+Monate vor einer Ausbuchung liefert `monatsErgebnis` deshalb keine Rate mehr, obwohl
+damals zurückgelegt wurde — ihre Kosten stehen zu niedrig da. Die Übersicht merkt davon
+nichts, weil sie nur nach vorn rechnet; die Kostensicht der Analyse rechnet zurück und
+fragt deshalb `ruecklagenrateFehlt`, um die betroffenen Monate zu benennen. Wer über
+vergangene Monate auswertet (`ergebnisKennzahlen`), reicht die Grenze mit durch.
+
 ## Kontostands-Anker
 
 Ein Anker (`konten/kontostand.ts`) ist eine **Beobachtung, kein Rechenergebnis**: an DIESEM

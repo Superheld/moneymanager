@@ -15,6 +15,16 @@ import { belegZuBuchung } from "./buchung/belegZuBuchung";
 import { buchungszeile, type Buchungszeile, type Zeilenkontext } from "./buchung/buchungszeile";
 import {
   addMonate,
+  ergebnisbasis,
+  ergebnisKennzahlen,
+  KOSTENZEILEN,
+  monatsErgebnis,
+  monatsKosten,
+  ruecklagenrateFehlt,
+  zeilenIst,
+  type ErgebnisKennzahlen,
+  type KostenZeileId,
+  type Ruecklage,
   blindeFlecken,
   budgetKategorien,
   budgetStand,
@@ -68,6 +78,7 @@ import type {
   BudgetRepository,
   KategorieRepository,
   LedgerPort,
+  RuecklagenRepository,
   UmsatzRepository,
   VertragRepository,
   VertragszuordnungRepository,
@@ -89,6 +100,8 @@ export interface AnalyseDeps {
   /** Für die Befunde: hält der Plan, und was steht ausserhalb von ihm? */
   readonly budgetRepo: BudgetRepository;
   readonly regelRepo: ZahlungsregelRepository;
+  /** Für die Kostensicht: Rücklagen kosten ihre Rate, und ihre Ausbuchungen begrenzen den Rückblick. */
+  readonly ruecklagenRepo: RuecklagenRepository;
 }
 
 export interface Analysebasis {
@@ -105,10 +118,28 @@ export interface Analysebasis {
   readonly budgets: readonly Budget[];
   readonly vertraege: readonly Vertrag[];
   readonly regeln: readonly Zahlungsregel[];
+  readonly ruecklagen: readonly Ruecklage[];
+  /**
+   * Die Tage aller Ausbuchungen — auch von Rücklagen, die es nicht mehr gibt. Nur die
+   * Daten, weil die Kostensicht nur eines daraus liest: vor welchem Monat ihr eine Rate
+   * fehlt (`ruecklagenrateFehlt`).
+   */
+  readonly ausbuchungsdaten: readonly string[];
+  /**
+   * Buchungs-ID → Vertrags-ID, so wie die ERGEBNISRECHNUNG sie liest: jede Zuordnung mit
+   * Vertrag, auch wenn der Vertrag dahinter fehlt.
+   *
+   * Das ist nicht `vertragZuBuchung` (oben), und der Unterschied ist Absicht: jene Karte
+   * übergeht Verweise ins Leere, weil sie Namen zeigt. Diese ist dieselbe, die die
+   * Übersicht ihrer Ergebnisrechnung gibt (`uebersichtLaden`) — derselbe Monat muss in
+   * Übersicht und Analyse dieselbe Zahl tragen, und mit zwei Lesarten der Zuordnung täte
+   * er es bei einem einzigen verwaisten Verweis nicht mehr.
+   */
+  readonly vertragJeBuchung: ReadonlyMap<string, string>;
 }
 
 export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
-  const [buchungen, konten, kategorien, umsaetze, bindung, budgets, vertraege, regeln] =
+  const [buchungen, konten, kategorien, umsaetze, bindung, budgets, vertraege, regeln, ruecklagen, ausbuchungen, zuordnungen] =
     await Promise.all([
       deps.ledger.alle(),
       deps.kontoRepo.alle(),
@@ -118,8 +149,13 @@ export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
       deps.budgetRepo.alle(),
       deps.vertragRepo.alle(),
       deps.regelRepo.alle(),
+      deps.ruecklagenRepo.alle(),
+      deps.ruecklagenRepo.ausbuchungen(),
+      deps.zuordnungRepo.alle(),
     ]);
   const umsatzZuBuchung = belegZuBuchung(umsaetze);
+  const vertragJeBuchung = new Map<string, string>();
+  for (const z of zuordnungen) if (z.vertragId) vertragJeBuchung.set(z.istbuchungId, z.vertragId);
   return {
     buchungen,
     konten,
@@ -131,6 +167,9 @@ export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
     budgets,
     vertraege,
     regeln,
+    ruecklagen,
+    ausbuchungsdaten: ausbuchungen.map((a) => a.datum),
+    vertragJeBuchung,
   };
 }
 
@@ -459,4 +498,110 @@ export function analyseAusblick(
     });
   }
   return punkte;
+}
+
+// ---------------------------------------------------------------- Kostensicht
+//
+// Die zweite FRAGE des Verlaufs. `analyseVerlauf` oben sagt, wofür Geld vom Konto ging
+// (Auszahlung); das hier sagt, was der Monat gekostet hat (Kosten). Die Begriffe stehen
+// in `core/CLAUDE.md` unter „Auszahlung und Kosten" — jede Zahl gehört in genau eine der
+// beiden Sichten, und deshalb sind es zwei Use-Cases und nicht einer mit Schalter.
+
+/** Ein Monat der Kostensicht. */
+export interface KostenMonat {
+  /** „YYYY-MM". */
+  readonly monat: string;
+  /** Der laufende Monat: sein Ist ist ein Zwischenstand (siehe `analyseKostenverlauf`). */
+  readonly laufend: boolean;
+  readonly einnahmen: Cent;
+  /**
+   * Je Kostenart, POSITIV (die negierte Zeile). Kann in einem Monat mit Erstattungen
+   * unter null fallen — das ist richtig und bleibt so stehen; wer daraus eine Fläche
+   * zeichnet, muss selbst bei null abschneiden.
+   */
+  readonly kosten: Readonly<Record<KostenZeileId, Cent>>;
+  readonly kostenGesamt: Cent;
+  /** „Bleibt wirklich frei", vorzeichenbehaftet. */
+  readonly ergebnis: Cent;
+  /** Diesem Monat fehlt die Rate einer später ausgebuchten Rücklage (`ruecklagenrateFehlt`). */
+  readonly ruecklagenUnvollstaendig: boolean;
+}
+
+export interface Kostenverlauf {
+  /** Älteste zuerst, wie `analyseVerlauf`. */
+  readonly monate: readonly KostenMonat[];
+  /** Über die ABGESCHLOSSENEN Monate des Fensters. */
+  readonly kennzahlen: ErgebnisKennzahlen;
+  /** Trifft die Einschränkung mindestens einen gezeigten Monat? */
+  readonly ruecklagenUnvollstaendig: boolean;
+}
+
+/**
+ * Die Ergebnisrechnung je Monat des Fensters — „Was hat der Monat gekostet?".
+ *
+ * Gerechnet wird über ALLE Konten, mit derselben Eingabe wie die Monatskarten der
+ * Übersicht (`uebersichtLaden`): der laufende Monat trägt hier dieselbe Zahl wie dort
+ * unter „bisher". Die Ausgabensicht daneben rechnet über die liquiden Konten; das ist
+ * kein Widerspruch, sondern der Unterschied der Fragen — Kosten hängen nicht daran, von
+ * wo bezahlt wurde.
+ *
+ * **Der LAUFENDE Monat erscheint, zählt aber in keine Kennzahl.** Zwei Gründe, einer je
+ * Hälfte der Entscheidung:
+ *
+ *   • Er ERSCHEINT, weil die Ausgabensicht ihn auch zeigt und die Übersicht ihn zeigt.
+ *     Fehlte er hier, verlöre der Verlauf beim Wechsel der Frage einen Monat, und die
+ *     Zahl aus der Übersicht wäre in der Analyse nicht wiederzufinden. Er ist markiert
+ *     (`laufend`), weil sein Ist ein Zwischenstand ist.
+ *   • Er ZÄHLT NICHT, weil er schief ist, und zwar in eine Richtung: Rücklagen und
+ *     aufbauende Budgets stehen schon mit der vollen Monatsrate da, das Gehalt vom
+ *     Monatsende aber noch nicht. Im Durchschnitt drückte er das Ergebnis, in den Quoten
+ *     stünde eine ganze Rate gegen halbe Einnahmen. Dieselbe Überlegung wie bei
+ *     `analyseAusblick`, wo er deshalb ganz als Plan läuft — nur ist die Antwort hier eine
+ *     andere, weil ein Rückblick keinen Plan zeigt.
+ *
+ * **BEKANNTE GRENZE: ausgebuchte Rücklagen.** Eine Rücklage kennt ihren Stand nur für den
+ * laufenden Zyklus (`sollRuecklage` ab `beginn`). Nach dem Ausbuchen beginnt sie neu oder
+ * ist gelöscht — und die Monate DAVOR zeigen für sie keine Rate mehr, obwohl damals
+ * zurückgelegt wurde. Deren Kosten stehen zu niedrig, ihr Ergebnis zu hoch. Die Sicht
+ * rechnet das nicht schön, sie sagt es: `ruecklagenUnvollstaendig` je Monat und für das
+ * Fenster, und die Oberfläche schreibt es offen neben die Zahlen. Beheben liesse es sich
+ * nur mit einer Geschichte der Zyklen; die gibt es nicht.
+ *
+ * Künftige Monate kommen nicht vor: das Fenster endet beim laufenden Monat.
+ */
+export function analyseKostenverlauf(basis: Analysebasis, von: string, bis: string, heute: string): Kostenverlauf {
+  const rechenbasis = ergebnisbasis({
+    regeln: basis.regeln,
+    budgets: basis.budgets,
+    ruecklagen: basis.ruecklagen,
+    ist: basis.buchungen,
+    kategorien: basis.kategorien,
+    konten: basis.konten,
+    vertragJeBuchung: basis.vertragJeBuchung,
+    heute,
+  });
+  const start = { ...parseIso(von), d: 1 };
+  const ergebnisse = Array.from({ length: monateImFenster(von, bis) }, (_, i) =>
+    monatsErgebnis(rechenbasis, toIso(addMonate(start, i))),
+  ).filter((m) => !m.zukunft);
+
+  const monate = ergebnisse.map((m): KostenMonat => {
+    const kosten = {} as Record<KostenZeileId, Cent>;
+    for (const id of KOSTENZEILEN) kosten[id] = -zeilenIst(m, id) || 0;
+    return {
+      monat: m.label,
+      laufend: m.laufend,
+      einnahmen: zeilenIst(m, "einnahmen"),
+      kosten,
+      kostenGesamt: monatsKosten(m),
+      ergebnis: m.ergebnis.ist ?? 0,
+      ruecklagenUnvollstaendig: ruecklagenrateFehlt(m.label, basis.ausbuchungsdaten),
+    };
+  });
+
+  return {
+    monate,
+    kennzahlen: ergebnisKennzahlen(ergebnisse.filter((m) => !m.laufend)),
+    ruecklagenUnvollstaendig: monate.some((m) => m.ruecklagenUnvollstaendig),
+  };
 }

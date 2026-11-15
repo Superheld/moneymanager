@@ -7,7 +7,8 @@
 import { describe, expect, it } from "vitest";
 import type { Depotwert } from "../core";
 import { depotEntwicklung, type Depotsicht } from "./depot/depotsichten";
-import { analyseAusblick, analyseBuchungen, analyseFensterTaggenau, type Analysebasis } from "./analysesichten";
+import { ergebnisbasis, monatsErgebnis } from "../core";
+import { analyseAusblick, analyseBuchungen, analyseFensterTaggenau, analyseKostenverlauf, type Analysebasis } from "./analysesichten";
 
 describe("analyseFensterTaggenau", () => {
   it("schiebt die Monatsmarke auf den letzten Tag desselben Monats", () => {
@@ -88,6 +89,9 @@ describe("analyseBuchungen — der Betrag der Zeile", () => {
     budgets: [],
     vertraege: [],
     regeln: [],
+    ruecklagen: [],
+    ausbuchungsdaten: [],
+    vertragJeBuchung: new Map(),
   };
 
   it("zeigt bei einer geteilten Buchung nur ihren Teil, nicht den Gesamtbetrag", () => {
@@ -130,6 +134,9 @@ describe("analyseAusblick", () => {
     budgets: [],
     vertraege: [],
     regeln: [],
+    ruecklagen: [],
+    ausbuchungsdaten: [],
+    vertragJeBuchung: new Map(),
     ...extra,
   });
 
@@ -189,5 +196,103 @@ describe("analyseAusblick", () => {
     ];
     const punkte = analyseAusblick(basis({ regeln }), "2026-08-15", 2, 2);
     expect(punkte.filter((p) => p.plan).every((p) => p.netto === 0)).toBe(true);
+  });
+});
+
+/**
+ * Die Kostensicht des Verlaufs. Alle Werte erfunden; echt sind die drei Entscheidungen,
+ * die der Use-Case trägt: der laufende Monat erscheint und zählt nicht, die Zahl ist
+ * dieselbe wie in der Übersicht, und die Grenze bei ausgebuchten Rücklagen steht dabei.
+ */
+describe("analyseKostenverlauf", () => {
+  const heute = "2026-08-15";
+  const basis = (extra: Partial<Analysebasis> = {}): Analysebasis => ({
+    buchungen: [
+      { id: "g6", datum: "2026-06-28", betrag: 300000, kontoId: "k1", charakter: "Ertrag", quelle: "import", kategorieId: "lohn" },
+      { id: "m6", datum: "2026-06-03", betrag: -90000, kontoId: "k1", charakter: "Aufwand", quelle: "import", kategorieId: "fix" },
+      { id: "a6", datum: "2026-06-12", betrag: -30000, kontoId: "k1", charakter: "Aufwand", quelle: "import", kategorieId: "alltag" },
+      { id: "g7", datum: "2026-07-28", betrag: 300000, kontoId: "k1", charakter: "Ertrag", quelle: "import", kategorieId: "lohn" },
+      { id: "m7", datum: "2026-07-03", betrag: -90000, kontoId: "k1", charakter: "Aufwand", quelle: "import", kategorieId: "fix" },
+      // Der laufende Monat: die Rate ist bezahlt, das Gehalt steht noch aus.
+      { id: "m8", datum: "2026-08-03", betrag: -90000, kontoId: "k1", charakter: "Aufwand", quelle: "import", kategorieId: "fix" },
+    ],
+    konten: [{ id: "k1", bezeichnung: "Giro", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 500000 }],
+    kategorien: [
+      { id: "lohn", name: "Lohn", defaultCharakter: "Ertrag" },
+      { id: "fix", name: "Festes", defaultCharakter: "Aufwand" },
+      { id: "alltag", name: "Alltag", defaultCharakter: "Aufwand" },
+    ],
+    kontoNamen: new Map([["k1", "Giro"]]),
+    umsatzZuBuchung: new Map(),
+    vertragsnamen: new Map(),
+    vertragZuBuchung: new Map(),
+    budgets: [
+      { id: "b1", kategorieId: "alltag", kontoId: "k1", art: "monatlich", start: "2026-01-01", betraege: [{ abMonat: "2026-01", betrag: 40000 }] },
+    ],
+    vertraege: [],
+    regeln: [
+      { id: "r1", bezeichnung: "Kesselmann", betrag: -90000, rhythmus: "monatlich", startdatum: "2026-01-03", charakter: "Aufwand", kontoId: "k1", kategorieId: "fix", vertragId: "v1" },
+    ],
+    ruecklagen: [{ id: "rl", bezeichnung: "Vibora", rate: 10000, beginn: "2026-01-01" }],
+    ausbuchungsdaten: [],
+    vertragJeBuchung: new Map([["m6", "v1"], ["m7", "v1"], ["m8", "v1"]]),
+    ...extra,
+  });
+
+  it("liefert je Monat die Zeilen der Ergebnisrechnung, Kosten positiv", () => {
+    const { monate } = analyseKostenverlauf(basis(), "2026-06-01", "2026-08-01", heute);
+    expect(monate.map((m) => m.monat)).toEqual(["2026-06", "2026-07", "2026-08"]);
+    expect(monate[0]).toMatchObject({
+      einnahmen: 300000,
+      kosten: { fixkosten: 90000, laufend: 30000, ungeplant: 0, abschreibungen: 10000, wagnisse: 0, vorsorge: 0 },
+      kostenGesamt: 130000,
+      ergebnis: 170000,
+      laufend: false,
+    });
+  });
+
+  it("zeigt den laufenden Monat, lässt ihn aber aus den Kennzahlen", () => {
+    const { monate, kennzahlen } = analyseKostenverlauf(basis(), "2026-06-01", "2026-08-01", heute);
+    expect(monate[2]).toMatchObject({ monat: "2026-08", laufend: true, einnahmen: 0 });
+    // Juni und Juli: 1300 und 1000 Kosten, je 3000 Einnahmen. Der August mit seiner
+    // Rate ohne Gehalt zöge beides schief.
+    expect(kennzahlen.monate).toBe(2);
+    expect(kennzahlen.kostenJeMonat).toBe(115000);
+    expect(kennzahlen.ergebnisJeMonat).toBe(185000);
+    expect(kennzahlen.fixkostenquote).toBeCloseTo(0.3, 10);
+    expect(kennzahlen.sparquote).toBeCloseTo(20000 / 600000, 10);
+  });
+
+  it("trägt für den laufenden Monat dieselbe Zahl wie die Übersicht", () => {
+    const b = basis();
+    const uebersicht = monatsErgebnis(
+      ergebnisbasis({ regeln: b.regeln, budgets: b.budgets, ruecklagen: b.ruecklagen, ist: b.buchungen, kategorien: b.kategorien, konten: b.konten, vertragJeBuchung: b.vertragJeBuchung, heute }),
+      "2026-08-01",
+    );
+    const { monate } = analyseKostenverlauf(b, "2026-06-01", "2026-08-01", heute);
+    expect(monate[2].ergebnis).toBe(uebersicht.ergebnis.ist);
+  });
+
+  it("kennt ohne abgeschlossenen Monat keine Kennzahl", () => {
+    const { monate, kennzahlen } = analyseKostenverlauf(basis(), "2026-08-01", "2026-08-01", heute);
+    expect(monate).toHaveLength(1);
+    expect(kennzahlen).toMatchObject({ monate: 0, fixkostenquote: null, sparquote: null });
+  });
+
+  it("markiert die Monate vor einer Ausbuchung als unvollständig", () => {
+    // Im Juli ausgebucht: die Rücklage beginnt neu, und der Juni zeigt keine Rate mehr.
+    const ausgebucht = basis({
+      ruecklagen: [{ id: "rl", bezeichnung: "Vibora", ziel: 120000, fristMonate: 12, beginn: "2026-07-20" }],
+      ausbuchungsdaten: ["2026-07-20"],
+    });
+    const v = analyseKostenverlauf(ausgebucht, "2026-06-01", "2026-08-01", heute);
+    expect(v.monate.map((m) => [m.monat, m.kosten.abschreibungen, m.ruecklagenUnvollstaendig])).toEqual([
+      ["2026-06", 0, true],
+      ["2026-07", 10000, false],
+      ["2026-08", 10000, false],
+    ]);
+    expect(v.ruecklagenUnvollstaendig).toBe(true);
+    // Ohne Ausbuchung im Fenster gilt die Einschränkung nicht — und steht dann auch nicht da.
+    expect(analyseKostenverlauf(basis(), "2026-06-01", "2026-08-01", heute).ruecklagenUnvollstaendig).toBe(false);
   });
 });

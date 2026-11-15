@@ -5,18 +5,27 @@
 // nach Kategorien. Vorher stand sie im Register „Kategorien", das denselben Monat
 // mitführte — man klickte hier und musste dort nachsehen.
 //
+// **Seit 2026-11-15 beantwortet es ZWEI Fragen**, und die Wahl zwischen ihnen steht über
+// allem anderen in der Karte: „Wofür ging Geld raus?" (Auszahlungen, die Sicht von
+// vorher) und „Was hat der Monat gekostet?" (die Ergebnisrechnung je Monat,
+// `KostenVerlauf`). Die Frage ist von der Darstellung unabhängig und hat deshalb einen
+// eigenen Umschalter — zwei Fragen in EINER Leiste mit „Fluss · Saldo · Tabelle" läsen
+// sich als fünf Ansichten derselben Zahlen, und genau das sind sie nicht: eine Zahl
+// gehört entweder in die Auszahlungs- oder in die Kostensicht, nie in beide.
+//
 // Zeitraum, gewählter Monat und Darstellung gehören diesem Register allein. Sie liegen
 // trotzdem im Screen (`zustand`), damit ein Wechsel des Reiters sie nicht verwirft.
 
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { analyseFenster, analyseVerlauf, type Analysebasis, type IstBuchung, type Zeitraum } from "../../../application";
+import { analyseFenster, analyseKostenverlauf, analyseVerlauf, type Analysebasis, type IstBuchung, type Zeitraum } from "../../../application";
 import { Card, DataTable, KPIStat } from "../bausteine";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe, geldTon } from "../bausteine/geldFarbe";
 import { Umschalter } from "../bausteine/Umschalter";
 import { Auswahl } from "../bausteine/Auswahl";
 import { Aufschluesselung } from "./Aufschluesselung";
+import { KostenVerlauf, type KostenAnsicht } from "./KostenVerlauf";
 import { MonatsFlussChart } from "./MonatsFlussChart";
 import { SaldoVerlaufChart } from "./SaldoVerlaufChart";
 import { Filterleiste, ZeitraumWahl } from "./ZeitraumWahl";
@@ -30,9 +39,17 @@ export interface VerlaufZustand {
    * dreimal dieselbe Information. Jetzt eine Fläche, umschaltbar.
    */
   readonly ansicht: "fluss" | "saldo" | "tabelle";
+  /** Welche Frage der Verlauf beantwortet — Auszahlungen oder Kosten (siehe Kopf). */
+  readonly frage: "ausgaben" | "kosten";
+  /**
+   * Die Darstellung der Kostensicht, getrennt von `ansicht`: einen Saldo hat sie nicht —
+   * ein Kontostand ist Liquidität, keine Kosten —, und mit EINEM gemeinsamen Feld stünde
+   * nach dem Wechsel der Frage eine Ansicht gewählt, die es dort nicht gibt.
+   */
+  readonly kostenAnsicht: KostenAnsicht;
 }
 
-export const VERLAUF_ANFANG: VerlaufZustand = { zeitraum: "12", monat: null, ansicht: "fluss" };
+export const VERLAUF_ANFANG: VerlaufZustand = { zeitraum: "12", monat: null, ansicht: "fluss", frage: "ausgaben", kostenAnsicht: "diagramm" };
 
 export function VerlaufRegister({
   basis,
@@ -51,6 +68,12 @@ export function VerlaufRegister({
   const geld = useGeld();
   const { von, bis } = useMemo(() => analyseFenster(basis, zustand.zeitraum, heute), [basis, zustand.zeitraum, heute]);
   const verlauf = useMemo(() => analyseVerlauf(basis, von, bis), [basis, von, bis]);
+  const kostenfrage = zustand.frage === "kosten";
+  // Nur gerechnet, wenn gefragt: die Ergebnisrechnung ordnet den ganzen Bestand ein.
+  const kosten = useMemo(
+    () => (kostenfrage ? analyseKostenverlauf(basis, von, bis, heute) : null),
+    [kostenfrage, basis, von, bis, heute],
+  );
 
   const monat = verlauf.find((m) => m.label === zustand.monat) ?? null;
   const aktivIndex = monat ? verlauf.indexOf(monat) : null;
@@ -91,14 +114,32 @@ export function VerlaufRegister({
     <>
       <Card
         title={t("historie.verlaufTitel")}
-        subtitle={t(`historie.verlauf.${zustand.ansicht}`)}
+        subtitle={kostenfrage ? t(`historie.kosten.untertitel.${zustand.kostenAnsicht}`) : t(`historie.verlauf.${zustand.ansicht}`)}
         action={
           <Filterleiste>
-            {monatWahl}
+            {/* Der Monat öffnet die Aufschlüsselung nach Kategorien — die gehört zur
+                Ausgabenfrage. In der Kostensicht stellte das Feld nichts ein. */}
+            {!kostenfrage && monatWahl}
             <ZeitraumWahl wert={zustand.zeitraum} aufAenderung={(z) => setZustand({ ...zustand, zeitraum: z, monat: null })} />
           </Filterleiste>
         }
       >
+        {/* Die Frage zuerst: sie entscheidet, was alles darunter bedeutet — Kennzahlen,
+            Darstellung und Tabelle. Ausgeschrieben als Frage, weil „Ausgaben · Kosten"
+            für die meisten dasselbe Wort zweimal wäre. */}
+        <Umschalter
+          label={t("historie.frageWahl")}
+          optionen={(["ausgaben", "kosten"] as const).map((f) => ({ wert: f, text: t(`historie.frage.${f}`) }))}
+          wert={zustand.frage}
+          aufAendern={(f) => setZustand({ ...zustand, frage: f })}
+          style={{ marginBottom: "var(--sp-4)" }}
+        />
+
+        {kosten && (
+          <KostenVerlauf verlauf={kosten} ansicht={zustand.kostenAnsicht} aufAnsicht={(a) => setZustand({ ...zustand, kostenAnsicht: a })} />
+        )}
+
+        {!kostenfrage && (<>
         {/* Alle fünf tragen GERICHTETES Geld, also kommt die Farbe aus dem Vorzeichen
             (`bausteine/geldFarbe`). */}
         <div className="kpis" style={{ marginTop: 0, marginBottom: "var(--sp-3)" }}>
@@ -155,11 +196,15 @@ export function VerlaufRegister({
         {!monat && zustand.ansicht !== "saldo" && (
           <div className="hinweis" style={{ marginTop: "var(--sp-3)" }}>{t("historie.monatAnklicken")}</div>
         )}
+        </>)}
       </Card>
 
       {/* Neben der Karte, nicht darin — keine Karte in einer Karte. Der `key` lässt die
-          Aufschlüsselung bei jedem Monat zugeklappt beginnen. */}
-      {monat && (
+          Aufschlüsselung bei jedem Monat zugeklappt beginnen. Nur zur Ausgabenfrage: sie
+          schlüsselt Auszahlungen auf, und unter der Kostensicht stünden zwei Rechnungen
+          übereinander, die nicht aufeinander aufgehen. Der gewählte Monat bleibt im
+          Zustand und ist nach dem Zurückschalten wieder da. */}
+      {monat && !kostenfrage && (
         <Card title={t("historie.monatAuswertung", { monat: monat.label })} subtitle={t("historie.monatAuswertungUntertitel")}>
           <Aufschluesselung key={monat.label} basis={basis} von={`${monat.label}-01`} bis={`${monat.label}-01`} onBuchung={onBuchung} />
         </Card>

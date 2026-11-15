@@ -722,11 +722,56 @@ anderen vorbeiscrollte. Drei Dinge daran sind Entscheidungen:
   kein Widerspruch: ein Reiter „Befunde" sagt, was darunter liegt; sieben Reiter „Treue",
   „Ohne Plan", „Ausreißer" sagten es nicht.
 
-Die Register davor beantworten **„wie viel und wohin"** — Verlauf (Fluss · Saldo ·
-Tabelle, darunter die Aufschlüsselung eines angeklickten Monats), die Kategorien über die
+Die Register davor beantworten **„wie viel und wohin"** — Verlauf (in zwei Fragen, unten;
+zur Ausgabenfrage darunter die Aufschlüsselung eines angeklickten Monats), die Kategorien über die
 Zeit und der **Blick nach vorn** (`AusblickKarte.tsx`). Die Befunde (`BefundeBereich.tsx`) beantworten **„und wie tragfähig ist das"**:
 fest gegen frei, Budget-Treue, Ausgaben ohne Budget und ohne Vertrag, Verträge Soll gegen
 Ist, Empfänger, Nutzung der Kategorien, Ausreißer.
+
+### Der Verlauf beantwortet zwei Fragen
+
+**Seit 2026-11-15 steht über dem Verlauf die Wahl der FRAGE** (`Umschalter`, im Zustand
+`frage`), unabhängig von der Darstellung darunter:
+
+| Frage | Sicht | rechnet | Darstellungen |
+|---|---|---|---|
+| „Wofür ging Geld raus?" | Auszahlung | `analyseVerlauf`, liquide Konten | Fluss · Saldo · Tabelle |
+| „Was hat der Monat gekostet?" | Kosten | `analyseKostenverlauf`, alle Konten | Diagramm · Tabelle |
+
+Die Begriffe stehen in `src/core/CLAUDE.md` unter „Auszahlung und Kosten". Vier Dinge
+daran sind Entscheidungen:
+
+- **Zwei Umschalter, nicht einer mit fünf Knöpfen.** Eine Zahl gehört in genau eine der
+  beiden Sichten; in EINER Leiste läsen sich Frage und Darstellung als fünf Ansichten
+  derselben Zahlen. Die Kostensicht hat deshalb auch ihr eigenes Feld für die Darstellung
+  (`kostenAnsicht`): einen Saldo gibt es dort nicht — ein Kontostand ist Liquidität —, und
+  mit einem gemeinsamen Feld stünde nach dem Wechsel eine Ansicht gewählt, die es nicht gibt.
+- **Die Monatswahl und die Aufschlüsselung gehören zur Ausgabenfrage.** Sie schlüsseln
+  Auszahlungen nach Kategorien auf; unter der Kostensicht stünden zwei Rechnungen
+  übereinander, die nicht aufeinander aufgehen.
+- **Der laufende Monat erscheint, zählt aber in keine Kennzahl.** Er steht blass bzw. mit
+  Pille da, weil die Übersicht dieselbe Zahl zeigt und der Verlauf beim Wechsel der Frage
+  keinen Monat verlieren soll. Aus Durchschnitt und Quoten bleibt er heraus: Rücklagen
+  und aufbauende Budgets stehen schon mit der ganzen Rate da, das Gehalt vom Monatsende
+  noch nicht. Der Satz dazu ist eine Einschränkung und steht offen unter den Zahlen.
+- **Quoten sind ungerichtet und haben KEINE Schwelle.** Fixkosten- und Sparquote bleiben
+  neutral; welche Quote „zu hoch" ist, hängt am Haushalt, und eine erfundene Grenze wäre
+  eine Bewertung ohne Grundlage. Gerechnet werden sie im Kern (`ergebnisKennzahlen`),
+  über die Summen des Zeitraums.
+
+**Die Kostensicht ist nach hinten unvollständig, und das steht dabei.** Eine Rücklage
+kennt nur ihren laufenden Zyklus; nach dem Ausbuchen fehlt den Monaten davor ihre Rate.
+`analyseKostenverlauf` markiert diese Monate (`ruecklagenrateFehlt`), die Tabelle trägt
+eine Pille, und unter den Zahlen steht der Satz offen — aber nur, wenn im Fenster
+wirklich ein Monat betroffen ist. Ein Vorbehalt, der immer dasteht, wird überlesen.
+Geprüft in `analyse/kostensicht.test.tsx`.
+
+**Die Stapel des Kostendiagramms tragen die Reihenfarben** (`--serie-1`…`-6`,
+`KostenStapelChart.tsx`), in fester Zuordnung zur Kostenart und nie nach Rang. Die vier
+Geld-Tokens stehen dort nicht: ein amberfarbener Stapel hiesse „sieh hin", und dass ein
+Monat etwas kostet, ist kein Befund. Sechs Kostenarten, sechs Reihenfarben — wer eine
+siebte Zeile in die Ergebnisrechnung bringt, braucht dafür eine Entscheidung und keinen
+zyklischen Index.
 
 **Jeder Befund ist eine eigene Karte, kein Register.** Der erste Versuch legte sie als
 umschaltbare Lupen auf eine Fläche — kürzer, und genau deshalb falsch: was hinter einem

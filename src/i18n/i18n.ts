@@ -655,6 +655,29 @@ const de = {
     verlaufTitel: "Monatsverlauf",
     ansicht: { fluss: "Ein & Aus", saldo: "Saldo", tabelle: "Tabelle" },
     ansichtWahl: "Ansicht",
+    frageWahl: "Frage",
+    frage: { ausgaben: "Wofür ging Geld raus?", kosten: "Was hat der Monat gekostet?" },
+    kosten: {
+      untertitel: {
+        diagramm: "Kosten je Monat nach Art, die Einnahmen als Linie darüber",
+        tabelle: "Die Ergebnisrechnung Monat für Monat",
+      },
+      ansicht: { diagramm: "Diagramm", tabelle: "Tabelle" },
+      diagrammName: "Kosten je Monat, gestapelt nach Art, mit den Einnahmen als Linie",
+      kpiKosten: "Ø Kosten / Monat",
+      kpiFixkostenquote: "Fixkostenquote",
+      kpiSparquote: "Sparquote",
+      kpiErgebnis: "Ø bleibt frei / Monat",
+      metaFixkostenquote: "Fixkosten ÷ Einnahmen",
+      metaSparquote: "Rücklagen, aufbauende Budgets und Vorsorge ÷ Einnahmen",
+      tooltip: "{{monat}}: Kosten {{kosten}}, Einnahmen {{ein}}, bleibt frei {{frei}}",
+      legendeLaufend: "blass: laufender Monat",
+      pillUnvollstaendig: "unvollständig",
+      hinweisLaufend:
+        "Der laufende Monat ist ein Zwischenstand: Rücklagen und aufbauende Budgets stehen schon mit der ganzen Monatsrate da, Einnahmen erst, wenn sie gebucht sind. In die Kennzahlen geht er deshalb nicht ein.",
+      hinweisRuecklagen:
+        "Den Monaten vor dem Ausbuchen einer Rücklage fehlt deren Rate: eine Rücklage kennt nur ihren laufenden Zyklus, und der beginnt mit dem Ausbuchen neu. Die Kosten dieser Monate stehen deshalb zu niedrig da, „bleibt wirklich frei“ zu hoch — auch in den Kennzahlen.",
+    },
     verlauf: {
       fluss: "Einnahmen und Ausgaben je Monat · Klick wählt einen Monat",
       saldo: "Realer Kontostand über die Zeit",
@@ -2877,6 +2900,29 @@ const en: typeof de = {
     verlaufTitel: "Monthly trend",
     ansicht: { fluss: "In & out", saldo: "Balance", tabelle: "Table" },
     ansichtWahl: "View",
+    frageWahl: "Question",
+    frage: { ausgaben: "Where did the money go?", kosten: "What did the month cost?" },
+    kosten: {
+      untertitel: {
+        diagramm: "Costs per month by kind, with income as a line on top",
+        tabelle: "The income statement month by month",
+      },
+      ansicht: { diagramm: "Chart", tabelle: "Table" },
+      diagrammName: "Costs per month, stacked by kind, with income as a line",
+      kpiKosten: "Avg. costs / month",
+      kpiFixkostenquote: "Fixed-cost ratio",
+      kpiSparquote: "Savings ratio",
+      kpiErgebnis: "Avg. truly free / month",
+      metaFixkostenquote: "Fixed costs ÷ income",
+      metaSparquote: "Reserves, building budgets and provision ÷ income",
+      tooltip: "{{monat}}: costs {{kosten}}, income {{ein}}, truly free {{frei}}",
+      legendeLaufend: "faded: current month",
+      pillUnvollstaendig: "incomplete",
+      hinweisLaufend:
+        "The current month is an interim figure: reserves and building budgets already count with their full monthly rate, income only once it is posted. It is therefore left out of the key figures.",
+      hinweisRuecklagen:
+        "Months before a reserve was closed out lack its rate: a reserve only knows its current cycle, and closing it out starts a new one. The costs of those months are therefore too low and “truly free” too high — in the key figures as well.",
+    },
     verlauf: {
       fluss: "Income and expenses per month · click selects a month",
       saldo: "Real account balance over time",

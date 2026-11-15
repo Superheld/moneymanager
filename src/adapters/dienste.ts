@@ -556,6 +556,7 @@ export function analyse(): Promise<Analysebasis> {
     vertragRepo: sqliteVertragRepository,
     budgetRepo: sqliteBudgetRepository,
     regelRepo: sqliteZahlungsregelRepository,
+    ruecklagenRepo: sqliteRuecklagenRepository,
   });
 }
 
