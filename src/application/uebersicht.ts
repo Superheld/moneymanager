@@ -24,12 +24,14 @@ import {
   staendeJeKlasse,
   vorschauAlleKonten,
   type Kategorie,
-  type Klassenstand,
+  bilanzJeKlasse,
+  type Klassenbilanz,
   type MonatsErgebnis,
   type Vorschauzeile,
 } from "../core";
 import { budgetstaende, type Budgetstand } from "./budgets/budgetsichten";
 import type { BudgetSicht } from "../core";
+import { belegungssicht } from "./konten/kontobelegung";
 import type {
   BudgetRepository,
   KategorieRepository,
@@ -101,12 +103,16 @@ export interface Uebersichtsdaten {
   /** Konto-ID → Bezeichnung. Die Vorschau gibt IDs heraus, die Oberfläche zeigt Namen. */
   readonly kontoNamen: ReadonlyMap<string, string>;
   /**
-   * Die realen Stände je Kontoklasse — die drei Perspektiven auf das Vermögen.
+   * Das Vermögen je Kontoklasse: was da ist, was davon Rücklagen und aufbauende Budgets
+   * binden, und was frei bleibt (`bilanzJeKlasse`).
    *
-   * Sie stehen UNTER den Monatskarten, weil die etwas anderes beantworten: die Karten
-   * sagen, was der Monat kostet, diese Liste sagt, was insgesamt da ist.
+   * Es steht UNTER den Monatskarten, weil die etwas anderes beantworten: die Karten
+   * sagen, was der Monat kostet, diese Liste sagt, was insgesamt da ist und wem es schon
+   * gehört.
    */
-  readonly klassen: readonly Klassenstand[];
+  readonly vermoegen: readonly Klassenbilanz[];
+  /** Anspruchs-ID → Name der Rücklage bzw. der Budget-Kategorie. */
+  readonly anspruchNamen: ReadonlyMap<string, string>;
 }
 
 /**
@@ -160,6 +166,7 @@ export async function uebersichtLaden(
     vertragsBuchungen,
   };
   const dieserMonat = heute.slice(0, 7);
+  const belegung = belegungssicht({ konten, buchungen, ruecklagen, sicht }, heute);
 
   return {
     ergebnisse: monatsErgebnisse(
@@ -174,7 +181,8 @@ export async function uebersichtLaden(
     hatPlandaten: regeln.length > 0 || budgets.length > 0 || ruecklagen.length > 0,
     vorschau: vorschauAlleKonten(konten, buchungen, regeln, heute, VORSCHAU_TAGE),
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
-    klassen: staendeJeKlasse(konten, buchungen),
+    vermoegen: bilanzJeKlasse(staendeJeKlasse(konten, buchungen), belegung.jeKonto),
+    anspruchNamen: belegung.namen,
   };
 }
 

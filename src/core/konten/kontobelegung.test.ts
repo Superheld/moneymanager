@@ -1,7 +1,9 @@
 // Die Kontobelegung — die eine Rechnung, gegen die jede Anzeige „gebunden / frei" liest.
 
 import { describe, expect, it } from "vitest";
-import { kontobelegung, type Anspruch } from "./kontobelegung";
+import { bilanzJeKlasse, kontobelegung, type Anspruch } from "./kontobelegung";
+import type { Klassenstand } from "../buchung/istbuchung";
+import type { Zahlungskonto } from "./konto";
 
 const anspruch = (id: string, kontoId: string, betrag: number, art: Anspruch["art"] = "ruecklage"): Anspruch => ({
   art,
@@ -52,5 +54,36 @@ describe("kontobelegung", () => {
     const b = kontobelegung(new Map(), [anspruch("r1", "weg", 100)]).get("weg")!;
     expect(b).toMatchObject({ stand: 0, gebunden: 100, frei: -100 });
     expect(b.posten[0].gedeckt).toBe(0);
+  });
+});
+
+describe("bilanzJeKlasse", () => {
+  const konto = (id: string, klasse: Zahlungskonto["klasse"]): Zahlungskonto => ({
+    id, bezeichnung: id, typ: "Tagesgeld", klasse, inhaberIds: [], saldo: 0,
+  });
+  const klasse = (k: Zahlungskonto["klasse"], staende: Record<string, number>): Klassenstand => ({
+    klasse: k,
+    stand: Object.values(staende).reduce((s, x) => s + x, 0),
+    konten: Object.keys(staende).map((id) => konto(id, k)),
+  });
+
+  it("teilt den Stand in gebunden und frei", () => {
+    const belegung = kontobelegung(new Map([["a", 5000]]), [anspruch("r1", "a", 3000)]);
+    const [b] = bilanzJeKlasse([klasse("ruecklage", { a: 5000 })], belegung);
+    expect(b).toMatchObject({ stand: 5000, gebunden: 3000, frei: 2000, fehlt: 0, kontenAnzahl: 1 });
+  });
+
+  it("verrechnet den Überschuss eines Kontos nicht mit der Lücke eines anderen", () => {
+    // Auf a fehlen 2000, auf b sind 4000 frei. Über die Summe gerechnet fehlte nichts.
+    const belegung = kontobelegung(new Map([["a", 1000], ["b", 4000]]), [anspruch("r1", "a", 3000)]);
+    const [b] = bilanzJeKlasse([klasse("ruecklage", { a: 1000, b: 4000 })], belegung);
+    expect(b).toMatchObject({ stand: 5000, gebunden: 1000, frei: 4000, fehlt: 2000 });
+  });
+
+  it("lässt eine Klasse ohne Ansprüche ganz frei", () => {
+    const belegung = kontobelegung(new Map([["g", 7000]]), []);
+    const [b] = bilanzJeKlasse([klasse("liquide", { g: 7000 })], belegung);
+    expect(b).toMatchObject({ gebunden: 0, frei: 7000, fehlt: 0 });
+    expect(b.posten).toEqual([]);
   });
 });

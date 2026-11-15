@@ -23,6 +23,8 @@
 //    Budgets.
 
 import type { Cent } from "../basis/geld";
+import type { Klassenstand } from "../buchung/istbuchung";
+import type { Kontoklasse } from "./konto";
 
 export type Anspruchsart = "ruecklage" | "budget";
 
@@ -89,4 +91,58 @@ export function kontobelegung(
     });
   }
   return raus;
+}
+
+/** Was in einer Kontoklasse liegt, und wie viel davon schon jemandem gehört. */
+export interface Klassenbilanz {
+  readonly klasse: Kontoklasse;
+  readonly stand: Cent;
+  readonly kontenAnzahl: number;
+  /** Der Teil des Stands, den Ansprüche binden — höchstens, was da ist. */
+  readonly gebunden: Cent;
+  /** Was niemand beansprucht. Nie negativ: was fehlt, steht in `fehlt`. */
+  readonly frei: Cent;
+  /** Um wie viel die Ansprüche über dem liegen, was auf ihren Konten ist. */
+  readonly fehlt: Cent;
+  /** Die Ansprüche auf Konten dieser Klasse, grösster zuerst. */
+  readonly posten: readonly Belegungsposten[];
+}
+
+/**
+ * Die Belegung, zusammengefasst je Kontoklasse — die Vermögenssicht der Übersicht.
+ *
+ * Je KONTO gerechnet und dann addiert, nicht über die Summe der Klasse: ein Überschuss
+ * auf dem einen Konto deckt die Lücke auf dem anderen nicht, solange niemand umbucht.
+ * Über die Summe gerechnet verschwände genau die Unterdeckung, die man sehen soll.
+ *
+ * Es gilt je Klasse `stand = gebunden + frei` — ausser ein Konto steht im Minus; dann
+ * ist `frei` 0 und der Stand darunter.
+ */
+export function bilanzJeKlasse(
+  klassen: readonly Klassenstand[],
+  jeKonto: ReadonlyMap<string, Kontobelegung>,
+): Klassenbilanz[] {
+  return klassen.map((k) => {
+    let gebunden = 0;
+    let frei = 0;
+    let fehlt = 0;
+    const posten: Belegungsposten[] = [];
+    for (const konto of k.konten) {
+      const b = jeKonto.get(konto.id);
+      if (!b) continue;
+      gebunden += Math.max(0, Math.min(b.stand, b.gebunden));
+      frei += Math.max(0, b.frei);
+      fehlt += Math.max(0, -b.frei);
+      posten.push(...b.posten);
+    }
+    return {
+      klasse: k.klasse,
+      stand: k.stand,
+      kontenAnzahl: k.konten.length,
+      gebunden,
+      frei,
+      fehlt,
+      posten: posten.sort((a, b) => b.betrag - a.betrag),
+    };
+  });
 }
