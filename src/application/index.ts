@@ -80,6 +80,9 @@ export {
   // Aufzählungen, die die UI als Auswahl anbietet
   KONTOTYPEN,
   KONTOKLASSEN,
+  // Die Arten eines Vermögenswerts und einer Schuld — die Masken bieten sie zur Wahl.
+  VERMOEGENSARTEN,
+  VERBINDLICHKEITSARTEN,
   // Die Kostenarten der Ergebnisrechnung in ihrer Reihenfolge — eine Aufzählung, über
   // die Tabelle und Diagramm der Kostensicht laufen, keine Entscheidung.
   KOSTENZEILEN,
@@ -263,6 +266,32 @@ export {
   type Positionszeile,
   type DepotDeps,
 } from "./depot/depotsichten";
+export {
+  vermoegenLaden,
+  type Beobachtungszeile,
+  type Schuldzeile,
+  type VermoegenDeps,
+  type Vermoegenssicht,
+  type Vermoegenswertzeile,
+} from "./vermoegen/vermoegensichten";
+export {
+  vermoegenswertAnlegen,
+  vermoegenswertAendern,
+  vermoegenswertFuehren,
+  vermoegenswertLoeschen,
+  wertEintragen,
+  wertEntfernen,
+  schuldAnlegen,
+  schuldAendern,
+  schuldFuehren,
+  schuldLoeschen,
+  restschuldEintragen,
+  restschuldEntfernen,
+  type BeobachtungEingabe,
+  type SchuldEingabe,
+  type VermoegenPflegeDeps,
+  type VermoegenswertEingabe,
+} from "./vermoegen/vermoegenPflege";
 export {
   ruecklagenLaden,
   // Sortiert eine schon geladene Auswahl für EINE Rücklage — wie `budgetstaende(sicht, am)`.
