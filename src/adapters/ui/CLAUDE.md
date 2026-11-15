@@ -603,7 +603,9 @@ unter der Karte *Da ist etwas zu tun* (bis 2026-11-08 in der Übersicht) standen
 gerechneten Fenster nicht ins Minus" (Einschränkung). Solange das ein Absatz ist, nimmt
 jedes Wegräumen der Erklärung die Einschränkung mit, **und die leere Karte liest sich
 danach als Freigabe**. Der Absatz wurde deshalb geteilt, bevor überhaupt etwas eingeklappt
-wurde. Der Test dazu ist mit der Karte gegangen; das Kriterium gilt weiter.
+wurde. Die Karte ist gegangen, die Rechnung steht seit 2026-11-15 als „Reicht das Geld?"
+im Ausblick der Analyse — mit derselben Teilung, und `analyse/liquiditaet.test.tsx` hält
+sie fest: die Erklärung im `<details>`, die Einschränkung daneben und nie darin.
 
 **Warum Einklappen hier kein Rückfall in den Reiter-Fehler ist:** in der Analyse steht der
 Befund, dass niemand sucht, was hinter einem Reiter liegt — ein Reiter sagt nicht, was
@@ -724,7 +726,7 @@ anderen vorbeiscrollte. Drei Dinge daran sind Entscheidungen:
 
 Die Register davor beantworten **„wie viel und wohin"** — Verlauf (in zwei Fragen, unten;
 zur Ausgabenfrage darunter die Aufschlüsselung eines angeklickten Monats), die Kategorien über die
-Zeit und der **Blick nach vorn** (`AusblickKarte.tsx`). Die Befunde (`BefundeBereich.tsx`) beantworten **„und wie tragfähig ist das"**:
+Zeit und der **Blick nach vorn** (`AusblickKarte.tsx`, darunter „Reicht das Geld?"). Die Befunde (`BefundeBereich.tsx`) beantworten **„und wie tragfähig ist das"**:
 fest gegen frei, Budget-Treue, Ausgaben ohne Budget und ohne Vertrag, Verträge Soll gegen
 Ist, Empfänger, Nutzung der Kategorien, Ausreißer.
 
@@ -798,6 +800,27 @@ Drei Dinge, die beim Anbauen zählen:
   zwei Grössen. **Der laufende Monat ist Plan, nicht Ist** (seit 2026-11-11): halb gebucht
   knickte die Linie genau an der Naht ein. Das Ist endet mit dem Vormonat
   (`analyseAusblick`).
+
+### Unter dem Ausblick: „Reicht das Geld?"
+
+Die Liquiditätsvorschau (`core/konten/liquiditaet.ts`, zwei Linien — siehe
+`src/core/konten/CLAUDE.md`) steht seit 2026-11-15 als eigene Karte unter dem Blick nach
+vorn (`LiquiditaetKarte.tsx`, gerechnet von `analyseLiquiditaet`). Der Saldo darüber
+rechnet monatsweise über alle liquiden Konten zusammen; die Tabelle sagt je Konto und
+taggenau, wie tief es geht und wann. Was daran Entscheidung ist:
+
+- **Sie zeigt jedes liquide, aktive Konto — immer.** Die Vorgängerin in der Übersicht
+  erschien nur bei einem Minus und war damit eine Warnung; als Warnung war sie zu laut.
+  Eine Tabelle, die immer dasteht, ist eine Auskunft.
+- **Nur `warnFarbe`, und nur unter null.** Kein Rahmen in Warnfarbe, kein grüner
+  Tiefstand: er ist eine Höhe, keine Richtung. „Fest" und „erwartet" stehen als Wort in
+  einer Pille.
+- **Erklärung und Einschränkung sind zwei Absätze** (oben, „Drei Ränge"): was die beiden
+  Linien bedeuten, klappt hinter der ausgeschriebenen Frage ein; dass ein Konto ohne
+  Minus nicht „geprüft und in Ordnung" ist, steht offen daneben — samt dem Tag, bis zu
+  dem gerechnet wurde.
+- **Schmal bleiben Konto, der erwartete Tiefstand und „im Minus ab".** Die erwartete
+  Linie ist die tiefere; an ihr sieht man zuerst, ob es eng wird.
 
 **Ein Screen-Test, der einen Kategorienamen sucht, muss ihn jetzt in seiner Karte
 suchen.** Derselbe Name steht in der Aufschlüsselung und in den Ranglisten darunter; eine

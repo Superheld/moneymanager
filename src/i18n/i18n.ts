@@ -525,6 +525,22 @@ const de = {
     tiefstandAm: "tiefster Stand {{betrag}} am {{tag}}",
     spalteTiefstand: "Tiefster Stand",
     pillPlan: "Plan",
+    reicht: {
+      titel: "Reicht das Geld?",
+      untertitel: "Die liquiden Konten bis zum {{bis}}, Tag für Tag vorgerechnet",
+      spalteKonto: "Konto",
+      spalteHeute: "Stand heute",
+      spalteFest: "Tiefstand fest",
+      spalteErwartet: "Tiefstand erwartet",
+      spalteMinus: "Im Minus ab",
+      fest: "fest",
+      erwartet: "erwartet",
+      legendeFrage: "Was heißen „fest“ und „erwartet“?",
+      legende:
+        "„Fest“ rechnet nur mit dem, was ein Datum hat: Vertragsraten und geplante Umbuchungen. Ein Minus dort ist sicher — daran ändert Sparsamkeit nichts. „Erwartet“ zieht zusätzlich ab, was von den monatlichen Budgets noch offen ist, gleichmäßig über die Tage verteilt. Ein Minus nur dort lässt dir noch die Wahl.",
+      hinweis:
+        "Was hier nicht im Minus steht, läuft bis zum {{bis}} nicht ins Minus — geprüft ist damit nicht mehr. Gerechnet wird ab dem Kontostand, den die App kennt: was seit dem letzten Abruf passiert ist, fehlt.",
+    },
     warnungMinus:
       "Im {{monat}} steht der vorhergesagte Stand bei {{betrag}}. Gerechnet ist monatsweise: " +
       "innerhalb eines Monats kann es früher eng werden, als hier zu sehen ist.",
@@ -2775,6 +2791,22 @@ const en: typeof de = {
     tiefstandAm: "lowest {{betrag}} on {{tag}}",
     spalteTiefstand: "Lowest balance",
     pillPlan: "Plan",
+    reicht: {
+      titel: "Is there enough money?",
+      untertitel: "The liquid accounts up to {{bis}}, computed day by day",
+      spalteKonto: "Account",
+      spalteHeute: "Balance today",
+      spalteFest: "Lowest, fixed",
+      spalteErwartet: "Lowest, expected",
+      spalteMinus: "Negative from",
+      fest: "fixed",
+      erwartet: "expected",
+      legendeFrage: "What do “fixed” and “expected” mean?",
+      legende:
+        "“Fixed” only counts what has a date: contract payments and planned transfers. Going negative there is certain — spending less will not help. “Expected” additionally deducts what is still open in the monthly budgets, spread evenly across the days. Going negative only there still leaves you a choice.",
+      hinweis:
+        "What is not shown as negative here does not go negative before {{bis}} — that is all that has been checked. The computation starts from the balance the app knows: whatever has happened since the last retrieval is missing.",
+    },
     warnungMinus:
       "In {{monat}} the projected balance is {{betrag}}. This is calculated by month: " +
       "within a month it can get tight earlier than shown here.",

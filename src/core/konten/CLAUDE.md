@@ -175,6 +175,10 @@ Drei Dinge, die dabei Entscheidungen sind und keine Rechenschritte:
 Und die Grenze der Auskunft, die in der Karte danebensteht: **was nicht gemeldet wird, ist
 nicht „geprüft und in Ordnung", sondern „läuft im gerechneten Fenster nicht ins Minus".**
 
+Gezeigt wird die Vorschau seit 2026-11-15 im Register „Ausblick" der Analyse („Reicht das
+Geld?", `analyseLiquiditaet`) — für die liquiden Konten, als Tabelle, die immer dasteht.
+Warum dort und nicht mehr in der Übersicht, steht in `src/adapters/ui/uebersicht/CLAUDE.md`.
+
 Eine kleine Verlaufslinie stand hier vom 31.08. bis zum 01.09. daneben — sie ist wieder
 weg: über den Tiefstand und den Tag hinaus, die schon in der Zeile stehen, verriet sie
 nichts. Deshalb gibt `liquiditaetsvorschau` auch nur den BEFUND heraus und nicht den

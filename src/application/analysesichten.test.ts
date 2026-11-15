@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import type { Depotwert } from "../core";
 import { depotEntwicklung, type Depotsicht } from "./depot/depotsichten";
 import { ergebnisbasis, monatsErgebnis } from "../core";
-import { analyseAusblick, analyseBuchungen, analyseFensterTaggenau, analyseKostenverlauf, type Analysebasis } from "./analysesichten";
+import { analyseAusblick, analyseBuchungen, analyseFensterTaggenau, analyseKostenverlauf, analyseLiquiditaet, type Analysebasis } from "./analysesichten";
 
 describe("analyseFensterTaggenau", () => {
   it("schiebt die Monatsmarke auf den letzten Tag desselben Monats", () => {
@@ -92,6 +92,7 @@ describe("analyseBuchungen — der Betrag der Zeile", () => {
     ruecklagen: [],
     ausbuchungsdaten: [],
     vertragJeBuchung: new Map(),
+    vormerkungen: [],
   };
 
   it("zeigt bei einer geteilten Buchung nur ihren Teil, nicht den Gesamtbetrag", () => {
@@ -137,6 +138,7 @@ describe("analyseAusblick", () => {
     ruecklagen: [],
     ausbuchungsdaten: [],
     vertragJeBuchung: new Map(),
+    vormerkungen: [],
     ...extra,
   });
 
@@ -236,6 +238,7 @@ describe("analyseKostenverlauf", () => {
     ruecklagen: [{ id: "rl", bezeichnung: "Vibora", rate: 10000, beginn: "2026-01-01" }],
     ausbuchungsdaten: [],
     vertragJeBuchung: new Map([["m6", "v1"], ["m7", "v1"], ["m8", "v1"]]),
+    vormerkungen: [],
     ...extra,
   });
 
@@ -294,5 +297,71 @@ describe("analyseKostenverlauf", () => {
     expect(v.ruecklagenUnvollstaendig).toBe(true);
     // Ohne Ausbuchung im Fenster gilt die Einschränkung nicht — und steht dann auch nicht da.
     expect(analyseKostenverlauf(basis(), "2026-06-01", "2026-08-01", heute).ruecklagenUnvollstaendig).toBe(false);
+  });
+});
+
+/**
+ * „Reicht das Geld?" — der Use-Case über der Liquiditätsvorschau. Die Rechnung selbst
+ * ist im Kern geprüft (`core/konten/liquiditaet.test.ts`); hier steht, was der Use-Case
+ * AUSWÄHLT und hineinreicht. Alle Werte erfunden.
+ */
+describe("analyseLiquiditaet", () => {
+  const heute = "2026-08-15";
+  const basis = (extra: Partial<Analysebasis> = {}): Analysebasis => ({
+    buchungen: [],
+    konten: [
+      { id: "giro", bezeichnung: "Giro", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 100000 },
+      { id: "alt", bezeichnung: "Altes Giro", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 5000, aktiv: false },
+      { id: "topf", bezeichnung: "Tagesgeld", typ: "Tagesgeld", klasse: "ruecklage", inhaberIds: [], saldo: 300000 },
+    ],
+    kategorien: [{ id: "alltag", name: "Alltag", defaultCharakter: "Aufwand" }],
+    kontoNamen: new Map([["giro", "Giro"], ["alt", "Altes Giro"], ["topf", "Tagesgeld"]]),
+    umsatzZuBuchung: new Map(),
+    vertragsnamen: new Map(),
+    vertragZuBuchung: new Map(),
+    budgets: [],
+    vertraege: [],
+    regeln: [],
+    ruecklagen: [],
+    ausbuchungsdaten: [],
+    vertragJeBuchung: new Map(),
+    vormerkungen: [],
+    ...extra,
+  });
+
+  it("zeigt nur liquide, aktive Konten — mit Namen und dem Ende des Fensters", () => {
+    const sicht = analyseLiquiditaet(basis(), heute, 30);
+    expect(sicht.zeilen.map((z) => [z.kontoId, z.name, z.start])).toEqual([["giro", "Giro", 100000]]);
+    expect(sicht.bis).toBe("2026-09-14");
+  });
+
+  it("trennt die feste von der erwarteten Linie", () => {
+    const sicht = analyseLiquiditaet(
+      basis({
+        regeln: [
+          { id: "r1", bezeichnung: "Kesselmann", betrag: -80000, rhythmus: "monatlich", startdatum: "2026-01-20", charakter: "Aufwand", kontoId: "giro" },
+        ],
+        budgets: [
+          { id: "b1", kategorieId: "alltag", kontoId: "giro", art: "monatlich", start: "2026-01-01", betraege: [{ abMonat: "2026-01", betrag: 60000 }] },
+        ],
+      }),
+      heute,
+      20,
+    );
+    const [giro] = sicht.zeilen;
+    // Fest: nur die Rate am 20. — das Konto bleibt im Plus.
+    expect(giro.fest).toMatchObject({ tiefstand: 20000, tiefstandAm: "2026-08-20" });
+    expect(giro.fest.minusAb).toBeUndefined();
+    // Erwartet: dazu der Budgetrest über die Tage — damit reicht es nicht mehr.
+    expect(giro.erwartet.tiefstand).toBeLessThan(0);
+    expect(giro.erwartet.minusAb).toBeDefined();
+  });
+
+  it("beginnt mit dem Stand abzüglich dessen, was die Bank schon vorgemerkt hat", () => {
+    const sicht = analyseLiquiditaet(
+      basis({ vormerkungen: [{ id: "v1", zahlungskontoId: "giro", betrag: -25000, waehrung: "EUR", gegenpartei: "Ohlert", verwendungszweck: "", erfasstAm: "2026-08-14" }] }),
+      heute,
+    );
+    expect(sicht.zeilen[0].start).toBe(75000);
   });
 });

@@ -15,6 +15,11 @@ import { belegZuBuchung } from "./buchung/belegZuBuchung";
 import { buchungszeile, type Buchungszeile, type Zeilenkontext } from "./buchung/buchungszeile";
 import {
   addMonate,
+  addTage,
+  istLiquide,
+  liquiditaetsvorschau,
+  type Verlaufsbefund,
+  type Vormerkung,
   ergebnisbasis,
   ergebnisKennzahlen,
   KOSTENZEILEN,
@@ -82,6 +87,7 @@ import type {
   UmsatzRepository,
   VertragRepository,
   VertragszuordnungRepository,
+  VormerkungRepository,
   ZahlungskontoRepository,
   ZahlungsregelRepository,
 } from "./ports";
@@ -102,6 +108,8 @@ export interface AnalyseDeps {
   readonly regelRepo: ZahlungsregelRepository;
   /** Für die Kostensicht: Rücklagen kosten ihre Rate, und ihre Ausbuchungen begrenzen den Rückblick. */
   readonly ruecklagenRepo: RuecklagenRepository;
+  /** Für „Reicht das Geld?": was die Bank schon kennt, ist vom Stand faktisch weg. */
+  readonly vormerkungRepo: VormerkungRepository;
 }
 
 export interface Analysebasis {
@@ -136,10 +144,12 @@ export interface Analysebasis {
    * er es bei einem einzigen verwaisten Verweis nicht mehr.
    */
   readonly vertragJeBuchung: ReadonlyMap<string, string>;
+  /** Was die Bank kennt und noch nicht gebucht hat — der Startpunkt der Liquiditätsvorschau. */
+  readonly vormerkungen: readonly Vormerkung[];
 }
 
 export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
-  const [buchungen, konten, kategorien, umsaetze, bindung, budgets, vertraege, regeln, ruecklagen, ausbuchungen, zuordnungen] =
+  const [buchungen, konten, kategorien, umsaetze, bindung, budgets, vertraege, regeln, ruecklagen, ausbuchungen, zuordnungen, vormerkungen] =
     await Promise.all([
       deps.ledger.alle(),
       deps.kontoRepo.alle(),
@@ -152,6 +162,7 @@ export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
       deps.ruecklagenRepo.alle(),
       deps.ruecklagenRepo.ausbuchungen(),
       deps.zuordnungRepo.alle(),
+      deps.vormerkungRepo.alle(),
     ]);
   const umsatzZuBuchung = belegZuBuchung(umsaetze);
   const vertragJeBuchung = new Map<string, string>();
@@ -170,6 +181,7 @@ export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
     ruecklagen,
     ausbuchungsdaten: ausbuchungen.map((a) => a.datum),
     vertragJeBuchung,
+    vormerkungen,
   };
 }
 
@@ -603,5 +615,79 @@ export function analyseKostenverlauf(basis: Analysebasis, von: string, bis: stri
     monate,
     kennzahlen: ergebnisKennzahlen(ergebnisse.filter((m) => !m.laufend)),
     ruecklagenUnvollstaendig: monate.some((m) => m.ruecklagenUnvollstaendig),
+  };
+}
+
+// ---------------------------------------------------------------- Reicht das Geld?
+
+/**
+ * Wie weit die Liquiditätsvorschau rechnet. Dieselbe Spanne wie die Vorschau der
+ * Übersicht („Was noch kommt"): darüber hinaus trägt die erwartete Linie nicht mehr —
+ * sie verteilt Budgets gleichmässig, und nach einem Quartal ist das Annahme auf Annahme.
+ */
+export const LIQUIDITAET_TAGE = 90;
+
+/** Ein Konto in „Reicht das Geld?". */
+export interface Liquiditaetszeile {
+  readonly kontoId: string;
+  readonly name: string;
+  /** Der Stand heute, abzüglich dessen, was die Bank schon vorgemerkt hat. */
+  readonly start: Cent;
+  /** Nur datierte Verpflichtungen. */
+  readonly fest: Verlaufsbefund;
+  /** Dazu der Budgetrest, gleichmässig verteilt. */
+  readonly erwartet: Verlaufsbefund;
+}
+
+export interface Liquiditaetssicht {
+  /** Der letzte Tag des gerechneten Fensters — die Aussage gilt nur bis hierher. */
+  readonly bis: string;
+  readonly zeilen: readonly Liquiditaetszeile[];
+}
+
+/**
+ * Die Liquiditätsvorschau je liquidem, aktivem Konto (`core/konten/liquiditaet.ts`).
+ *
+ * Sie stand bis 2026-11-08 als Warnkarte ganz oben in der Übersicht und war dort zu
+ * laut. Hier ist sie eine Tabelle im Register „Ausblick" — und anders als die Karte
+ * zeigt sie JEDES Konto, nicht nur die mit Handlungsbedarf: eine Tabelle, die nur
+ * erscheint, wenn etwas brennt, wäre wieder die Warnkarte.
+ *
+ * **Nur liquide Konten.** Gefragt ist, ob das Geld für das reicht, was abgeht — und
+ * abgebucht wird vom Girokonto, nicht vom Depotverrechnungskonto. Die alte Karte nahm
+ * alle Konten, weil sie nur Ausnahmen zeigte; als vollständige Liste stünden Rücklagen-
+ * und Vorsorgekonten hier Zeile für Zeile ohne Aussage. Stillgelegte filtert der Kern.
+ *
+ * **Was hier NICHT im Minus steht, läuft im gerechneten Fenster nicht ins Minus — mehr
+ * ist nicht geprüft.** Die Oberfläche schreibt das offen daneben; `bis` kommt deshalb
+ * mit heraus.
+ */
+export function analyseLiquiditaet(basis: Analysebasis, heute: string, tage = LIQUIDITAET_TAGE): Liquiditaetssicht {
+  const vorschauen = liquiditaetsvorschau({
+    konten: basis.konten.filter(istLiquide),
+    buchungen: basis.buchungen,
+    regeln: basis.regeln,
+    // Dieselbe Budgetsicht wie überall: was einem Vertrag gehört, zählt in kein Budget —
+    // sonst zöge die erwartete Linie eine Rate zweimal ab, einmal datiert und einmal
+    // als Budgetverbrauch.
+    budgetsicht: {
+      buchungen: basis.buchungen,
+      kategorien: basis.kategorien,
+      budgets: basis.budgets,
+      vertragsBuchungen: new Set(basis.vertragJeBuchung.keys()),
+    },
+    vormerkungen: basis.vormerkungen,
+    heute,
+    tage,
+  });
+  return {
+    bis: toIso(addTage(parseIso(heute), tage)),
+    zeilen: vorschauen.map((v) => ({
+      kontoId: v.kontoId,
+      name: basis.kontoNamen.get(v.kontoId) ?? v.kontoId,
+      start: v.start,
+      fest: v.fest,
+      erwartet: v.erwartet,
+    })),
   };
 }

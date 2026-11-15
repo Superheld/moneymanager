@@ -31,6 +31,7 @@ import {
   analyseBefunde,
   analyseFenster,
   analyseFensterTaggenau,
+  analyseLiquiditaet,
   type Analysebasis,
   type Depotdaten,
   type IstBuchung,
@@ -42,6 +43,7 @@ import { BuchungDetail } from "../buchung/BuchungDetail";
 import { AusblickKarte } from "./AusblickKarte";
 import { BefundeBereich } from "./BefundeBereich";
 import { DepotAnsicht } from "./DepotAnsicht";
+import { LiquiditaetKarte } from "./LiquiditaetKarte";
 import { KATEGORIEN_ANFANG, KategorienRegister, type KategorienZustand } from "./KategorienRegister";
 import { VERLAUF_ANFANG, VerlaufRegister, type VerlaufZustand } from "./VerlaufRegister";
 import { Filterzeile, ZeitraumWahl } from "./ZeitraumWahl";
@@ -122,6 +124,14 @@ export function AnalyseScreen() {
    */
   const ausblick = useMemo(() => (basis ? analyseAusblick(basis, heute, 6, 12) : []), [basis, heute]);
 
+  /**
+   * „Reicht das Geld?" steht unter dem Blick nach vorn und hängt wie er an keinem
+   * Zeitraum: das Fenster ist fest (`LIQUIDITAET_TAGE`). Aus derselben Basis gerechnet
+   * wie der Saldo darüber — zwei Vorschauen auf einem Bildschirm müssen denselben
+   * Bestand meinen.
+   */
+  const liquiditaet = useMemo(() => (basis ? analyseLiquiditaet(basis, heute) : null), [basis, heute]);
+
   const ist = basis?.buchungen ?? [];
 
   /**
@@ -168,6 +178,10 @@ export function AnalyseScreen() {
 
             {/* Der Blick nach vorn ist derselbe Saldo wie im Verlauf, nur weitergedacht. */}
             {wirksamesRegister === "ausblick" && <AusblickKarte punkte={ausblick} />}
+            {/* Daneben, nicht darin — keine Karte in einer Karte. Der Ausblick darüber
+                rechnet monatsweise über alle liquiden Konten zusammen; das hier sagt je
+                Konto und taggenau, ob es reicht. */}
+            {wirksamesRegister === "ausblick" && liquiditaet && <LiquiditaetKarte sicht={liquiditaet} />}
 
             {/* Die Befunde beantworten die Frage nach „wie viel wohin" — ob das so
                 tragfähig ist. */}
