@@ -19,8 +19,8 @@ import {
   type Ruecklagenart,
   type Zahlungskonto,
 } from "../../core";
-import { vertragsBuchungenLaden } from "../budgets/budgetsichten";
-import { anspruchsbestand, belegungssicht, budgetsichtMit, type Belegungssicht, type KontobelegungDeps } from "../konten/kontobelegung";
+import { vertragsBuchungenLaden } from "../vertraege/vertragszuordnung";
+import { anspruchsbestand, belegungssicht, zustaendigkeitssichtMit, type Belegungssicht, type KontobelegungDeps } from "../konten/kontobelegung";
 import { ruecklagenbestandLaden } from "./ruecklagenbestand";
 
 /** Ein Konto, auf dem mindestens eine Rücklage Geld beansprucht. */
@@ -112,7 +112,7 @@ export async function geldJeKontoLaden(deps: KontobelegungDeps, heute: string): 
     vertragsBuchungenLaden(deps.zuordnungRepo),
   ]);
   const ruecklagen = rb.ruecklagen;
-  const sicht = budgetsichtMit({ buchungen, kategorien, budgets, vertragsBuchungen }, rb);
+  const sicht = zustaendigkeitssichtMit({ buchungen, kategorien, budgets, vertragsBuchungen }, rb);
   const belegung = belegungssicht({ konten, buchungen, ruecklagen, sicht }, heute);
   return geldJeKonto(belegung, konten, ruecklagen, heute, anspruchsbestand(sicht));
 }

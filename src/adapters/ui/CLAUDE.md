@@ -97,7 +97,7 @@ Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlic
 | Ein Schritt der Einrichtung samt Knopf in seinen Bereich | `Einrichtungsschritt` (`EinrichtungsschrittZeile`, `EINRICHTUNG_ZIEL`) |
 | Was auf einem Konto gebunden ist: Ansprüche, gedeckt, Stand, gebunden, frei | `BelegungTabelle` (ohne Karte; im Kontoauszug und in „Wo das Geld liegt") |
 | Eine Rücklage anlegen oder bearbeiten, beide Sorten | `ruecklagen/RuecklageDialog` (nur im Bereich Rücklagen) |
-| Verlauf als Balken mit Rahmen oder Stand | `BudgetVerlaufChart` (Form `monatlich` für ein Budget, `ruecklage` für eine Rücklage) |
+| Verlauf als Balken mit Rahmen oder Stand | `VerlaufChart` (Form `monatlich` für ein Budget, `ruecklage` für eine Rücklage) |
 
 Was nicht in der Tabelle steht und an zwei Stellen gebraucht wird, ist ein Kandidat für
 einen neuen Eintrag — und gehört dann auch hier hinein.
@@ -116,7 +116,7 @@ Was das für den Code hier heisst:
 - **Tabelle, Dialog und Verlauf der Budgets liegen in `budgets/`**, seit nur noch dieser
   Bereich sie benutzt; bis Paket 4 lagen sie in `bausteine/`, weil der Bereich Rücklagen
   sie für die aufbauenden mitbenutzte, und die Umleitung ihrer Wörter (`budgetTexte`)
-  ist mit ihnen gegangen. Geteilt bleibt nur der Chart (`bausteine/BudgetVerlaufChart`).
+  ist mit ihnen gegangen. Geteilt bleibt nur der Chart (`bausteine/VerlaufChart`).
 - **EINE Liste, EIN Dialog für beide Sorten.** Der Bereich Rücklagen zeigt jede Rücklage
   in derselben Liste (`RuecklagenScreen`, Zeilen fertig aus `Ruecklagenzeile`): Name,
   Sorte als Pille, Kategorie, Rate, Stand (auch im Minus), mit Ziel der Fortschritt, das
@@ -1030,7 +1030,9 @@ Alle Texte über `t(…)` aus `src/i18n/i18n.ts`, de und en als zwei Blöcke. Sc
 wiederholen sich über die Namensräume vielfach (`titel`, `suche`, `bearbeiten` …) — beim
 Ändern **am NAMENSRAUM ankern, nie am blossen Schlüsseltext**, sonst trifft es den falschen
 Bereich. `npm test` prüft de/en-Parität, Platzhalter und dass kein `t("…")` ins Leere zeigt —
-nicht aber, ob ein Schlüssel im richtigen Namensraum liegt.
+nicht aber, ob ein Schlüssel im richtigen Namensraum liegt. Geprüft ist das nur an den
+Modulgrenzen (`src/architektur.test.ts`): der Bereich Rücklagen und die Bausteine, die er
+benutzt, zeigen keinen Schlüssel `budgets.…`.
 
 ## Tests für Screens
 

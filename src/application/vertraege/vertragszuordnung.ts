@@ -331,3 +331,21 @@ export async function vertragszuordnungenAbraeumen(
   const betroffen = (await zuordnungRepo.alle()).filter((z) => z.vertragId === vertragId);
   for (const z of betroffen) await zuordnungRepo.loeschen(z.istbuchungId);
 }
+
+/**
+ * Die IDs aller Buchungen, die an einem Vertrag hängen.
+ *
+ * `vertragId === null` ist eine Aussage („gehört zu keinem Vertrag") und kein fehlender
+ * Wert — solche Zeilen zählen normal gegen ihr Budget.
+ *
+ * Hier und nicht bei den Budgets, obwohl die es zuerst brauchten: die Frage gehört dem
+ * Vertrag, und die Rücklagen brauchen dieselbe Menge für ihre Sicht
+ * (`ruecklagen/geldJeKonto.ts`). Rücklagen kennen keine Budgets
+ * (`src/architektur.test.ts`, „Modulgrenzen").
+ */
+export async function vertragsBuchungenLaden(
+  repo: VertragszuordnungRepository,
+): Promise<Set<string>> {
+  const zuordnungen = await repo.alle();
+  return new Set(zuordnungen.filter((z) => z.vertragId).map((z) => z.istbuchungId));
+}

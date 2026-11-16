@@ -11,10 +11,10 @@
 // Zweimal dieselbe Zahl in zwei Schriftgrössen liest sich wie zwei verschiedene.
 
 import { useTranslation } from "react-i18next";
-import type { Budgetmonat } from "../../../application";
+import type { Fortschreibungsmonat } from "../../../application";
 import { useGeld } from "../bausteine/einstellungenKontext";
 
-export function Fortschreibung({ monat }: { monat: Budgetmonat }) {
+export function Fortschreibung({ monat }: { monat: Fortschreibungsmonat }) {
   const { t } = useTranslation();
   const geld = useGeld();
 

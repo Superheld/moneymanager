@@ -3,7 +3,7 @@
 //
 // Seit Paket 4 (ADR-0006) für jede Rücklage, beide Sorten; bis dahin hatte nur das
 // aufbauende Budget einen Verlauf (`budgets/BudgetVerlauf`). Der Chart ist derselbe
-// (`bausteine/BudgetVerlaufChart`, Form `ruecklage`), die Zahlen kommen fertig aus der
+// (`bausteine/VerlaufChart`, Form `ruecklage`), die Zahlen kommen fertig aus der
 // Anwendungsschicht (`ruecklagenVerlauf`, `ruecklagenzeilenImMonat`) und rechnen gegen
 // DIESELBE Sicht wie die Liste darüber.
 //
@@ -21,7 +21,7 @@ import {
 import { Button, Card } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
 import { Buchungsliste } from "../bausteine/Buchungsliste";
-import { BudgetVerlaufChart } from "../bausteine/BudgetVerlaufChart";
+import { VerlaufChart } from "../bausteine/VerlaufChart";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { Fortschreibung } from "./Fortschreibung";
@@ -48,7 +48,7 @@ export function RuecklageVerlauf({
   const monat = monate[Math.min(gewaehlt, monate.length - 1)];
   const zeilen = useMemo(() => (monat ? ruecklagenzeilenImMonat(sicht, ruecklage, monat) : []), [sicht, ruecklage, monat]);
   const titel = t("ruecklagen.verlaufTitel", { name: ruecklage.bezeichnung });
-  const schliessen = <Button variant="ghost" onClick={onSchliessen}>{t("budgets.verlaufSchliessen")}</Button>;
+  const schliessen = <Button variant="ghost" onClick={onSchliessen}>{t("ruecklagen.verlaufSchliessen")}</Button>;
 
   if (!monat) {
     return (
@@ -61,11 +61,11 @@ export function RuecklageVerlauf({
   return (
     <Card
       title={titel}
-      subtitle={t("budgets.verlaufUntertitel", { monate: monate.length })}
+      subtitle={t("ruecklagen.verlaufUntertitel", { monate: monate.length })}
       action={
         <span className="tabellenfilter" style={{ display: "inline-flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
           <Auswahl
-            ariaLabel={t("budgets.verlaufMonatWaehlen")}
+            ariaLabel={t("ruecklagen.verlaufMonatWaehlen")}
             wert={String(gewaehlt)}
             aufAenderung={(v) => setGewaehlt(Number(v))}
             optionen={monate.map((m, i) => ({ wert: String(i), text: m.monat }))}
@@ -74,7 +74,7 @@ export function RuecklageVerlauf({
         </span>
       }
     >
-      <BudgetVerlaufChart monate={monate} art="ruecklage" aktivIndex={gewaehlt} onMonatClick={setGewaehlt} />
+      <VerlaufChart monate={monate} art="ruecklage" aktivIndex={gewaehlt} onMonatClick={setGewaehlt} />
       <div
         style={{
           display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "var(--sp-3)", flexWrap: "wrap",

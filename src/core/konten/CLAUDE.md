@@ -51,7 +51,7 @@ nichts über ihre Kategorie, und der Anspruch war schlicht das Soll; vor ihrem F
 (`findet_ab`) ist er das weiterhin. Gefunden wird mit derselben Zuständigkeit wie im
 Verbrauch eines Budgets und in der Ergebnisrechnung — eine Rücklage im Minus beansprucht
 nichts. Wer die Belegung aufruft, gibt deshalb die Budget-Sicht MIT den Rücklagen herein
-(`budgetsichtMit`, `anspruchsbestand` in `application/konten/kontobelegung.ts`).
+(`zustaendigkeitssichtMit`, `anspruchsbestand` in `application/konten/kontobelegung.ts`).
 
 Reicht der Stand nicht, wird **anteilig** verteilt, über alle Ansprüche gleich, ohne
 Reihenfolge. `budget.kontoId` heisst seither nur noch eines: hier liegt das Geld des

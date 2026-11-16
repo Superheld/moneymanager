@@ -96,6 +96,17 @@ export async function ausgabenvorschlaegeLaden(
   return berechnen(buchungen, kategorien, bisMonat, vertraglich, belegt, {}, vonRuecklagen);
 }
 
+/**
+ * Der Merkzettel der verworfenen Budgetvorschläge — und zugleich der von VOR der Trennung.
+ *
+ * Bis 2026-11-16 stand jeder Vorschlag im Bereich Budgets, auch der einer Rücklage, und
+ * wer ihn verwarf, schrieb ihn hierher. Der Bereich Budgets schreibt und liest ihn weiter;
+ * der Bereich Rücklagen liest ihn mit, damit ein damals verworfener Vorschlag nicht
+ * wieder auftaucht. Er gehört damit beiden und steht in der Wurzel: Rücklagen kennen
+ * keine Budgets (`src/architektur.test.ts`, „Modulgrenzen").
+ */
+export const SCHLUESSEL_BUDGETVORSCHLAG_IGNORIERT = "budgetvorschlag.ignoriert";
+
 /** Nimmt aus einer Liste, was ein Bereich verworfen hat. */
 export function ohneVerworfene<T extends { readonly kategorieId: string }>(
   liste: readonly T[],

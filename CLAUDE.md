@@ -83,9 +83,30 @@ Was **keinem** Bereich gehört, bleibt in der Wurzel der Schicht: die Fassaden (
 (`uebersicht.ts`, `analysesichten.ts`, `core/monatsausblick.ts`, `core/auswertung.ts`,
 `core/einordnung.ts`, `core/ergebnis.ts`, `core/reichweite.ts`, `core/bericht.ts`,
 `core/einrichtung.ts`, `ausgabenvorschlaege.ts` in Kern und Anwendung — die eine
-Einstufung „Budget oder Rücklage?" für zwei Bereiche) —
+Einstufung „Budget oder Rücklage?" für zwei Bereiche —, `core/zustaendigkeit.ts` — wer
+einen Anteil trägt, Budget oder Rücklage — und `core/fortschreibung.ts`, die Form eines
+Monats, die Budget und Rücklage beide schreiben) —
 sie rechnen über mehrere Bereiche hinweg, und das ist ihre Aufgabe, kein Fehler. In `ui/` liegen aus demselben Grund
 die bereichsübergreifenden Tests oben (`screens`, `interaktion`, `formulare`).
+
+**Zwischen den Bereichen gibt es Richtungen** (Modulgrenzen, seit 2026-11-16). Die erste:
+**Budgets dürfen Rücklagen kennen, Rücklagen kennen keine Budgets** — in Kern, Anwendung
+und Oberfläche, Texte eingeschlossen. Ein Budget zählt „ohne die Rücklage auf seiner
+Unterkategorie" und muss deshalb von ihr wissen; eine Rücklage braucht für ihren Stand
+kein Budget. Daraus folgen zwei Regeln, die für jede weitere Richtung genauso gelten:
+
+- **Was beide gegeneinander ABWÄGT, gehört keinem von beiden**, sondern in die Wurzel der
+  Schicht — so die Zuständigkeit (am selben Knoten gewinnt das Budget). Was beide nur als
+  FORM teilen, ebenso, wenn es kein Primitiv quer durch alles ist (`fortschreibung.ts`).
+- **Ein Baustein trägt keinen Bereich in einen anderen**: was ein Bereich nicht kennen
+  darf, darf ein Baustein, den er benutzt, auch nicht — weder einen Use-Case noch einen
+  i18n-Schlüssel aus dessen Namensraum. Ein geteilter Baustein hat seinen eigenen
+  Namensraum (`verlaufChart.*`).
+
+Ausführbar in `src/architektur.test.ts` („Modulgrenzen"): eine Richtung ist dort eine
+Zeile in `MODULGRENZEN`, geprüft über alle drei Schichten — direkte Importe, Namen über
+die Fassaden bis zu ihrer Herkunft, `dienste`-Aufrufe bis zum Use-Case, Schlüssel in der
+Oberfläche und in den Bausteinen, die der Bereich benutzt.
 
 Zwei Namen weichen ab, beide weil die OBERFLÄCHE der Navigation folgt und nicht der
 Fachgliederung:
@@ -158,7 +179,7 @@ Regeln je Schicht*.
 2. `src/application/index.ts` — was die UI überhaupt sehen darf.
 3. `src/adapters/dienste.ts` — wo Use-Cases und SQLite zusammenkommen; von dort führt
    jeder Faden weiter.
-4. `src/architektur.test.ts` — die Schichtgrenze als ausführbare Regel.
+4. `src/architektur.test.ts` — Schicht- und Modulgrenzen als ausführbare Regel.
 
 Jede Schicht trägt ihre eigene `CLAUDE.md` — sie lädt, sobald man dort arbeitet. Die
 Übersicht steht unten unter *Die Regeln je Schicht*.
@@ -520,7 +541,7 @@ Vier Dinge gelten überall und stehen deshalb hier:
   filtern deshalb mit derselben Regel (`istLiquide`). Festgehalten in
   `core/konten/konto.test.ts` und `core/buchung/historie.test.ts`.
 
-Ausführbar geprüft wird das in `src/architektur.test.ts` (Schichtgrenzen),
+Ausführbar geprüft wird das in `src/architektur.test.ts` (Schicht- und Modulgrenzen),
 `src/doku.test.ts` (Verweise) und `src/privatsphaere.test.ts` (IBANs echter Banken).
 
 ## Nichts aus dem echten Bestand ins Repo

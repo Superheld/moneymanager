@@ -60,7 +60,7 @@ import {
   ruecklagenDeckung,
   ruecklagenstand,
   type Budget,
-  type BudgetSicht,
+  type Zustaendigkeitssicht,
   type Einordnung,
   type ErgebnisPosten,
   type IstBuchung,
@@ -210,7 +210,7 @@ function rechnen(b: Bestand, f: Fenster): unknown {
     heute: b.heute,
   };
   const basis = ergebnisbasis(eingabe);
-  const sicht: BudgetSicht = {
+  const sicht: Zustaendigkeitssicht = {
     buchungen: b.ist,
     kategorien: b.kategorien,
     budgets: b.budgets,

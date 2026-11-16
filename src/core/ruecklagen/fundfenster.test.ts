@@ -14,7 +14,8 @@
 
 import { describe, expect, it } from "vitest";
 import type { IstBuchung } from "../buchung/istbuchung";
-import { budgetBuchungen, ruecklagenEntnahmenAus, type Budget, type BudgetSicht } from "../budgets/budget";
+import { budgetBuchungen, type Budget } from "../budgets/budget";
+import { ruecklagenEntnahmenAus, type Zustaendigkeitssicht } from "../zustaendigkeit";
 import { einordnen } from "../einordnung";
 import { einordnungskontext, ergebnisbasis, monatsErgebnis, type ErgebnisEingabe } from "../ergebnis";
 import type { Kategorie } from "../kategorien/kategorie";
@@ -75,7 +76,7 @@ describe("Wirkung 1: eine Rücklage von Hand mit Kategorie findet ab `findetAb` 
   });
 
   it("nimmt dem Budget darüber die gefundene Ausgabe weg — dieselbe Zuständigkeit wie im Ergebnis", () => {
-    const sicht: BudgetSicht = { buchungen: e.ist, kategorien, budgets: [haus], vertragsBuchungen: new Set(), ruecklagen: [dach] };
+    const sicht: Zustaendigkeitssicht = { buchungen: e.ist, kategorien, budgets: [haus], vertragsBuchungen: new Set(), ruecklagen: [dach] };
     expect(budgetBuchungen(sicht, haus, "2026-03-01", "2026-06-01").map((p) => p.buchung.id)).toEqual([vorher.id]);
   });
 
@@ -143,7 +144,7 @@ describe("Wirkung 3: der Anspruch auf dem Konto sinkt um die gefundenen Entnahme
   };
   const vorher = buchung("2026-02-10", -7000, { kategorieId: "k-geraet" });
   const danach = buchung("2026-04-12", -15000, { kategorieId: "k-geraet" });
-  const sicht: BudgetSicht = { buchungen: [vorher, danach], kategorien, budgets: [], vertragsBuchungen: new Set(), ruecklagen: [geraet] };
+  const sicht: Zustaendigkeitssicht = { buchungen: [vorher, danach], kategorien, budgets: [], vertragsBuchungen: new Set(), ruecklagen: [geraet] };
   const bestand = { entnahmen: ruecklagenEntnahmenAus(sicht), abschluesse: [] };
   const konto = new Map([["tg", 1000000]]);
 
@@ -160,7 +161,7 @@ describe("Wirkung 3: der Anspruch auf dem Konto sinkt um die gefundenen Entnahme
 
   it("beansprucht im Minus nichts", () => {
     const gross = buchung("2026-04-20", -90000, { kategorieId: "k-geraet" });
-    const s2: BudgetSicht = { ...sicht, buchungen: [vorher, danach, gross] };
+    const s2: Zustaendigkeitssicht = { ...sicht, buchungen: [vorher, danach, gross] };
     const d = ruecklagenDeckung([geraet], "2026-05-20", konto, { entnahmen: ruecklagenEntnahmenAus(s2) });
     expect(d.posten[0].soll).toBe(0);
   });

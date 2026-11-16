@@ -32,7 +32,7 @@ import {
   type Vorschauzeile,
 } from "../core";
 import { budgetstaende, type Budgetstand } from "./budgets/budgetsichten";
-import type { BudgetSicht } from "../core";
+import type { Zustaendigkeitssicht } from "../core";
 import { belegungssicht } from "./konten/kontobelegung";
 import { vermoegensbestandLaden } from "./vermoegen/vermoegensichten";
 import { ergebnisvorsorgeLaden, type VorsorgeDeps } from "./vorsorge/vorsorge";
@@ -82,7 +82,7 @@ export interface Uebersichtsdaten {
   /** Die Budgetstände des laufenden Monats, in Baumordnung. */
   readonly staende: readonly Budgetstand[];
   /** Für einen anderen Monat: `budgetstaende(sicht, am)`. */
-  readonly sicht: BudgetSicht;
+  readonly sicht: Zustaendigkeitssicht;
   /** Kategorie-ID → Name. Der Kern gibt IDs heraus, die Oberfläche zeigt Namen. */
   readonly kategorieNamen: ReadonlyMap<string, string>;
   /** Buchungs-ID → Empfänger aus dem Import. Steht am Umsatz, nicht an der Buchung. */
@@ -192,7 +192,7 @@ export async function uebersichtLaden(
   const liquideIds = new Set(konten.filter(istLiquide).map((k) => k.id));
   const liquideBuchungen = buchungen.filter((b) => liquideIds.has(b.kontoId));
 
-  const sicht: BudgetSicht = {
+  const sicht: Zustaendigkeitssicht = {
     buchungen,
     kategorien,
     budgets,

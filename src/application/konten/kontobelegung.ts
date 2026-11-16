@@ -17,13 +17,13 @@ import {
   ruecklagenEntnahmenAus,
   type Anspruchsbestand,
   type Budget,
-  type BudgetSicht,
+  type Zustaendigkeitssicht,
   type IstBuchung,
   type Kontobelegung,
   type Ruecklage,
   type Zahlungskonto,
 } from "../../core";
-import { vertragsBuchungenLaden } from "../budgets/budgetsichten";
+import { vertragsBuchungenLaden } from "../vertraege/vertragszuordnung";
 import type {
   BudgetRepository,
   KategorieRepository,
@@ -58,15 +58,15 @@ export interface KontobelegungDeps extends BudgetanspruchDeps {
  * gefunden hat (dieselbe Auswahl wie der Verbrauch eines Budgets) und die Abschlüsse, die
  * das Fenster ihres laufenden Zyklus begrenzen.
  */
-export function anspruchsbestand(sicht: BudgetSicht): Anspruchsbestand {
+export function anspruchsbestand(sicht: Zustaendigkeitssicht): Anspruchsbestand {
   return { entnahmen: ruecklagenEntnahmenAus(sicht), abschluesse: sicht.ausbuchungen ?? [] };
 }
 
 /** Die Budget-Sicht samt Rücklagen — wie die Übersicht sie baut. */
-export function budgetsichtMit(
-  basis: Omit<BudgetSicht, "ruecklagen" | "ruecklagenzuordnungen" | "ausbuchungen">,
+export function zustaendigkeitssichtMit(
+  basis: Omit<Zustaendigkeitssicht, "ruecklagen" | "ruecklagenzuordnungen" | "ausbuchungen">,
   rb: Ruecklagenbestand,
-): BudgetSicht {
+): Zustaendigkeitssicht {
   return { ...basis, ruecklagen: alleRuecklagen(rb), ruecklagenzuordnungen: rb.ruecklagenzuordnungen, ausbuchungen: rb.ausbuchungen };
 }
 
@@ -91,7 +91,7 @@ export async function anspruchsbestandLaden(deps: BudgetanspruchDeps): Promise<{
   /** Mitgegeben für die Hinweise im Dialog einer Rücklage (ein Budget an der Kategorie). */
   budgets: readonly Budget[];
   /** Die Sicht dahinter — für den Verlauf einer Rücklage und ihre Buchungen je Monat. */
-  sicht: BudgetSicht;
+  sicht: Zustaendigkeitssicht;
 }> {
   const [buchungen, kategorien, budgets, vertragsBuchungen, rb] = await Promise.all([
     deps.ledger.alle(),
@@ -100,7 +100,7 @@ export async function anspruchsbestandLaden(deps: BudgetanspruchDeps): Promise<{
     vertragsBuchungenLaden(deps.zuordnungRepo),
     ruecklagenbestandLaden(deps.ruecklagenRepo, deps.ruecklagenzuordnungRepo),
   ]);
-  const sicht = budgetsichtMit({ buchungen, kategorien, budgets, vertragsBuchungen }, rb);
+  const sicht = zustaendigkeitssichtMit({ buchungen, kategorien, budgets, vertragsBuchungen }, rb);
   return { bestand: anspruchsbestand(sicht), budgets, sicht };
 }
 
@@ -114,7 +114,7 @@ export function belegungssicht(
     konten: readonly Zahlungskonto[];
     buchungen: IstBuchung[];
     ruecklagen: readonly Ruecklage[];
-    sicht: BudgetSicht;
+    sicht: Zustaendigkeitssicht;
   },
   heute: string,
 ): Belegungssicht {
@@ -136,7 +136,7 @@ export async function kontobelegungLaden(deps: KontobelegungDeps, heute: string)
     vertragsBuchungenLaden(deps.zuordnungRepo),
   ]);
   return belegungssicht(
-    { konten, buchungen, ruecklagen: rb.ruecklagen, sicht: budgetsichtMit({ buchungen, kategorien, budgets, vertragsBuchungen }, rb) },
+    { konten, buchungen, ruecklagen: rb.ruecklagen, sicht: zustaendigkeitssichtMit({ buchungen, kategorien, budgets, vertragsBuchungen }, rb) },
     heute,
   );
 }

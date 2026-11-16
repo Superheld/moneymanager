@@ -7,29 +7,29 @@
 //
 // Gefragt wird nur für Ausgaben, die keine Umbuchung, keine Umschichtung, kein Ertrag und
 // keine Vertragszahlung sind: diese Schritte bleiben, wie sie sind, und kommen vorher.
+//
+// **Warum in der Wurzel und in keinem der beiden Bereiche:** hier wird ABGEWOGEN — am
+// selben Knoten gewinnt das Budget, darunter nimmt eine Rücklage dem Budget ihre Buchungen
+// ab und umgekehrt. Das ist keine Eigenschaft des Budgets und keine der Rücklage, sondern
+// eine Regel zwischen beiden. Bis 2026-11-16 stand sie in `ruecklagen/`, und die Rücklagen
+// mussten dafür die Budgets kennen, während die Budgets für ihren Verbrauch bei den
+// Rücklagen nachfragten — ein Kreis. Jetzt kennen die Budgets die Rücklagen (ein Budget
+// zählt „ohne die Rücklage darunter"), die Rücklagen keine Budgets, und was beide
+// gegeneinander abwägt, steht hier (`src/architektur.test.ts`, „Modulgrenzen").
+//
+// Aus demselben Grund steht hier die Sicht, über die gefragt wird
+// (`Zustaendigkeitssicht`), und was aus ihr folgt: welche Anteile ein Budget oder eine
+// Rücklage trägt (`getrageneBuchungen`), was jede Rücklage über ihre Kategorie gefunden
+// hat (`ruecklagenEntnahmenAus`). Was nur die Rücklage betrifft — ihre Zuordnungen, an
+// welchen Tagen sie findet, wer zur Wahl steht —, liegt in `ruecklagen/zuordnung.ts`.
 
-import type { Budget } from "../budgets/budget";
-import type { Kategorie } from "../kategorien/kategorie";
-import type { Ruecklage, Ruecklagenzyklus } from "./ruecklage";
-import { ruecklagenart } from "./topf";
-
-/**
- * Eine ausdrückliche Zuordnung: welche Rücklage einen Anteil einer Buchung trägt (seit
- * Migration 79, Tabelle `ruecklage_zuordnung`).
- *
- * Gebraucht wird sie nur, wo die Kategorie allein nicht entscheidet — wenn mehrere
- * Rücklagen an ihr hängen. Der Anteil wird über seine KATEGORIE benannt und nicht über
- * seinen Index: die Aufteilungen bekommen bei jedem Speichern neue IDs, die Kategorie
- * bleibt. Ändert jemand sie, passt die Zuordnung zu keinem Anteil mehr, und die Buchung
- * wird neu eingeordnet — eine neue Kategorie ist eine neue Frage.
- */
-export interface Ruecklagenzuordnung {
-  readonly istbuchungId: string;
-  /** Der Anteil mit dieser Kategorie; fehlt sie, gilt die Zuordnung der ganzen Buchung. */
-  readonly kategorieId?: string;
-  /** Fehlt sie, heisst das „ausdrücklich keine Rücklage" — nicht „noch offen". */
-  readonly ruecklageId?: string;
-}
+import type { Cent } from "./basis/geld";
+import { kategorieAnteile, type IstBuchung } from "./buchung/istbuchung";
+import type { Budget } from "./budgets/budget";
+import type { Kategorie } from "./kategorien/kategorie";
+import type { Ruecklage, Ruecklagenzyklus } from "./ruecklagen/ruecklage";
+import type { Ruecklagenentnahme } from "./ruecklagen/topf";
+import { findetAm, type Ruecklagenzuordnung } from "./ruecklagen/zuordnung";
 
 /** Der Anteil, nach dem gefragt wird. */
 export interface Anteilsfrage {
@@ -53,23 +53,6 @@ export type Zustaendig =
   /** Mehrere Rücklagen kämen in Frage: bis jemand zuordnet, ungeplant und offen. */
   | { readonly art: "wartet"; readonly kandidaten: readonly string[] }
   | { readonly art: "ungeplant" };
-
-/**
- * Trägt die Rücklage ihre Kategorie an diesem Tag?
- *
- * Nur in ihrem Fenster [`findetAb`, `beendetAm`]. Fehlt `findetAb`, unterscheidet die
- * Sorte: eine `abschliessend`e findet dann gar nichts über die Kategorie (eine Rücklage
- * von Hand vor der Umstellung), eine `fortlaufend`e gilt „ohne Anfang" — so behandelt die
- * Einordnung heute ein aufbauendes Budget, auch VOR seinem Start. Dass eine solche
- * Buchung dann Entnahme ist und trotzdem nichts kostet (die Kosten zählen erst ab
- * `beginn`), ist ein bekannter Befund und wird bewusst nachgebildet, nicht behoben.
- */
-function traegtAm(r: Ruecklage, datum: string): boolean {
-  if (!r.kategorieId) return false;
-  if (r.beendetAm && datum > r.beendetAm) return false;
-  if (r.findetAb) return datum >= r.findetAb;
-  return ruecklagenart(r) === "fortlaufend";
-}
 
 /**
  * Baut die Zuständigkeit für einen Bestand; zurück kommt eine Funktion, weil die Vorarbeit
@@ -159,7 +142,7 @@ export function zustaendigkeit(
       if (budget) return { art: "laufend", budgetId: budget.id };
       const kandidaten = ohneRuecklagen
         ? []
-        : (ruecklagenAn.get(knoten) ?? []).filter((r) => traegtAm(r, anteil.datum)).map((r) => r.id);
+        : (ruecklagenAn.get(knoten) ?? []).filter((r) => findetAm(r, anteil.datum)).map((r) => r.id);
       if (kandidaten.length === 1) return { art: "ruecklage", ruecklageId: kandidaten[0] };
       if (kandidaten.length > 1) return { art: "wartet", kandidaten };
       knoten = eltern.get(knoten);
@@ -202,7 +185,7 @@ export function herausgerechnet(
   for (const b of budgets) budgetAn.set(b.kategorieId, b);
   const ruecklagenAn = new Map<string, Ruecklage[]>();
   for (const r of ruecklagen) {
-    if (!r.kategorieId || !traegtAm(r, am)) continue;
+    if (!r.kategorieId || !findetAm(r, am)) continue;
     const liste = ruecklagenAn.get(r.kategorieId);
     if (liste) liste.push(r);
     else ruecklagenAn.set(r.kategorieId, [r]);
@@ -235,29 +218,172 @@ export function herausgerechnet(
 }
 
 /**
- * Die Rücklagen, denen ein Anteil mit dieser Kategorie zugeordnet werden darf: jede, die
- * an der Kategorie oder an einem ihrer Vorfahren hängt — an der Kategorie samt ihren
- * Unterkategorien, wie sie auch von selbst findet. Nächste Ebene zuerst.
+ * Alles, was die Frage „wer trägt diesen Anteil?" für einen Bestand braucht — Buchungen,
+ * Kategorien, Budgets, Rücklagen samt Zuordnungen und Ausbuchungen, und welche Buchungen
+ * zu einem Vertrag gehören.
  *
- * Eine Rücklage ohne Kategorie steht nie darin (Teil B des Entwurfs, Abschnitt 1): sie
- * findet nur über ihre Ausbuchung, und eine Zuordnung zu ihr wäre eine zweite, stille
- * Regel daneben. Beendete gehören nicht dazu — ihnen wird nichts mehr zugeordnet.
- *
- * Die eine Stelle für die Prüfung an der Anwendungsgrenze (`ruecklageZuordnen`) und für
- * die Auswahl im Buchungsdialog: was man sieht, ist genau das, was sich speichern lässt.
+ * Bis 2026-11-16 hiess sie `BudgetSicht` und stand bei den Budgets; über sie fragten aber auch
+ * Stand, Anspruch und Verlauf jeder Rücklage. Sie gehört der Abwägung zwischen
+ * beiden und steht deshalb hier.
  */
-export function waehlbareRuecklagen(
-  kategorien: readonly Kategorie[],
-  ruecklagen: readonly Ruecklage[],
-  kategorieId: string | undefined,
-): Ruecklage[] {
-  if (!kategorieId) return [];
-  const eltern = new Map(kategorien.map((k) => [k.id, k.elternId]));
-  const raus: Ruecklage[] = [];
-  let knoten: string | undefined = kategorieId;
-  for (let i = 0; knoten && i < 100; i++) {
-    for (const r of ruecklagen) if (!r.beendetAm && r.kategorieId === knoten) raus.push(r);
-    knoten = eltern.get(knoten);
+export interface Zustaendigkeitssicht {
+  readonly buchungen: readonly IstBuchung[];
+  readonly kategorien: readonly Kategorie[];
+  /** ALLE Budgets — für das Herausrechnen der ineinanderliegenden. */
+  readonly budgets: readonly Budget[];
+  /**
+   * IDs der Buchungen, die zu einem Vertrag gehören. Sie zählen NICHT gegen ein Budget
+   * (Kopf von `budgets/budget.ts`). Pflichtfeld: eine leere Menge ist eine Aussage („keine Verträge
+   * bekannt") und muss hingeschrieben werden, nicht durch Weglassen entstehen.
+   */
+  readonly vertragsBuchungen: ReadonlySet<string>;
+  /**
+   * ALLE Rücklagen, beendete eingeschlossen — wer eine Kategorie trägt, entscheidet seit
+   * Paket 3 des Umbaus die Zuständigkeit (oben), dieselbe wie in
+   * der Einordnung. Eine Rücklage auf einer Unterkategorie nimmt dem Budget darüber ab
+   * ihrem Fundfenster ihre Buchungen weg, wie ein Unterbudget.
+   *
+   * Optional, und das ist eine Abwägung: ohne Rücklagen rechnet die Sicht genau wie vor
+   * der Umstellung (die Budgets tragen ihre Kategorien allein). Der Monatsausblick lässt
+   * sie bewusst weg (er rechnet unverändert); jede Sicht, die neben der Ergebnisrechnung
+   * steht, gibt sie mit.
+   */
+  readonly ruecklagen?: readonly Ruecklage[];
+  readonly ruecklagenzuordnungen?: readonly Ruecklagenzuordnung[];
+  /** Die Ausbuchungen — ein ausgebuchter Kauf trägt keine Kategorie mehr. */
+  readonly ausbuchungen?: readonly Ruecklagenzyklus[];
+}
+
+/** Ein Anteil einer Aufwandsbuchung und wer ihn trägt. */
+interface GetragenerAnteil {
+  readonly buchung: IstBuchung;
+  readonly anteil: number;
+  readonly kategorieId?: string;
+  /** Wie an der Buchung, vorzeichenbehaftet. */
+  readonly betrag: Cent;
+  readonly traeger: Zustaendig;
+}
+
+const getragenJeSicht = new WeakMap<Zustaendigkeitssicht, readonly GetragenerAnteil[]>();
+
+/**
+ * Jeder Anteil jeder Aufwandsbuchung, die auf ein Budget oder eine Rücklage zählen kann,
+ * und wer ihn trägt — EINMAL je Sicht gerechnet, weil Verbrauch, Stand und Anspruch jedes
+ * Budgets und jeder Rücklage dieselbe Frage stellen.
+ *
+ * Ausgenommen wie bisher: alles ausser Aufwand und die Vertragsraten (Kopf von
+ * `budgets/budget.ts`).
+ * `budgetrelevant = false` fällt NICHT schon hier heraus, sondern in der Zuständigkeit —
+ * dort entscheidet sich, ob eine ausdrückliche Zuordnung ihn trotzdem einer Rücklage gibt.
+ * Einem Budget gibt sie ihn nie.
+ */
+function getrageneAnteile(sicht: Zustaendigkeitssicht): readonly GetragenerAnteil[] {
+  const gemerkt = getragenJeSicht.get(sicht);
+  if (gemerkt) return gemerkt;
+  const traeger = zustaendigkeit(
+    sicht.kategorien,
+    sicht.budgets,
+    sicht.ruecklagen ?? [],
+    sicht.ruecklagenzuordnungen ?? [],
+    sicht.ausbuchungen ?? [],
+  );
+  const raus: GetragenerAnteil[] = [];
+  for (const b of sicht.buchungen) {
+    if (b.charakter !== "Aufwand") continue;
+    // Vertragsraten sind anderswo geplant und stehen im Ausblick in ihrer eigenen Zeile.
+    if (sicht.vertragsBuchungen.has(b.id)) continue;
+    // Über die Anteile, nicht über b.kategorieId: eine geteilte Buchung (S-7) belastet
+    // ein Budget nur mit IHREM Teil, nicht mit dem vollen Betrag — und nicht gar nicht.
+    kategorieAnteile(b).forEach((a, i) => {
+      raus.push({
+        buchung: b,
+        anteil: i,
+        kategorieId: a.kategorieId,
+        betrag: a.betrag,
+        traeger: traeger({ istbuchungId: b.id, kategorieId: a.kategorieId, datum: b.datum, budgetrelevant: b.budgetrelevant }),
+      });
+    });
+  }
+  getragenJeSicht.set(sicht, raus);
+  return raus;
+}
+
+/** Trägt `id` (ein Budget oder eine Rücklage) den Anteil? */
+function traegt(t: Zustaendig, id: string): boolean {
+  return (t.art === "laufend" && t.budgetId === id) || (t.art === "ruecklage" && t.ruecklageId === id);
+}
+
+/**
+ * Die Anteile, die eine Rücklage über die Zuständigkeit trägt — für ihren Stand und ihren
+ * Anspruch auf dem Konto. Dieselbe Auswahl wie der Verbrauch eines Budgets.
+ */
+export function ruecklagenEntnahmenAus(sicht: Zustaendigkeitssicht): Map<string, Ruecklagenentnahme[]> {
+  const raus = new Map<string, Ruecklagenentnahme[]>();
+  for (const x of getrageneAnteile(sicht)) {
+    if (x.traeger.art !== "ruecklage") continue;
+    const e = { datum: x.buchung.datum, betrag: x.betrag };
+    const liste = raus.get(x.traeger.ruecklageId);
+    if (liste) liste.push(e);
+    else raus.set(x.traeger.ruecklageId, [e]);
   }
   return raus;
 }
+
+/**
+ * Die Anteile (`buchungId#index`), die eine Rücklage trägt oder die auf eine Zuordnung
+ * warten — für die Ausgabenvorschläge (`ausgabenvorschlaege.ts`), die sie auslassen:
+ * was eine Rücklage schon trägt, soll weder ein Budget messen noch eine zweite Rücklage.
+ *
+ * Bis Migration 81 hiess das `vonRuecklagenGetragen` und nahm die aufbauenden Budgets
+ * aus (deren Kategorien schloss der Vorschlag ohnehin aus, weil dort ein Budget lag).
+ * Seither sind sie Rücklagen, und die eine Regel deckt beide.
+ */
+export function ruecklagenAnteile(sicht: Zustaendigkeitssicht): Set<string> {
+  const raus = new Set<string>();
+  for (const x of getrageneAnteile(sicht)) {
+    const t = x.traeger;
+    if (t.art === "ruecklage" || t.art === "wartet") raus.add(`${x.buchung.id}#${x.anteil}`);
+  }
+  return raus;
+}
+
+/** Ein Verbrauchsposten: welche Buchung mit welchem Teilbetrag auf ein Budget oder eine Rücklage zählt. */
+export interface Verbrauchsposten {
+  readonly buchung: IstBuchung;
+  /**
+   * Index des Anteils innerhalb der Buchung. Zusammen mit `buchung.id` der Schlüssel,
+   * an dem der Monatsausblick erkennt, welche Anteile schon von einem Budget getragen
+   * werden — der Rest gehört unter „Sonstiges". Ohne ihn wäre ein Anteil, den kein
+   * Budget nimmt, unsichtbar, und die Ist-Spalte summierte nicht mehr auf.
+   */
+  readonly anteil: number;
+  /** Die Kategorie DES ANTEILS — bei geteilten Buchungen nicht die der Buchung. */
+  readonly kategorieId?: string;
+  /** Beitrag zum Verbrauch, POSITIV (eine Erstattung ist entsprechend negativ). */
+  readonly betrag: Cent;
+}
+
+/**
+ * Die Anteile im Fenster [von, bis), die `id` trägt — ein Budget oder eine Rücklage. Die
+ * eine Auswahl hinter dem Verbrauch eines Budgets und dem, was eine Rücklage im
+ * Monatsausblick getragen hat.
+ */
+export function getrageneBuchungen(
+  sicht: Zustaendigkeitssicht,
+  id: string,
+  von: string,
+  bis: string,
+): Verbrauchsposten[] {
+  // Wer den Anteil trägt, sagt die Zuständigkeit — dieselbe Frage wie in der Einordnung.
+  // Ein eingebettetes Budget oder eine Rücklage darunter nimmt dem Dach seine Kategorien
+  // ab (`budgetKategorien` beschreibt dasselbe für Budgets allein); die eine teure
+  // Anschaffung, für die zurückgelegt wurde, trägt kein Budget (`budgetrelevant`).
+  const raus: Verbrauchsposten[] = [];
+  for (const x of getrageneAnteile(sicht)) {
+    if (x.buchung.datum < von || x.buchung.datum >= bis) continue;
+    if (!x.kategorieId || !traegt(x.traeger, id)) continue;
+    raus.push({ buchung: x.buchung, anteil: x.anteil, kategorieId: x.kategorieId, betrag: -x.betrag });
+  }
+  return raus.sort((x, y) => x.buchung.datum.localeCompare(y.buchung.datum));
+}
+

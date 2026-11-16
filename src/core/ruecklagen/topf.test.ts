@@ -28,7 +28,7 @@ import {
   zyklusKosten,
   type Ruecklagenentnahme,
 } from "./topf";
-import { zustaendigkeit } from "./zustaendigkeit";
+import { zustaendigkeit } from "../zustaendigkeit";
 
 /** `anzahl` Monate (`YYYY-MM`) ab `von`. */
 function monate(von: string, anzahl: number): string[] {

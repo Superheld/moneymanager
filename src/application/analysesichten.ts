@@ -64,7 +64,7 @@ import {
   toIso,
   type BlinderFleck,
   type Budget,
-  type BudgetSicht,
+  type Zustaendigkeitssicht,
   type Budgettreue,
   type Cent,
   type Empfaengerzeile,
@@ -101,7 +101,7 @@ import {
   type VermoegensEingabe,
   type Vermoegensvergleich,
 } from "../core";
-import { belegungssicht, budgetsichtMit } from "./konten/kontobelegung";
+import { belegungssicht, zustaendigkeitssichtMit } from "./konten/kontobelegung";
 import { ruecklagenbestandLaden } from "./ruecklagen/ruecklagenbestand";
 import type { Umsatz } from "./import";
 import { vertragsbindungLaden } from "./vertraege/vertragszuordnung";
@@ -395,7 +395,7 @@ export function analyseBefunde(basis: Analysebasis, von: string, bis: string): B
   for (const b of basis.budgets) {
     for (const id of budgetKategorien(b, basis.budgets, basis.kategorien)) budgetierte.add(id);
   }
-  const sicht: BudgetSicht = budgetsichtMit(
+  const sicht: Zustaendigkeitssicht = zustaendigkeitssichtMit(
     {
       buchungen: basis.buchungen,
       kategorien: basis.kategorien,
@@ -823,7 +823,7 @@ export function analyseReichweite(basis: Analysebasis, heute: string): Reichweit
       konten: basis.konten,
       buchungen: [...basis.buchungen],
       ruecklagen: basis.ruecklagen,
-      sicht: budgetsichtMit(
+      sicht: zustaendigkeitssichtMit(
         {
           buchungen: [...basis.buchungen],
           kategorien: basis.kategorien,

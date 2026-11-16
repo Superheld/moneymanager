@@ -15,6 +15,14 @@ macht jeden Test von der Laufzeit abhängig. Zeitpunkte kommen als Parameter her
 (`monatsausblick.ts`, `einordnung.ts`, `ergebnis.ts`, `reichweite.ts`, `bericht.ts`, `einrichtung.ts`,
 `ausgabenvorschlaege.ts` — Budget oder Rücklage, für beide Bereiche in einer Rechnung) und die Fassade `index.ts`.
 
+Dazu zwei Dateien, die **genau zwischen zwei Bereichen stehen**, weil
+Rücklagen keine Budgets kennen (Wurzel-`CLAUDE.md`, „Modulgrenzen"):
+`zustaendigkeit.ts` wägt ab, wer einen Anteil trägt — ein Budget oder eine Rücklage — und
+hält die Sicht dafür (`Zustaendigkeitssicht`, bis 2026-11-16 `BudgetSicht`);
+`fortschreibung.ts` hält die Form eines Monats (`Fortschreibungsmonat`, vorher
+`Budgetmonat`), die Budget und Rücklage beide schreiben. Was nur die Rücklage betrifft —
+ihre Zuordnungen, an welchen Tagen sie findet —, liegt in `ruecklagen/zuordnung.ts`.
+
 ## Geld
 
 **Integer Cent, nie Float.** Formatiert wird über `geldFormatieren` /
@@ -145,7 +153,7 @@ auf" ausführbar macht.
 
 | Datei | beantwortet |
 |---|---|
-| `einordnung.ts` | Was IST diese Buchung — Einnahme, Fixkosten, laufende Kosten, Entnahme aus einer Rücklage, Vorsorge, Umbuchung, ungeplant (auch: wartet auf Zuordnung)? Die eine Stelle dafür; wer auswertet, fragt hier und sortiert nicht selbst. Wer einen Anteil trägt, beantwortet sie über `ruecklagen/zustaendigkeit.ts` — dieselbe Funktion, die der Verbrauch eines Budgets fragt. |
+| `einordnung.ts` | Was IST diese Buchung — Einnahme, Fixkosten, laufende Kosten, Entnahme aus einer Rücklage, Vorsorge, Umbuchung, ungeplant (auch: wartet auf Zuordnung)? Die eine Stelle dafür; wer auswertet, fragt hier und sortiert nicht selbst. Wer einen Anteil trägt, beantwortet sie über `zustaendigkeit.ts` — dieselbe Funktion, die der Verbrauch eines Budgets fragt. |
 | `ergebnis.ts` | Was kostet der Monat? Baut auf der Einordnung und fügt die Zeit hinzu (Periodisierung, Topfkosten), dazu die Überleitung. |
 | `reichweite.ts` | Wie viele Monate das freie Geld die Kosten trägt. Liest die Zeilen von `ergebnis.ts` nur und steht deshalb daneben, nicht darin. |
 | `bericht.ts` | Ein abgeschlossener Monat oder ein Jahr auf einem Blatt: summiert Monatsergebnisse und ihre Überleitung, stellt den Zeitraum davor daneben, vergleicht das Nettovermögen an zwei Stichtagen. Rechnet nichts Eigenes — ein Jahr ist die Summe seiner Monate, und deshalb geht auch seine Überleitung exakt auf. |

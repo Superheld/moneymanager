@@ -13,6 +13,14 @@ benutzt wird, gehört hierher. Was nur ein Bereich braucht, bleibt in seinem Ber
 — auch wenn es „allgemein" aussieht. Ein Baustein, den nur ein Screen benutzt, ist kein
 Baustein, sondern ein Teil dieses Screens.
 
+**Ein Baustein trägt keinen Bereich in einen anderen** (seit 2026-11-16). Was ein Bereich
+nicht kennen darf (Wurzel-`CLAUDE.md`, „Modulgrenzen"), darf auch kein Baustein, den er
+benutzt: keinen Use-Case jenes Bereichs aufrufen, keinen Schlüssel aus seinem
+Namensraum zeigen. Ein geteilter Baustein bekommt deshalb einen eigenen Namensraum —
+`VerlaufChart` (bis dahin `BudgetVerlaufChart`) zeichnet für Budgets und Rücklagen und
+holt seine Texte aus `verlaufChart.*`, nicht aus `budgets.*`. Geprüft wird, wer einen
+Baustein DIREKT importiert (`src/architektur.test.ts`).
+
 ## Der Design-System-Teil
 
 `Card`, `KPIStat`, `Pill`, `CoverageTrack`, `DataTable`, `Button`, `FormField` und der in

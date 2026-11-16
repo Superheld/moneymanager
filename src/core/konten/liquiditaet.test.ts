@@ -4,7 +4,8 @@ import { describe, expect, it } from "vitest";
 import { handlungsbedarf, liquiditaetsvorschau } from "./liquiditaet";
 import type { Zahlungskonto } from "./konto";
 import type { Zahlungsregel } from "../basis/zahlungsregel";
-import type { Budget, BudgetSicht } from "../budgets/budget";
+import type { Budget } from "../budgets/budget";
+import type { Zustaendigkeitssicht } from "../zustaendigkeit";
 import type { Kategorie } from "../kategorien/kategorie";
 
 const HEUTE = "2026-06-01";
@@ -42,7 +43,7 @@ const budget = (over: Partial<Budget> = {}): Budget => ({
   ...over,
 });
 
-const sicht = (budgets: Budget[]): BudgetSicht => ({
+const sicht = (budgets: Budget[]): Zustaendigkeitssicht => ({
   buchungen: [],
   kategorien: KATEGORIEN,
   budgets,
