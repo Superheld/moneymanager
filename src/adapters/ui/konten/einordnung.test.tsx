@@ -100,7 +100,7 @@ describe("Einordnung im Kontoauszug", () => {
     // Das aufbauende Budget steht mit NAMEN da — „aus Budget" allein liesse offen, aus
     // welchem, und genau das will man an der Zeile wissen.
     expect(
-      (await zeileVon("Anzahlung Ohlert")).getByText(pille("topf", { budget: "Vorhaben Nordseite" })),
+      (await zeileVon("Anzahlung Ohlert")).getByText(pille("ruecklageBenannt", { budget: "Vorhaben Nordseite" })),
     ).toBeInTheDocument();
   });
 
@@ -130,7 +130,7 @@ describe("Einordnung im Kontoauszug", () => {
 
     const zeile = await zeileVon("Sammelposten Tarnow");
     expect(zeile.getByText(pille("laufend"))).toBeInTheDocument();
-    expect(zeile.getByText(pille("topf", { budget: "Vorhaben Nordseite" }))).toBeInTheDocument();
+    expect(zeile.getByText(pille("ruecklageBenannt", { budget: "Vorhaben Nordseite" }))).toBeInTheDocument();
   });
 
   it("nennt die Umbuchung genau EINMAL in der Zeile", async () => {
@@ -177,7 +177,7 @@ describe("Einordnung im Buchungsdialog", () => {
 
     const abschnitt = await einordnungImDialog(nutzer, "Anzahlung Ohlert");
     expect(
-      abschnitt.getByText(i18n.t("einordnung.grund.topf", { budget: "Vorhaben Nordseite" })),
+      abschnitt.getByText(i18n.t("einordnung.grund.ruecklageBenannt", { budget: "Vorhaben Nordseite" })),
     ).toBeInTheDocument();
   });
 

@@ -1,10 +1,9 @@
 // Zuständigkeit — wer einen Anteil einer Ausgabe trägt: ein monatliches Budget, eine
 // Rücklage, mehrere (dann wartet er auf eine Zuordnung) oder niemand.
 //
-// IM UMBAU: von niemandem aufgerufen ausser den Tests. Heute beantwortet das
-// `einordner` in `core/einordnung.ts` (Schritte 5 und 6); wenn die Rechnung umgestellt
-// ist, fragen dort UND in `budgetBuchungen` beide diese eine Funktion — sonst rechnete
-// der Verbrauch eines Dachs anders als das Ergebnis.
+// Seit Paket 3 des Umbaus fragen hier die Einordnung (`core/einordnung.ts`) UND der
+// Verbrauch eines Budgets (`budgetBuchungen`) — EINE Antwort für beide, sonst rechnete der
+// Verbrauch eines Dachs anders als das Ergebnis.
 //
 // Gefragt wird nur für Ausgaben, die keine Umbuchung, keine Umschichtung, kein Ertrag und
 // keine Vertragszahlung sind: diese Schritte bleiben, wie sie sind, und kommen vorher.
@@ -78,19 +77,21 @@ function traegtAm(r: Ruecklage, datum: string): boolean {
  *
  * `ruecklagen` sind ALLE, beendete eingeschlossen: eine beendete trägt ihre Kategorie bis
  * zu ihrem Ende, und ein Monat davor soll nicht anders aussehen, nur weil sie inzwischen
- * beendet ist. `budgets` dürfen alle sein — gezählt werden nur die monatlichen; ein
- * aufbauendes kommt als Rücklage herein.
+ * beendet ist. `budgets` sind alle: ein monatliches trägt als laufende Kosten, ein
+ * aufbauendes als Rücklage mit seiner eigenen ID. Am selben Knoten gehen beide jeder
+ * Rücklage von Hand vor — das monatliche, weil eine neue Rücklage dort nicht angelegt
+ * werden darf (der Altfall), das aufbauende bis Paket 4 aus dem Grund oben.
  *
  * Die Reihenfolge (Teil B des Entwurfs, Abschnitt 2):
  *
  *   1. Ausdrückliche Zuordnung — erst die für die Kategorie des Anteils, dann die für die
  *      ganze Buchung. Eine Zeile ohne Rücklage heisst „ausdrücklich keine": weiter, aber
  *      ohne Rücklagen.
- *   2. Alte Verknüpfung über eine Ausbuchung → `ausgebucht`. Sonst führt
- *      `budgetrelevant = false` zu `ungeplant`, wie heute (eine von Hand aus den Budgets
- *      genommene Ausgabe kostet ihren Monat).
- *   3. Der nächste Vorfahr der Kategorie, an dem etwas hängt. Ein monatliches Budget
- *      gewinnt dort gegen eine Rücklage (der Altfall; neu anlegen lässt es sich nicht).
+ *   2. `budgetrelevant = false`: mit alter Verknüpfung über eine Ausbuchung →
+ *      `ausgebucht`, sonst `ungeplant` (eine von Hand aus den Budgets genommene Ausgabe
+ *      kostet ihren Monat).
+ *   3. Der nächste Vorfahr der Kategorie, an dem etwas hängt. Ein Budget gewinnt dort
+ *      gegen eine Rücklage von Hand (siehe oben).
  *      Eine Rücklage hängt dort nur, wenn ihr Fenster den Tag enthält — sonst fällt der
  *      Anteil zum Dach durch, wie heute vor der Umstellung. Eine → `ruecklage`, mehrere
  *      → `wartet`.
@@ -108,8 +109,13 @@ export function zustaendigkeit(
   abschluesse: readonly Ruecklagenzyklus[],
 ): (anteil: Anteilsfrage) => Zustaendig {
   const eltern = new Map(kategorien.map((k) => [k.id, k.elternId]));
+  // Monatliche UND aufbauende: ein aufbauendes Budget ist bis Migration 81 noch ein Budget
+  // und trägt seine Kategorie VOR jeder Rücklage von Hand am selben Knoten. Liefe es als
+  // gewöhnliche Rücklage mit, wartete jede Buchung dort auf eine Zuordnung, die sich nicht
+  // speichern lässt — `ruecklage_zuordnung` verweist auf `ruecklage`, und dort steht das
+  // Budget erst ab Paket 4.
   const budgetAn = new Map<string, Budget>();
-  for (const b of budgets) if (b.art === "monatlich") budgetAn.set(b.kategorieId, b);
+  for (const b of budgets) budgetAn.set(b.kategorieId, b);
   const ruecklagenAn = new Map<string, Ruecklage[]>();
   for (const r of ruecklagen) {
     if (!r.kategorieId) continue;
@@ -139,15 +145,22 @@ export function zustaendigkeit(
     }
     const ohneRuecklagen = !!ausdruecklich && !ausdruecklich.ruecklageId;
 
-    const alt = ausgebucht.get(anteil.istbuchungId);
-    if (alt) return { art: "ausgebucht", ruecklageIds: alt };
-    if (anteil.budgetrelevant === false) return { art: "ungeplant" };
+    // Eine alte Verknüpfung gilt nur, solange die Buchung aus den Budgets genommen ist —
+    // so fragte die Einordnung vor der Umstellung, und wer einen ausgebuchten Kauf von
+    // Hand wieder budgetrelevant stellt, hat ihn damit zurück in seine Kategorie gelegt.
+    if (anteil.budgetrelevant === false) {
+      const alt = ausgebucht.get(anteil.istbuchungId);
+      return alt ? { art: "ausgebucht", ruecklageIds: alt } : { art: "ungeplant" };
+    }
 
     let knoten = anteil.kategorieId;
     // Der Zähler schützt gegen einen Zyklus im Baum, wie in `elternBudget`.
     for (let i = 0; knoten && i < 100; i++) {
       const budget = budgetAn.get(knoten);
-      if (budget) return { art: "laufend", budgetId: budget.id };
+      if (budget?.art === "monatlich") return { art: "laufend", budgetId: budget.id };
+      // „Ausdrücklich keine Rücklage" gilt auch für das aufbauende Budget: für den Nutzer
+      // ist es eine Rücklage.
+      if (budget && !ohneRuecklagen) return { art: "ruecklage", ruecklageId: budget.id };
       const kandidaten = ohneRuecklagen
         ? []
         : (ruecklagenAn.get(knoten) ?? []).filter((r) => traegtAm(r, anteil.datum)).map((r) => r.id);
@@ -157,4 +170,32 @@ export function zustaendigkeit(
     }
     return { art: "ungeplant" };
   };
+}
+
+/**
+ * Die Rücklagen, denen ein Anteil mit dieser Kategorie zugeordnet werden darf: jede, die
+ * an der Kategorie oder an einem ihrer Vorfahren hängt — an der Kategorie samt ihren
+ * Unterkategorien, wie sie auch von selbst findet. Nächste Ebene zuerst.
+ *
+ * Eine Rücklage ohne Kategorie steht nie darin (Teil B des Entwurfs, Abschnitt 1): sie
+ * findet nur über ihre Ausbuchung, und eine Zuordnung zu ihr wäre eine zweite, stille
+ * Regel daneben. Beendete gehören nicht dazu — ihnen wird nichts mehr zugeordnet.
+ *
+ * Die eine Stelle für die Prüfung an der Anwendungsgrenze (`ruecklageZuordnen`) und für
+ * die Auswahl im Buchungsdialog: was man sieht, ist genau das, was sich speichern lässt.
+ */
+export function waehlbareRuecklagen(
+  kategorien: readonly Kategorie[],
+  ruecklagen: readonly Ruecklage[],
+  kategorieId: string | undefined,
+): Ruecklage[] {
+  if (!kategorieId) return [];
+  const eltern = new Map(kategorien.map((k) => [k.id, k.elternId]));
+  const raus: Ruecklage[] = [];
+  let knoten: string | undefined = kategorieId;
+  for (let i = 0; knoten && i < 100; i++) {
+    for (const r of ruecklagen) if (!r.beendetAm && r.kategorieId === knoten) raus.push(r);
+    knoten = eltern.get(knoten);
+  }
+  return raus;
 }

@@ -1902,3 +1902,90 @@ describe("Migration 79 — eine Rücklage: nur das Schema", () => {
     db.close();
   });
 });
+
+describe("Migration 80 — eine Rücklage: freie Rate in die Reihe, Fundfenster ab heute", () => {
+  /** Ein Bestand vor v80: jede Form, mit und ohne Kategorie, laufend und beendet. */
+  function vor80(): Database {
+    const db = new SQL.Database();
+    apply(db, 0, 79);
+    db.run("INSERT INTO kategorie (id, name, default_charakter) VALUES ('kat-a','Haushalt','Aufwand')");
+    db.run("INSERT INTO zahlungskonto (id, bezeichnung, typ, inhaber_ids) VALUES ('k1','Girokonto','Giro','[]')");
+    db.run(
+      `INSERT INTO ruecklage (id, bezeichnung, ziel, frist_monate, rate, beginn, kategorie_id, konto_id, beendet_am) VALUES
+         ('r-ziel','Brammert',120000,24,NULL,'2025-03-01','kat-a','k1',NULL),
+         ('r-frei','Ossenkamp',NULL,NULL,5000,'2025-06-14','kat-a',NULL,NULL),
+         ('r-ohne','Luedersen',NULL,NULL,3000,'2024-11-02',NULL,NULL,NULL),
+         ('r-ende','Tiedjen',NULL,NULL,2000,'2024-01-01','kat-a',NULL,'2025-02-10'),
+         ('r-beides','Wernholt',60000,12,1500,'2025-01-01',NULL,NULL,NULL)`,
+    );
+    return db;
+  }
+  const heute = (db: Database) => String(db.exec("SELECT date('now','localtime')")[0].values[0][0]);
+
+  it("legt die freie Rate als erste Zeile der Reihe an, ab dem Monat des Beginns, und leert `rate`", () => {
+    const db = vor80();
+    apply(db, 79, 80);
+    expect(db.exec("SELECT ruecklage_id, ab_monat, betrag FROM ruecklage_rate ORDER BY ruecklage_id")[0].values).toEqual([
+      ["r-ende", "2024-01", 2000],
+      ["r-frei", "2025-06", 5000],
+      ["r-ohne", "2024-11", 3000],
+    ]);
+    // Mit Ziel und Frist folgt die Rate aus beiden; eine daneben eingetragene Rate wurde
+    // nie gelesen und bleibt, wo sie ist.
+    expect(db.exec("SELECT id, rate FROM ruecklage ORDER BY id")[0].values).toEqual([
+      ["r-beides", 1500],
+      ["r-ende", null],
+      ["r-frei", null],
+      ["r-ohne", null],
+      ["r-ziel", null],
+    ]);
+    db.close();
+  });
+
+  it("lässt nur eine laufende Rücklage mit Kategorie ab dem Tag der Umstellung finden", () => {
+    const db = vor80();
+    apply(db, 79, 80);
+    const tag = heute(db);
+    // Die Form, nicht der Wert: der Tag hängt an Uhr und Zeitzone.
+    expect(tag).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(db.exec("SELECT id, findet_ab FROM ruecklage ORDER BY id")[0].values).toEqual([
+      ["r-beides", null], // ohne Kategorie
+      ["r-ende", null], // beendet
+      ["r-frei", tag],
+      ["r-ohne", null], // ohne Kategorie
+      ["r-ziel", tag],
+    ]);
+    db.close();
+  });
+
+  it("läuft ein zweites Mal folgenlos durch und überschreibt kein gesetztes Fundfenster", () => {
+    const db = vor80();
+    apply(db, 79, 80);
+    db.run("UPDATE ruecklage SET findet_ab = '2026-12-01' WHERE id = 'r-ziel'");
+    const vorher = db.exec("SELECT * FROM ruecklage ORDER BY id")[0].values;
+    const reiheVorher = db.exec("SELECT * FROM ruecklage_rate ORDER BY ruecklage_id")[0].values;
+    apply(db, 79, 80);
+    expect(db.exec("SELECT * FROM ruecklage ORDER BY id")[0].values).toEqual(vorher);
+    expect(db.exec("SELECT * FROM ruecklage_rate ORDER BY ruecklage_id")[0].values).toEqual(reiheVorher);
+    db.close();
+  });
+
+  it("lässt `rate` stehen, wo die Reihe für den Monat schon einen anderen Betrag trägt", () => {
+    // Überführt ist nur, was je Zeile geprüft in der Reihe steht — sonst ginge die Zahl
+    // verloren, ohne dass sie irgendwo anders stünde.
+    const db = vor80();
+    db.run("INSERT INTO ruecklage_rate (ruecklage_id, ab_monat, betrag) VALUES ('r-frei','2025-06',4000)");
+    apply(db, 79, 80);
+    expect(db.exec("SELECT rate FROM ruecklage WHERE id = 'r-frei'")[0].values).toEqual([[5000]]);
+    expect(db.exec("SELECT betrag FROM ruecklage_rate WHERE ruecklage_id = 'r-frei'")[0].values).toEqual([[4000]]);
+    db.close();
+  });
+
+  it("hinterlässt mit eingeschalteten Fremdschlüsseln keinen Widerspruch", () => {
+    const db = vor80();
+    db.run("PRAGMA foreign_keys = ON");
+    apply(db, 79, 80);
+    expect(db.exec("PRAGMA foreign_key_check")).toEqual([]);
+    db.close();
+  });
+});

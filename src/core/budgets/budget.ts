@@ -51,6 +51,9 @@ import type { Cent } from "../basis/geld";
 import { kategorieAnteile, type IstBuchung } from "../buchung/istbuchung";
 import { kategorieUnterbaum, type Kategorie } from "../kategorien/kategorie";
 import { addMonate, parseIso, toIso } from "../basis/datum";
+import type { Ruecklage, Ruecklagenzyklus } from "../ruecklagen/ruecklage";
+import type { Ruecklagenentnahme } from "../ruecklagen/topf";
+import { zustaendigkeit, type Ruecklagenzuordnung, type Zustaendig } from "../ruecklagen/zustaendigkeit";
 
 export type Budgetart = "monatlich" | "aufbauend";
 
@@ -310,6 +313,111 @@ export interface BudgetSicht {
    * bekannt") und muss hingeschrieben werden, nicht durch Weglassen entstehen.
    */
   readonly vertragsBuchungen: ReadonlySet<string>;
+  /**
+   * ALLE Rücklagen, beendete eingeschlossen — wer eine Kategorie trägt, entscheidet seit
+   * Paket 3 des Umbaus die Zuständigkeit (`ruecklagen/zustaendigkeit.ts`), dieselbe wie in
+   * der Einordnung. Eine Rücklage auf einer Unterkategorie nimmt dem Budget darüber ab
+   * ihrem Fundfenster ihre Buchungen weg, wie ein Unterbudget.
+   *
+   * Optional, und das ist eine Abwägung: ohne Rücklagen rechnet die Sicht genau wie vor
+   * der Umstellung (die Budgets tragen ihre Kategorien allein). Der Monatsausblick lässt
+   * sie bewusst weg (er rechnet unverändert); jede Sicht, die neben der Ergebnisrechnung
+   * steht, gibt sie mit.
+   */
+  readonly ruecklagen?: readonly Ruecklage[];
+  readonly ruecklagenzuordnungen?: readonly Ruecklagenzuordnung[];
+  /** Die Ausbuchungen — ein ausgebuchter Kauf trägt keine Kategorie mehr. */
+  readonly ausbuchungen?: readonly Ruecklagenzyklus[];
+}
+
+/** Ein Anteil einer Aufwandsbuchung und wer ihn trägt. */
+interface GetragenerAnteil {
+  readonly buchung: IstBuchung;
+  readonly anteil: number;
+  readonly kategorieId?: string;
+  /** Wie an der Buchung, vorzeichenbehaftet. */
+  readonly betrag: Cent;
+  readonly traeger: Zustaendig;
+}
+
+const getragenJeSicht = new WeakMap<BudgetSicht, readonly GetragenerAnteil[]>();
+
+/**
+ * Jeder Anteil jeder Aufwandsbuchung, die auf ein Budget oder eine Rücklage zählen kann,
+ * und wer ihn trägt — EINMAL je Sicht gerechnet, weil Verbrauch, Stand und Anspruch jedes
+ * Budgets und jeder Rücklage dieselbe Frage stellen.
+ *
+ * Ausgenommen wie bisher: alles ausser Aufwand und die Vertragsraten (siehe Kopf).
+ * `budgetrelevant = false` fällt NICHT schon hier heraus, sondern in der Zuständigkeit —
+ * dort entscheidet sich, ob eine ausdrückliche Zuordnung ihn trotzdem einer Rücklage gibt.
+ * Einem Budget gibt sie ihn nie.
+ */
+function getrageneAnteile(sicht: BudgetSicht): readonly GetragenerAnteil[] {
+  const gemerkt = getragenJeSicht.get(sicht);
+  if (gemerkt) return gemerkt;
+  const traeger = zustaendigkeit(
+    sicht.kategorien,
+    sicht.budgets,
+    sicht.ruecklagen ?? [],
+    sicht.ruecklagenzuordnungen ?? [],
+    sicht.ausbuchungen ?? [],
+  );
+  const raus: GetragenerAnteil[] = [];
+  for (const b of sicht.buchungen) {
+    if (b.charakter !== "Aufwand") continue;
+    // Vertragsraten sind anderswo geplant und stehen im Ausblick in ihrer eigenen Zeile.
+    if (sicht.vertragsBuchungen.has(b.id)) continue;
+    // Über die Anteile, nicht über b.kategorieId: eine geteilte Buchung (S-7) belastet
+    // ein Budget nur mit IHREM Teil, nicht mit dem vollen Betrag — und nicht gar nicht.
+    kategorieAnteile(b).forEach((a, i) => {
+      raus.push({
+        buchung: b,
+        anteil: i,
+        kategorieId: a.kategorieId,
+        betrag: a.betrag,
+        traeger: traeger({ istbuchungId: b.id, kategorieId: a.kategorieId, datum: b.datum, budgetrelevant: b.budgetrelevant }),
+      });
+    });
+  }
+  getragenJeSicht.set(sicht, raus);
+  return raus;
+}
+
+/** Trägt `id` (ein Budget oder eine Rücklage) den Anteil? */
+function traegt(t: Zustaendig, id: string): boolean {
+  return (t.art === "laufend" && t.budgetId === id) || (t.art === "ruecklage" && t.ruecklageId === id);
+}
+
+/**
+ * Die Anteile, die eine Rücklage über die Zuständigkeit trägt — für ihren Stand und ihren
+ * Anspruch auf dem Konto. Dieselbe Auswahl wie der Verbrauch eines Budgets.
+ */
+export function ruecklagenEntnahmenAus(sicht: BudgetSicht): Map<string, Ruecklagenentnahme[]> {
+  const raus = new Map<string, Ruecklagenentnahme[]>();
+  for (const x of getrageneAnteile(sicht)) {
+    if (x.traeger.art !== "ruecklage") continue;
+    const e = { datum: x.buchung.datum, betrag: x.betrag };
+    const liste = raus.get(x.traeger.ruecklageId);
+    if (liste) liste.push(e);
+    else raus.set(x.traeger.ruecklageId, [e]);
+  }
+  return raus;
+}
+
+/**
+ * Die Anteile (`buchungId#index`), die eine Rücklage VON HAND über ihre Kategorie trägt
+ * oder die auf eine Zuordnung warten — für den Budgetvorschlag, der sie auslässt. Die
+ * aufbauenden Budgets zählen hier nicht: deren Kategorien schliesst der Vorschlag ohnehin
+ * aus, weil dort schon ein Budget liegt.
+ */
+export function vonRuecklagenGetragen(sicht: BudgetSicht): Set<string> {
+  const budgetIds = new Set(sicht.budgets.map((b) => b.id));
+  const raus = new Set<string>();
+  for (const x of getrageneAnteile(sicht)) {
+    const t = x.traeger;
+    if ((t.art === "ruecklage" && !budgetIds.has(t.ruecklageId)) || t.art === "wartet") raus.add(`${x.buchung.id}#${x.anteil}`);
+  }
+  return raus;
 }
 
 export function budgetVerbrauch(sicht: BudgetSicht, budget: Budget, von: string, bis: string): Cent {
@@ -345,24 +453,15 @@ export function budgetBuchungen(
   von: string,
   bis: string,
 ): Verbrauchsposten[] {
-  const { buchungen, kategorien, budgets, vertragsBuchungen } = sicht;
-  const relevant = budgetKategorien(budget, budgets, kategorien);
+  // Wer den Anteil trägt, sagt die Zuständigkeit — dieselbe Frage wie in der Einordnung.
+  // Ein eingebettetes Budget oder eine Rücklage darunter nimmt dem Dach seine Kategorien
+  // ab (`budgetKategorien` beschreibt dasselbe für Budgets allein); die eine teure
+  // Anschaffung, für die zurückgelegt wurde, trägt kein Budget (`budgetrelevant`).
   const raus: Verbrauchsposten[] = [];
-  for (const b of buchungen) {
-    if (b.charakter !== "Aufwand") continue;
-    if (b.datum < von || b.datum >= bis) continue;
-    // Vertragsraten sind anderswo geplant und stehen im Ausblick in ihrer eigenen Zeile.
-    if (vertragsBuchungen.has(b.id)) continue;
-    // Und die eine teure Anschaffung, für die zurückgelegt wurde, ist ausgenommen: sie
-    // spränge jeden Monatsrahmen, und danach sagte der nichts mehr aus.
-    if (b.budgetrelevant === false) continue;
-    // Über die Anteile, nicht über b.kategorieId: eine geteilte Buchung (S-7) belastet
-    // dieses Budget nur mit IHREM Teil, nicht mit dem vollen Betrag — und nicht gar nicht.
-    kategorieAnteile(b).forEach((a, i) => {
-      if (a.kategorieId && relevant.has(a.kategorieId)) {
-        raus.push({ buchung: b, anteil: i, kategorieId: a.kategorieId, betrag: -a.betrag });
-      }
-    });
+  for (const x of getrageneAnteile(sicht)) {
+    if (x.buchung.datum < von || x.buchung.datum >= bis) continue;
+    if (!x.kategorieId || !traegt(x.traeger, budget.id)) continue;
+    raus.push({ buchung: x.buchung, anteil: x.anteil, kategorieId: x.kategorieId, betrag: -x.betrag });
   }
   return raus.sort((x, y) => x.buchung.datum.localeCompare(y.buchung.datum));
 }

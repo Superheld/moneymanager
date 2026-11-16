@@ -45,7 +45,8 @@ const alle = <T,>(xs: readonly T[]) => ({ alle: async () => [...xs] });
 const DEPS = {
   kontoRepo: alle(KONTEN),
   ledger: alle([]),
-  ruecklagenRepo: alle(RUECKLAGEN),
+  ruecklagenRepo: { ...alle(RUECKLAGEN), beendete: async () => [], ausbuchungen: async () => [] },
+  ruecklagenzuordnungRepo: alle([]),
   kategorieRepo: alle(KATEGORIEN),
   budgetRepo: alle(BUDGETS),
   zuordnungRepo: alle([]),

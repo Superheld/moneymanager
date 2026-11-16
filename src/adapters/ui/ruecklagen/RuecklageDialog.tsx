@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { hatZiel, minorZuMajor, waehlbareKonten, type Kategorie, type Ruecklage, type Zahlungskonto } from "../../../application";
+import { hatZiel, minorZuMajor, monatsRuecklage, waehlbareKonten, type Kategorie, type Kategoriebelegung, type Ruecklage, type Zahlungskonto } from "../../../application";
 import { ruecklageAktualisieren, ruecklageAnlegen } from "../../dienste";
 import { Button, FormField } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
@@ -25,6 +25,7 @@ export function RuecklageDialog({
   heute,
   konten,
   kategorien,
+  kategoriebelegung,
   onClose,
   onGespeichert,
 }: {
@@ -33,6 +34,8 @@ export function RuecklageDialog({
   heute: string;
   konten: readonly Zahlungskonto[];
   kategorien: readonly Kategorie[];
+  /** Was an jeder Kategorie schon hängt — für die beiden Hinweise unter dem Feld. */
+  kategoriebelegung?: Kategoriebelegung;
   onClose: () => void;
   onGespeichert: () => void | Promise<void>;
 }) {
@@ -43,11 +46,17 @@ export function RuecklageDialog({
   const [bezeichnung, setBezeichnung] = useState(r?.bezeichnung ?? "");
   const [ziel, setZiel] = useState(r?.ziel == null ? "" : String(minorZuMajor(r.ziel, geld.waehrung)));
   const [fristMonate, setFristMonate] = useState(r?.fristMonate == null ? "" : String(r.fristMonate));
-  const [rate, setRate] = useState(r?.rate == null ? "" : String(minorZuMajor(r.rate, geld.waehrung)));
+  // Die freie Rate steht seit Migration 80 in der Reihe; `monatsRuecklage` nimmt die, die zuletzt gilt.
+  const [rate, setRate] = useState(r && !hatZiel(r) ? String(minorZuMajor(monatsRuecklage(r), geld.waehrung)) : "");
   const [beginn, setBeginn] = useState(r?.beginn ?? heute);
   const [kontoId, setKontoId] = useState(r?.kontoId ?? "");
   const [kategorieId, setKategorieId] = useState(r?.kategorieId ?? "");
   const [fehler, setFehler] = useState<string | null>(null);
+  // Die beiden Hinweise zur Kategorie: eine andere Rücklage daran heisst, dass Buchungen
+  // dort künftig warten; ein monatliches Budget daran nimmt eine neu gewählte Kategorie
+  // nicht an (der Altfall bleibt, wie er ist — das Budget gewinnt).
+  const andere = (kategorieId && kategoriebelegung?.ruecklagen.get(kategorieId)?.filter((x) => x.id !== r?.id)) || [];
+  const mitBudget = !!kategorieId && kategorieId !== r?.kategorieId && !!kategoriebelegung?.monatlich.has(kategorieId);
 
   async function speichern() {
     setFehler(null);
@@ -64,7 +73,7 @@ export function RuecklageDialog({
       kategorieId: kategorieId || undefined,
     };
     try {
-      if (r) await ruecklageAktualisieren(r.id, eingabe);
+      if (r) await ruecklageAktualisieren(r.id, eingabe, heute);
       else await ruecklageAnlegen(eingabe);
       await onGespeichert();
     } catch (e) {
@@ -125,14 +134,22 @@ export function RuecklageDialog({
             optionen={[{ wert: "", text: t("ruecklagen.kontoKeins") }, ...waehlbareKonten(konten, kontoId).map((k) => ({ wert: k.id, text: k.bezeichnung }))]}
           />
         </FormField>
-        {/* Die Kategorie ist ein Vorschlag fürs Ausbuchen und keine Regel: sie holt die
-            passenden Buchungen nach vorn. Deshalb optional, und deshalb mit einem Weg
+        {/* Über die Kategorie findet die Rücklage ihre Ausgaben von selbst. Noch optional
+            (eine Rücklage ohne rechnet wie vor der Umstellung), und deshalb mit einem Weg
             zurück — der Picker selbst kennt kein „keine". */}
         <FormField label={t("ruecklagen.feldKategorie")} hint={t("ruecklagen.feldKategorieHinweis")}>
           <Feldzeile
             feld={<CategoryPicker kategorien={[...kategorien]} value={kategorieId} onChange={setKategorieId} placeholder={t("ruecklagen.kategorieKeine")} />}
             knopf={kategorieId ? <Button variant="link" onClick={() => setKategorieId("")}>{t("ruecklagen.kategorieEntfernen")}</Button> : null}
           />
+          {andere.length > 0 && (
+            <div className="hinweis" style={{ marginTop: 6 }}>
+              {t("ruecklagen.kategorieSchonBelegt", { namen: andere.map((x) => x.bezeichnung).join(", ") })}
+            </div>
+          )}
+          {mitBudget && (
+            <div className="hinweis" style={{ marginTop: 6 }}>{t("ruecklagen.kategorieHatBudget")}</div>
+          )}
         </FormField>
       </div>
     </Modal>

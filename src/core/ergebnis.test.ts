@@ -92,6 +92,7 @@ function eingabe(over: Partial<ErgebnisEingabe>): ErgebnisEingabe {
     budgets: [],
     ruecklagen: [],
     ausbuchungen: [],
+    ruecklagenzuordnungen: [],
     ist: [],
     kategorien: KATEGORIEN,
     konten: KONTEN,
@@ -643,7 +644,7 @@ describe("Einordnung", () => {
     });
     expect(einordnen(e.ist, einordnungskontext(e)).map((x) => [x.art, x.budgetId, x.betrag])).toEqual([
       ["laufend", "alltag", -3000],
-      ["topf", "reise", -2000],
+      ["ruecklage", "reise", -2000],
     ]);
   });
 

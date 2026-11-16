@@ -41,12 +41,14 @@ import type {
   KategorieRepository,
   LedgerPort,
   RuecklagenRepository,
+  RuecklagenzuordnungRepository,
   UmsatzRepository,
   VertragRepository,
   VertragszuordnungRepository,
   ZahlungskontoRepository,
   ZahlungsregelRepository,
 } from "./ports";
+import { alleRuecklagen, ruecklagenbestandLaden } from "./ruecklagen/ruecklagenbestand";
 
 /** Wie viele Monate der Rückblick der Budgetliste höchstens anbietet. */
 const MAX_MONATE_ZURUECK = 24;
@@ -60,6 +62,8 @@ export interface UebersichtDeps {
   readonly zuordnungRepo: VertragszuordnungRepository;
   readonly kontoRepo: ZahlungskontoRepository;
   readonly ruecklagenRepo: RuecklagenRepository;
+  /** Die ausdrücklichen Zuordnungen zu einer Rücklage — Einordnung und Budgets lesen sie. */
+  readonly ruecklagenzuordnungRepo: RuecklagenzuordnungRepository;
   readonly vertragRepo: VertragRepository;
   /**
    * Für die Zeile Vorsorge: hat der Haushalt ein Ziel, kostet der Monat dessen Rate.
@@ -151,7 +155,7 @@ export async function uebersichtLaden(
   heute: string,
 ): Promise<Uebersichtsdaten> {
   const bestand = vermoegensbestandLaden(deps.vorsorge);
-  const [buchungen, kategorien, regeln, budgets, umsaetze, zuordnungen, konten, ruecklagen, vertragsnamen, ausbuchungen, vorsorge] =
+  const [buchungen, kategorien, regeln, budgets, umsaetze, zuordnungen, konten, rb, vertragsnamen, vorsorge] =
     await Promise.all([
       deps.ledger.alle(),
       deps.kategorieRepo.alle(),
@@ -160,11 +164,11 @@ export async function uebersichtLaden(
       deps.umsatzRepo.alle(),
       deps.zuordnungRepo.alle(),
       deps.kontoRepo.alle(),
-      deps.ruecklagenRepo.alle(),
+      ruecklagenbestandLaden(deps.ruecklagenRepo, deps.ruecklagenzuordnungRepo),
       vertragsnamenLaden(deps.zuordnungRepo, deps.vertragRepo),
-      deps.ruecklagenRepo.ausbuchungen(),
       ergebnisvorsorgeLaden(deps.vorsorge, bestand),
     ]);
+  const { ruecklagen, beendete, ausbuchungen, ruecklagenzuordnungen } = rb;
   // Die Schulden für die Teilung der Kreditraten: derselbe Bestand wie im Bereich
   // Vermögen und in der Vorsorge, EINMAL geholt.
   const { verbindlichkeiten, staende } = await bestand;
@@ -193,13 +197,16 @@ export async function uebersichtLaden(
     kategorien,
     budgets,
     vertragsBuchungen,
+    ruecklagen: alleRuecklagen(rb),
+    ruecklagenzuordnungen,
+    ausbuchungen,
   };
   const dieserMonat = heute.slice(0, 7);
   const belegung = belegungssicht({ konten, buchungen, ruecklagen, sicht }, heute);
 
   return {
     ergebnisse: monatsErgebnisse(
-      ergebnisbasis({ regeln, budgets, ruecklagen, ausbuchungen, ist: buchungen, kategorien, konten, vertragJeBuchung, heute, vorsorge, schulden }),
+      ergebnisbasis({ regeln, budgets, ruecklagen, beendete, ausbuchungen, ruecklagenzuordnungen, ist: buchungen, kategorien, konten, vertragJeBuchung, heute, vorsorge, schulden }),
     ),
     staende: budgetstaende(sicht, `${dieserMonat}-28`),
     sicht,

@@ -314,6 +314,7 @@ export {
   type Buchungsvorschlag,
   type Ruecklagensicht,
   type RuecklagenDeps,
+  type Kategoriebelegung,
 } from "./ruecklagen/ruecklagensichten";
 export {
   ruecklageAnlegen,
@@ -322,6 +323,12 @@ export {
   ruecklageLoeschen,
   type RuecklagenEingabe,
 } from "./ruecklagen/ruecklagenPflege";
+export {
+  ruecklageZuordnen,
+  type Ruecklagenwahl,
+  type RuecklagenzuordnenDeps,
+  type RuecklagenzuordnenEingabe,
+} from "./ruecklagen/ruecklageZuordnen";
 export {
   kontoloeschungPruefen,
   kontoVollstaendigLoeschen,

@@ -64,8 +64,9 @@ Drei Dinge daran sind Entscheidung:
   Beträge für denselben Kauf liefen sonst auseinander.
 - **Ungedeckt** ist die Ausgabe über dem Zyklus-Soll am Tag des Ausbuchens
   (`zyklusUngedeckt`). Ohne festgehaltenen Zyklus steht „unbekannt" da, nicht 0 — und der
-  Kauf gilt, wie in der Ergebnisrechnung, als gedeckt. In `ergebnis.ts` steht dieselbe
-  Regel noch inline; wer eine ändert, ändert beide.
+  Kauf gilt, wie in der Ergebnisrechnung, als gedeckt. Gerechnet wird an EINER Stelle
+  (`altabschlussUngedeckt` in `topf.ts`), die auch die Ergebnisrechnung fragt; bis
+  Paket 3 stand die Regel dort ein zweites Mal inline.
 - **Die Zeile öffnet die Buchung nur, wenn eine dranhängt** (`DataTable` mit
   `istKlickbar`). Wiederaufnehmen oder Löschen einer beendeten Rücklage gibt es dort nicht.
 
@@ -82,7 +83,7 @@ eine Ausgabe zu ihnen findet:
 | | findet seine Ausgaben | passt für |
 |---|---|---|
 | **aufbauendes Budget** | von selbst, über die Kategorie samt Unterkategorien | viele Ausgaben über die Zeit: Urlaub, Reparaturen |
-| **Rücklage** | von Hand, eine Buchung je Ausbuchen | ein Gegenstand, ein Kauf: das Gerät, das Auto |
+| **Rücklage** | mit Kategorie: von selbst über sie, ab ihrem Fundfenster (`findet_ab`, seit Paket 3); ohne: von Hand, eine Buchung je Ausbuchen | ein Gegenstand, ein Kauf: das Gerät, das Auto |
 
 ### In der Oberfläche ist beides eine Rücklage (seit 2026-11-15)
 
@@ -131,13 +132,33 @@ weil nur sie die Liste mit Balken zeigt. Der Satz „nur Rechnung" hängt an `nu
 stehen lassen. **Die Ergebnisrechnung ist davon unberührt**: sie liest keine dieser
 Funktionen.
 
-Die Spalte `kategorie_id` der Rücklage war bis 2026-11-15 gespeichert und nirgends
-benutzt; ein Feld dafür gab es in keiner Maske. Seitdem trägt der Dialog sie, und sie
-tut genau eines: **beim Ausbuchen stehen die Buchungen dieser Kategorie zuerst**
-(`buchungswahlFuer` in `application/ruecklagen/ruecklagensichten.ts`). Sie ist ein
-Vorschlag und keine Regel. Zählte sie von selbst wie beim Budget, wüsste die Rücklage
-mit Ziel nach der ersten kleinen Ausgabe nicht, ob ihr Zyklus neu beginnt — und zwei
-Töpfe auf derselben Kategorie stritten um dieselbe Buchung.
+**Die Kategorie einer Rücklage findet seit Paket 3 ihre Ausgaben** — bis dahin war sie
+nur ein Vorschlag fürs Ausbuchen (`buchungswahlFuer` holt die Buchungen der Kategorie
+weiter nach vorn). Ab dem Tag in `findet_ab` trägt die Rücklage jede Ausgabe ihrer
+Kategorie samt Unterkategorien; davor gilt, was ohne sie gälte, und deshalb kostet kein
+Monat vor der Umstellung anders. Drei Fälle, die man kennen muss:
+
+- **Mehrere Rücklagen an derselben Kategorie: die Buchung wartet.** Sie zählt als
+  ungeplant und trägt die Pille „wartet auf Zuordnung", bis jemand im Buchungsdialog
+  wählt, welche Rücklage sie trägt — oder „keine Rücklage" (`ruecklageZuordnen`,
+  Tabelle `ruecklage_zuordnung`, je Anteil über seine Kategorie benannt). Vorbelegt
+  wird nichts. Der Dialog der Rücklage sagt vorher, wenn an der gewählten Kategorie
+  schon eine hängt.
+- **Ein Budget am selben Knoten gewinnt.** Ein monatliches immer — eine NEUE Rücklage an
+  dessen Kategorie weist die Anwendung ab (`ruecklage.kategorieHatBudget`, Hinweis auf
+  eine Unterkategorie); ein Altfall bleibt stehen, und die Rücklage findet dort nur
+  ausdrücklich Zugeordnetes. Ein aufbauendes ebenfalls, aber nur bis Paket 4: es steht
+  noch in der Tabelle `budget`, eine Zuordnung darauf liesse sich nicht speichern
+  (`ruecklage_zuordnung` verweist auf `ruecklage`), und mit ihm in der Wahl wartete jede
+  Buchung dort auf etwas, das niemand wählen kann.
+- **Ohne Kategorie rechnet eine Rücklage wie vorher**: sie findet nur über ihre
+  Ausbuchung und steht nie zur Wahl.
+
+Eine neu angelegte Rücklage mit Kategorie findet ab ihrem Beginn; eine nachgetragene
+Kategorie ab dem Tag des Speicherns (`ruecklageAktualisieren`), sonst änderte das
+Nachtragen vergangene Monate. Der Anspruch auf dem Konto sinkt um das Gefundene
+(`anspruchAm` in `ruecklage.ts`): er ist der Stand über null, und eine Rücklage im Minus
+beansprucht nichts.
 
 ## Der Rücklagenfluss ist DREI Zahlen, nicht eine
 
@@ -195,36 +216,51 @@ im Kern zu tun hiesse zu raten, wie viele Monate gemeint sind.
 
 Rücklage und aufbauendes Budget werden eine Sache: jede Rücklage hängt an einer
 Kategorie, läuft wie ein Budget (auch ins Minus) und ist entweder `fortlaufend` oder
-`abschliessend`. **Alles, was oben steht, gilt bis zur Umstellung weiter** — was hier
-steht, ist angelegt und wird noch von nichts benutzt, das rechnet.
+`abschliessend`.
 
-Was schon steht:
+**Paket 3 ist gebaut: die Rechnung ist umgestellt.** Was es dafür gibt:
 
-- **Das Schema (Migration 79):** `ruecklage.art` (Vorgabe `abschliessend`, so ist jede
-  bisherige gemeint), `ruecklage.findet_ab` (ohne Vorgabe), die Reihe `ruecklage_rate`
-  und die Zuordnung `ruecklage_zuordnung`. Gefüllt wird davon nichts; die freie Rate steht
-  weiter in `rate`. `RuecklagenRepository` liest und schreibt die Felder, die Reihe über
-  eigene Wege (`rateSpeichern`), damit `ruecklageAktualisieren` sie nicht löscht.
-  `RuecklagenzuordnungRepository` gibt es als Port und in SQLite, verdrahtet ist es nicht.
-- **Die Rechenbausteine** in `topf.ts` und `zustaendigkeit.ts`: Zyklen, Raten, Stand je
-  Sorte, die max-Regel je Zyklus (`zyklusKosten`), die alte Regel für Zyklen, die vor der
-  Umstellung mit einer Buchung ausgebucht wurden (`altabschlussKosten`), Abschliessen und
-  wer einen Anteil trägt. **Aufgerufen werden sie nur von ihren Tests**, und die prüfen
-  vor allem eines: auf heutigen Daten ergeben sie Monat für Monat dasselbe wie
-  `topfKosten`, der Rücklagenposten und `zyklusPosten` in `ergebnis.ts` und die
-  Einordnung.
+- **Das Schema (Migration 79)** und **die Überführung (Migration 80)**: die freie Rate
+  steht in der Reihe `ruecklage_rate` (ab dem Monat des Beginns, `rate` ist dort leer,
+  wo sie überführt ist), und jede laufende Rücklage von Hand mit Kategorie findet ab dem
+  Tag der Umstellung (`findet_ab`).
+- **Die Rechenbausteine** in `topf.ts` und `zustaendigkeit.ts` rechnen: Einordnung,
+  Ergebnisrechnung, Verbrauch eines Budgets, Belegung, Deckung und Budgetvorschläge fragen
+  dieselbe Zuständigkeit. Die aufbauenden Budgets werden übergangsweise als Rücklage
+  gelesen (`alsRuecklage`); ihre Tabelle bleibt bis Migration 81.
+- **Die Probe** `src/umstellungsprobe.test.ts`: jede Zeile der Ergebnisrechnung, die
+  Einordnung jedes Anteils, Belegung und Deckung an mehreren Stichtagen, Budgetstände und
+  Monatsausblick — für den Spielstand und zwei harte Bestände, vor und nach Migration 80,
+  gegen eine Erwartung, die mit dem Code VOR der Umstellung erzeugt ist.
 
-Zwei Kostenregeln, und wo jede gelten wird: die **max-Regel** für jeden Zyklus ausser
-einem, den eine Ausbuchung mit verknüpfter Buchung vor der Umstellung abgeschlossen hat
-— dort die **alte Regel** (Ungedecktes im Kaufmonat, gemessen am Abschlusstag), damit
-kein vergangener Monat anders kostet. Beides trifft nie im selben Zyklus zusammen.
+**Zwei Kostenregeln, und wo jede gilt:**
+
+| Regel | gilt für | rechnet |
+|---|---|---|
+| **max-Regel** (`zyklusKosten`) | jeden Zyklus ausser dem unten: den laufenden, jedes aufbauende Budget, jeden neuen Abschluss | Kosten bis M = max(Raten bis M, Entnahmen bis Ende M) |
+| **alte Regel** (`altabschlussKosten`) | einen Zyklus, den VOR der Umstellung eine Ausbuchung mit verknüpfter Buchung abgeschlossen hat | jeder Monat seine Rate, im Kaufmonat dazu, was der Kauf über dem Angesparten am Abschlusstag lag |
+
+Beides trifft nie im selben Zyklus zusammen. Die alte Regel bleibt, weil die max-Regel
+das Ungedeckte in andere Monate verschöbe, sobald Kaufdatum und Abschlussmonat
+auseinanderliegen.
+
+**Was konservativ unverändert rechnet** (Teil B des Entwurfs, Abschnitt 5): der Stand je
+Sorte (`fortlaufend` mit der Rate des laufenden Monats, `abschliessend` erst ab dem
+Folgemonat), der Bedarf im Fluss, der Tacho und `ruecklagenKonten`, der Monatsausblick
+(er bekommt keine Rücklagen in seine Budget-Sicht).
+
+**Zwei Befunde werden nachgebildet und nicht behoben**, beide mit Test in
+`fundfenster.test.ts`: eine Kategoriebuchung VOR dem Start eines aufbauenden Budgets ist
+eine Entnahme und kostet nichts; ein Kauf, den zwei Ausbuchungen nennen, zählt in beiden
+als ungedeckt. **Eine Abweichung** ist benannt (`topf.test.ts`): ein aufbauendes Budget
+ohne `start` (nur in einer von Hand geänderten Datei) zählt seine Ausgaben jetzt ab dem
+ersten Betragsmonat; vorher kosteten sie nie etwas.
 
 **`findet_ab` leer heisst je Sorte etwas anderes:** bei `abschliessend` findet die
-Kategorie nichts von selbst, bei `fortlaufend` gilt sie ohne Anfang — wie heute ein
-aufbauendes Budget, dessen Kategoriebuchungen VOR dem Start Entnahmen sind und nichts
-kosten. Das ist ein bekannter Befund und wird nachgebildet, nicht behoben.
+Kategorie nichts von selbst, bei `fortlaufend` gilt sie ohne Anfang — wie ein
+aufbauendes Budget.
 
-Wenn die Rechnung umgestellt ist, gehört dieser Abschnitt in die Abschnitte oben, und
-die Sätze dort, die die Trennung beschreiben, fallen weg — ebenso in `../CLAUDE.md` die
-Regel „Der Topf hängt an der KATEGORIE, nicht an der Buchung": die Zuordnung gibt es,
-wo die Kategorie mehrdeutig ist.
+Noch offen: Paket 4 (Migration 81, die aufbauenden Budgets werden Rücklagen; eine Liste,
+ein Dialog mit Kategorie als Pflicht) und Paket 5 (Abschliessen statt Ausbuchen). Wenn
+beides steht, gehört dieser Abschnitt in die Abschnitte oben, und die Sätze dort, die die
+Trennung beschreiben, fallen weg.

@@ -62,6 +62,11 @@ export async function budgetvorschlaegeLaden(
   ignoriert: ReadonlySet<string> = new Set(),
   /** Die erfassten Buchung↔Vertrag-Verknüpfungen; ohne sie zählen nur die Kandidaten. */
   zuordnungRepo?: VertragszuordnungRepository,
+  /**
+   * Die Anteile, die eine Rücklage über ihre Kategorie trägt oder die auf eine Zuordnung
+   * warten (`vonRuecklagenGetragen`) — sie zählen in keinen Vorschlag.
+   */
+  vonRuecklagen: ReadonlySet<string> = new Set(),
 ): Promise<Budgetvorschlag[]> {
   const [buchungen, umsaetze, kategorien, budgets] = await Promise.all([
     ledger.alle(),
@@ -90,5 +95,5 @@ export async function budgetvorschlaegeLaden(
   }
   for (const id of ignoriert) belegt.add(id);
 
-  return berechnen(buchungen, kategorien, bisMonat, vertraglich, belegt);
+  return berechnen(buchungen, kategorien, bisMonat, vertraglich, belegt, {}, vonRuecklagen);
 }

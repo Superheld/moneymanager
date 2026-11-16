@@ -10,7 +10,7 @@
 // `core/CLAUDE.md` unter „Auszahlung und Kosten".
 //
 // Eingeordnet wird der ANTEIL, nicht die Buchung: eine geteilte Buchung kann zur Hälfte
-// laufende Kosten sein und zur anderen aus einem Topf kommen.
+// laufende Kosten sein und zur anderen aus einer Rücklage kommen.
 //
 // Die Reihenfolge der Fragen ist die Regel, und sie ist dieselbe, die `budgetBuchungen`
 // für den Verbrauch eines Budgets anlegt — sonst zeigte die Budgetliste einen Verbrauch,
@@ -21,32 +21,48 @@
 //      bleibt aber Vermögen (der Wertpapierkauf, die Tilgung).
 //   3. Ertrag                      → Einnahme.
 //   4. Aufwand mit Vertrag         → Fixkosten.
-//   5. Aufwand, nicht budgetrelevant → Entnahme aus einer Rücklage, WENN für die
-//      Buchung eine ausgebucht wurde; sonst ungeplant (ausserhalb der Budgets).
-//   6. Kategorie unter einem Budget → laufende Kosten (monatlich) oder Entnahme aus
-//      dem Topf (aufbauend).
-//   7. sonst                       → ungeplant.
+//   5. Alles Weitere beantwortet die Zuständigkeit (`ruecklagen/zustaendigkeit.ts`), je
+//      Anteil, in dieser Reihenfolge (Teil B des Entwurfs zu ADR-0006, Abschnitt 2):
+//        a. eine ausdrückliche Zuordnung zu einer Rücklage → Entnahme aus ihr;
+//        b. nicht budgetrelevant → Entnahme, WENN für die Buchung vor der Umstellung
+//           eine Rücklage ausgebucht wurde; sonst ungeplant;
+//        c. der nächste Vorfahr der Kategorie mit einem Träger: ein monatliches Budget
+//           (laufende Kosten), ein aufbauendes oder EINE Rücklage, deren Fundfenster den
+//           Tag enthält (Entnahme), MEHRERE solche Rücklagen (ungeplant, bis jemand
+//           zuordnet — `wartetAuf`);
+//        d. sonst ungeplant.
 //
-// **Schritt 5 fragt nach der AUSBUCHUNG, nicht nach `budgetrelevant` allein.** Das Feld
+// **Eine Art `ruecklage` für beide Formen** (seit Paket 3). Bis dahin hiess die Entnahme
+// aus einem aufbauenden Budget `topf` und die aus einer Rücklage von Hand `ruecklage`;
+// für den Nutzer ist es dieselbe Sache, und die Ergebnisrechnung rechnet sie inzwischen
+// nach denselben Bausteinen. Woher sie kommt, sagen `ruecklageId` und — solange das
+// aufbauende Budget noch ein Budget ist — `budgetId`.
+//
+// **Schritt b fragt nach der AUSBUCHUNG, nicht nach `budgetrelevant` allein.** Das Feld
 // sagt „zählt in kein Budget" und wird beim Ausbuchen gesetzt — aber auch von Hand.
 // Zunächst galt es allein als „aus Erspartem bezahlt"; damit kostete eine von Hand
-// markierte Ausgabe nie etwas, obwohl niemand dafür zurückgelegt hatte. Entnahme ist
-// deshalb nur, wofür eine Rücklage ausgebucht wurde (`ruecklagenKaeufe`); deren Raten
-// waren die Kosten davor.
+// markierte Ausgabe nie etwas, obwohl niemand dafür zurückgelegt hatte.
+//
+// **Die Kategorie einer Rücklage von Hand findet erst ab `findetAb`.** Davor gilt bei der
+// Einordnung, was ohne sie gälte — das Budget darüber oder „ungeplant" —, und deshalb
+// trägt kein Monat vor der Umstellung eine andere Zahl.
 //
 // Keine Migration, kein neues Feld: die Einordnung ist ABGELEITET. Ein gespeicherter Wert
-// könnte der Kategorie, dem Vertrag oder dem Budget widersprechen, aus denen er folgt.
+// könnte der Kategorie, dem Vertrag oder dem Budget widersprechen, aus denen er folgt. Die
+// ausdrückliche Zuordnung ist keiner: sie ist eine Entscheidung des Nutzers, die nur dort
+// gebraucht wird, wo die Kategorie allein nicht entscheidet.
 
 import type { Cent } from "./basis/geld";
 import { kategorieAnteile, type IstBuchung } from "./buchung/istbuchung";
-import { budgetKategorien, type Budget } from "./budgets/budget";
+import type { Budget } from "./budgets/budget";
 import type { Kategorie } from "./kategorien/kategorie";
+import type { Ruecklage, Ruecklagenzyklus } from "./ruecklagen/ruecklage";
+import { zustaendigkeit, type Ruecklagenzuordnung } from "./ruecklagen/zustaendigkeit";
 
 export type Einordnungsart =
   | "einnahme"
   | "fixkosten"
   | "laufend"
-  | "topf"
   | "ruecklage"
   | "vorsorge"
   | "umbuchung"
@@ -61,8 +77,24 @@ export interface Einordnung {
   /** Vorzeichenbehaftet wie die Buchung (Abfluss negativ). */
   readonly betrag: Cent;
   readonly art: Einordnungsart;
-  /** Bei `laufend` und `topf`: das Budget, das den Anteil trägt. */
+  /**
+   * Bei `laufend`: das monatliche Budget. Bei `ruecklage` aus einem aufbauenden Budget:
+   * dieses Budget (dann ist `ruecklageId` dieselbe ID) — bis Paket 4 ist es noch eines.
+   */
   readonly budgetId?: string;
+  /**
+   * Bei `ruecklage`: die Rücklage, die den Anteil trägt. Fehlt bei einer Entnahme über
+   * eine alte Ausbuchung — die rechnet nach der alten Regel (`ausgebucht`).
+   */
+  readonly ruecklageId?: string;
+  /** Bei `ruecklage` über eine alte Ausbuchung: die Rücklagen, deren Ausbuchung sie nennt. */
+  readonly ausgebucht?: readonly string[];
+  /**
+   * Bei `ungeplant`: die Rücklagen, zwischen denen zu wählen ist — mehrere hängen an der
+   * Kategorie, und keine Zuordnung sagt, welche es war. Bis dahin kostet der Anteil seinen
+   * Monat wie jede ungeplante Ausgabe.
+   */
+  readonly wartetAuf?: readonly string[];
   /** Der Vertrag der Buchung, falls zugeordnet — bei jeder Art, nicht nur Fixkosten. */
   readonly vertragId?: string;
   /**
@@ -75,6 +107,7 @@ export interface Einordnung {
 
 export interface Einordnungskontext {
   readonly kategorien: readonly Kategorie[];
+  /** ALLE Budgets, monatliche wie aufbauende. */
   readonly budgets: readonly Budget[];
   /**
    * Buchungs-ID → Vertrags-ID, nur für zugeordnete Buchungen. Pflichtfeld aus demselben
@@ -85,29 +118,35 @@ export interface Einordnungskontext {
   /** Die Konten, die der Vorsorge dienen (`istVorsorgekonto`). */
   readonly vorsorgeKonten: ReadonlySet<string>;
   /**
-   * Die Buchungen, mit denen eine Rücklage ausgebucht wurde.
-   *
-   * Nur sie gelten als Entnahme. `budgetrelevant === false` allein genügt seit
-   * 2026-11-15 nicht mehr: das Feld sagt „zählt in kein Budget", und wer es von Hand
-   * setzt, ohne dass eine Rücklage dahintersteht, hat damit nichts angespart. Eine
-   * solche Ausgabe kostet ihren Monat (ungeplant) — sonst hätte sie nie etwas gekostet.
+   * ALLE Rücklagen, beendete eingeschlossen: eine beendete trägt ihre Kategorie bis zu
+   * ihrem Ende. Pflicht — fehlten sie, fände keine Rücklage je eine Ausgabe, und niemand
+   * sähe es.
    */
-  readonly ruecklagenKaeufe: ReadonlySet<string>;
+  readonly ruecklagen: readonly Ruecklage[];
+  /** Die ausdrücklichen Zuordnungen (`ruecklage_zuordnung`). */
+  readonly ruecklagenzuordnungen: readonly Ruecklagenzuordnung[];
+  /**
+   * Die Ausbuchungen. Nur die mit einer verknüpften Buchung zählen hier: sie machen
+   * einen nicht budgetrelevanten Kauf zur Entnahme. `budgetrelevant === false` allein
+   * genügt seit 2026-11-15 nicht mehr — wer es von Hand setzt, ohne dass eine Rücklage
+   * dahintersteht, hat damit nichts angespart.
+   */
+  readonly ausbuchungen: readonly Ruecklagenzyklus[];
 }
 
 /**
  * Baut die Einordnung für einen Bestand. Zurück kommt eine Funktion, weil die
- * Vorarbeit (welche Kategorie gehört welchem Budget) einmal anfällt und nicht je Buchung.
+ * Vorarbeit (wer trägt welche Kategorie) einmal anfällt und nicht je Buchung.
  */
 export function einordner(kontext: Einordnungskontext): (b: IstBuchung) => Einordnung[] {
-  const budgetJeKategorie = new Map<string, Budget>();
-  for (const budget of kontext.budgets) {
-    // `budgetKategorien` nimmt die Unterbäume eingebetteter Budgets heraus — jede
-    // Kategorie gehört damit höchstens einem Budget, und die Reihenfolge ist egal.
-    for (const id of budgetKategorien(budget, kontext.budgets, kontext.kategorien)) {
-      budgetJeKategorie.set(id, budget);
-    }
-  }
+  const traeger = zustaendigkeit(
+    kontext.kategorien,
+    kontext.budgets,
+    kontext.ruecklagen,
+    kontext.ruecklagenzuordnungen,
+    kontext.ausbuchungen,
+  );
+  const aufbauend = new Set(kontext.budgets.filter((b) => b.art === "aufbauend").map((b) => b.id));
 
   return (b) => {
     const vertragId = kontext.vertragJeBuchung.get(b.id);
@@ -133,22 +172,22 @@ export function einordner(kontext: Einordnungskontext): (b: IstBuchung) => Einor
     if (b.charakter === "Umschichtung") return alsGanzes("vorsorge");
     if (b.charakter === "Ertrag") return alsGanzes("einnahme");
     if (vertragId) return alsGanzes("fixkosten");
-    if (b.budgetrelevant === false) {
-      return alsGanzes(kontext.ruecklagenKaeufe.has(b.id) ? "ruecklage" : "ungeplant");
-    }
 
     return kategorieAnteile(b).map((a, anteil): Einordnung => {
-      const budget = a.kategorieId ? budgetJeKategorie.get(a.kategorieId) : undefined;
-      return {
-        buchung: b,
-        anteil,
-        kategorieId: a.kategorieId,
-        betrag: a.betrag,
-        art: !budget ? "ungeplant" : budget.art === "aufbauend" ? "topf" : "laufend",
-        budgetId: budget?.id,
-        vertragId,
-        intern: false,
-      };
+      const basis = { buchung: b, anteil, kategorieId: a.kategorieId, betrag: a.betrag, vertragId, intern: false };
+      const z = traeger({ istbuchungId: b.id, kategorieId: a.kategorieId, datum: b.datum, budgetrelevant: b.budgetrelevant });
+      switch (z.art) {
+        case "laufend":
+          return { ...basis, art: "laufend", budgetId: z.budgetId };
+        case "ruecklage":
+          return { ...basis, art: "ruecklage", ruecklageId: z.ruecklageId, budgetId: aufbauend.has(z.ruecklageId) ? z.ruecklageId : undefined };
+        case "ausgebucht":
+          return { ...basis, art: "ruecklage", ausgebucht: z.ruecklageIds };
+        case "wartet":
+          return { ...basis, art: "ungeplant", wartetAuf: z.kandidaten };
+        case "ungeplant":
+          return { ...basis, art: "ungeplant" };
+      }
     });
   };
 }

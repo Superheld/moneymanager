@@ -121,9 +121,18 @@ auf" ausführbar macht.
 - **Verträge werden vorschüssig periodisiert:** die Zahlung gilt für die Monate AB ihrer
   Fälligkeit, verteilt nach dem Rhythmus der Zahlungsregel. Vorschüssig, weil es der
   Normalfall ist (Versicherung, Jahresabo) und der Kern die Abweichung davon nicht kennt.
-- **Der Topf hängt an der KATEGORIE, nicht an der Buchung.** Ein zweites Feld an der
-  Buchung („woraus bezahlt") ist geprüft und verworfen: wer es genauer will, legt
-  Unterkategorien an. Es bleibt bei einem Kategoriebaum.
+- **Der Topf hängt an der KATEGORIE — die Zuordnung klärt nur, wo sie mehrdeutig ist.**
+  Eine Rücklage findet ihre Ausgaben über ihre Kategorie samt Unterkategorien, ab ihrem
+  Fundfenster (`findet_ab`); das ist der Normalweg, und eine Buchung trägt dafür nichts.
+  Hängen MEHRERE Rücklagen an derselben Kategorie, wartet die Buchung, bis jemand sagt,
+  welche es war (`ruecklage_zuordnung`, je Anteil über seine Kategorie benannt; seit
+  Paket 3 des Umbaus, ADR-0006 Entscheidung 5). Bis dahin stand hier, ein Feld an der
+  Buchung („woraus bezahlt") sei geprüft und verworfen; verworfen bleibt ein solches Feld
+  als Normalweg — die Zuordnung ist keine zweite Kategorie, sondern die Antwort auf genau
+  eine Frage, die die Kategorie allein nicht beantwortet. Verworfen ist auch, je Rücklage
+  eine eigene Unterkategorie zu verlangen (viele kleine Kategorien, nur um der Rechnung
+  willen). Ein monatliches Budget und eine Rücklage an derselben Kategorie lässt die App
+  nicht neu anlegen; im Altfall gewinnt das Budget.
 - **Vorsorge ist Kosten, keine Verwendung des Überschusses.** Als Verwendung sähe ein
   Monat, in dem nichts zurückgelegt wurde, BESSER aus. Gerechnet wird die Rate, die das
   Ziel verlangt; ob sie überwiesen wurde, zeigt die Überleitung.
@@ -135,7 +144,7 @@ auf" ausführbar macht.
 
 | Datei | beantwortet |
 |---|---|
-| `einordnung.ts` | Was IST diese Buchung — Einnahme, Fixkosten, laufende Kosten, Entnahme aus Topf oder Rücklage, Vorsorge, Umbuchung, ungeplant? Die eine Stelle dafür; wer auswertet, fragt hier und sortiert nicht selbst. |
+| `einordnung.ts` | Was IST diese Buchung — Einnahme, Fixkosten, laufende Kosten, Entnahme aus einer Rücklage, Vorsorge, Umbuchung, ungeplant (auch: wartet auf Zuordnung)? Die eine Stelle dafür; wer auswertet, fragt hier und sortiert nicht selbst. Wer einen Anteil trägt, beantwortet sie über `ruecklagen/zustaendigkeit.ts` — dieselbe Funktion, die der Verbrauch eines Budgets fragt. |
 | `ergebnis.ts` | Was kostet der Monat? Baut auf der Einordnung und fügt die Zeit hinzu (Periodisierung, Topfkosten), dazu die Überleitung. |
 | `reichweite.ts` | Wie viele Monate das freie Geld die Kosten trägt. Liest die Zeilen von `ergebnis.ts` nur und steht deshalb daneben, nicht darin. |
 | `bericht.ts` | Ein abgeschlossener Monat oder ein Jahr auf einem Blatt: summiert Monatsergebnisse und ihre Überleitung, stellt den Zeitraum davor daneben, vergleicht das Nettovermögen an zwei Stichtagen. Rechnet nichts Eigenes — ein Jahr ist die Summe seiner Monate, und deshalb geht auch seine Überleitung exakt auf. |
@@ -187,12 +196,15 @@ weil die Schuld sinkt. Vier Dinge daran:
   Monat, keine Eigenschaft der einzelnen Abbuchung — sie trägt nicht in sich, welcher
   Teil Zins war.
 
-**Der Kauf aus einer Rücklage wird gegen ihren Stand geprüft** (seit Migration 76,
-dieselbe Regel wie `topfKosten`): die Ausbuchung hält den beendeten Zyklus fest, und was
-der Kauf über das Angesparte hinaus kostet, zählt im Kaufmonat. **Entnahme ist dabei nur,
-wofür eine Rücklage ausgebucht wurde.** `budgetrelevant === false` allein genügt nicht
-mehr: eine Ausgabe, die jemand nur von Hand aus den Budgets nimmt, kostet ihren Monat
-(ungeplant) — sonst hätte sie nie etwas gekostet.
+**Der Kauf aus einer Rücklage wird gegen ihren Stand geprüft** (seit Migration 76): die
+Ausbuchung hält den beendeten Zyklus fest, und was der Kauf über das Angesparte hinaus
+kostet, zählt im Kaufmonat (`altabschlussKosten` in `ruecklagen/topf.ts`). Jeder andere
+Zyklus — der laufende, ein aufbauendes Budget, eine Rücklage, die über ihre Kategorie
+findet — rechnet nach der max-Regel (`zyklusKosten`); beides trifft nie im selben Zyklus
+zusammen. **Eine nicht budgetrelevante Ausgabe ist nur Entnahme, wofür eine Rücklage
+ausgebucht wurde** — oder wenn jemand sie ausdrücklich einer Rücklage zugeordnet hat.
+`budgetrelevant === false` allein genügt nicht: eine Ausgabe, die jemand nur von Hand aus
+den Budgets nimmt, kostet ihren Monat (ungeplant) — sonst hätte sie nie etwas gekostet.
 
 **Und sie ist nach HINTEN nur für Ausbuchungen ab Migration 76 vollständig.** Eine
 Rücklage kennt nur ihren laufenden Zyklus (`sollRuecklage` ab `beginn`); das Ausbuchen

@@ -2363,4 +2363,41 @@ export const MIGRATIONS: Migration[] = [
          ON ruecklage_zuordnung (ruecklage_id) WHERE ruecklage_id IS NOT NULL`,
     ],
   },
+  {
+    version: 80, // Eine Ruecklage, Stufe 2: freie Rate in die Reihe, Fundfenster ab heute
+    sql: [
+      // Zweite von drei Stufen (ADR-0006). Sie laeuft zusammen mit dem Code, der die Reihe
+      // und das Fundfenster liest — vorher haette der alte Code eine Aenderung in `rate`
+      // geschrieben, waehrend die Reihe schon gefuellt daneben stand.
+      //
+      // (a) Die freie Rate wird die erste Zeile ihrer Reihe, gueltig ab dem Monat, in dem
+      // der laufende Zyklus begann — genau ab da zaehlte `sollRuecklage` sie. Mit Ziel und
+      // Frist folgt die Rate weiter aus beiden (Ziel geht vor, wie in `monatsRuecklage`),
+      // eine dort zusaetzlich eingetragene Rate wurde nie gelesen und bleibt, wo sie ist.
+      // `OR IGNORE`, damit ein zweiter Lauf nichts doppelt anlegt.
+      `-- @wennSpalte ruecklage.rate
+       INSERT OR IGNORE INTO ruecklage_rate (ruecklage_id, ab_monat, betrag)
+         SELECT id, substr(beginn, 1, 7), rate FROM ruecklage
+          WHERE rate > 0 AND NOT (IFNULL(ziel, 0) > 0 AND IFNULL(frist_monate, 0) > 0)`,
+      // Danach ist `rate` leer, wo die Reihe sie traegt — je Zeile geprueft, nicht
+      // angenommen. Die Spalte selbst bleibt, bis sie nachweislich ueberall leer ist.
+      `-- @wennSpalte ruecklage.rate
+       UPDATE ruecklage SET rate = NULL
+        WHERE rate IS NOT NULL
+          AND NOT (IFNULL(ziel, 0) > 0 AND IFNULL(frist_monate, 0) > 0)
+          AND EXISTS (SELECT 1 FROM ruecklage_rate x
+                       WHERE x.ruecklage_id = ruecklage.id
+                         AND x.ab_monat = substr(ruecklage.beginn, 1, 7)
+                         AND x.betrag = ruecklage.rate)`,
+      // (b) Eine laufende Ruecklage mit Kategorie findet ihre Ausgaben ab HEUTE ueber die
+      // Kategorie. Nicht ab ihrem Beginn: dann rechnete jeder vergangene Monat anders, weil
+      // die Kategorie rueckwirkend faende, was vorher das Budget darueber trug oder was
+      // ungeplant war. Ohne Kategorie und beendet bleibt `findet_ab` leer — dort sucht
+      // niemand ueber eine Kategorie. Die Uhr steht hier ausnahmsweise in der Migration:
+      // sie laeuft in einer Transaktion genau einmal, und der Tag ist das, was gemeint ist.
+      `UPDATE ruecklage SET findet_ab = date('now', 'localtime')
+        WHERE findet_ab IS NULL AND art = 'abschliessend'
+          AND beendet_am IS NULL AND kategorie_id IS NOT NULL`,
+    ],
+  },
 ];

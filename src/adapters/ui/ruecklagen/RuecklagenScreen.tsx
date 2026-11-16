@@ -443,6 +443,7 @@ export function RuecklagenScreen() {
           heute={heute}
           konten={konten}
           kategorien={sicht?.kategorien ?? []}
+          kategoriebelegung={sicht?.kategoriebelegung}
           onClose={() => setBearbeitet(null)}
           onGespeichert={async () => { setBearbeitet(null); await laden(); }}
         />

@@ -1,11 +1,10 @@
 // Eine Rücklage als Folge von Zyklen — die Rechenbausteine für „eine Rücklage" (ADR-0006).
 //
-// IM UMBAU: Diese Datei wird von NIEMANDEM aufgerufen ausser ihren Tests. Die laufende
-// Rechnung (`ergebnis.ts`, `einordnung.ts`, Deckung, Fluss, Belegung) rechnet weiter wie
-// bisher; umgeschaltet wird erst, wenn die Ratenreihe überführt ist. Bis dahin hält
-// `topf.test.ts` fest, dass die Bausteine auf heutigen Daten DASSELBE ergeben wie die
-// heutige Rechnung — Monat für Monat, für das aufbauende Budget, die Rücklage von Hand
-// und den abgeschlossenen Zyklus mit verknüpftem Kauf.
+// Seit Paket 3 des Umbaus (Migration 80) rechnet die Ergebnisrechnung jede Rücklage über
+// diese Bausteine — die Rücklagen von Hand und, übergangsweise als Rücklage gelesen
+// (`alsRuecklage`), die aufbauenden Budgets. `topf.test.ts` hält fest, dass sie auf den
+// Daten von davor DASSELBE ergeben wie die Rechnung von davor, und
+// `src/umstellungsprobe.test.ts` prüft es Zahl für Zahl an ganzen Beständen.
 //
 // Das Bild dahinter: eine Rücklage legt Monat für Monat ihre Rate zurück und trägt die
 // Ausgaben, die zu ihr gehören. Eine `fortlaufend`e tut das für immer, eine
@@ -15,13 +14,14 @@
 //
 //     Kosten bis M = max(Σ Raten bis M, Σ Entnahmen bis Ende M)
 //
-// die Regel des aufbauenden Budgets (`topfKosten` in `ergebnis.ts`), jetzt je Zyklus.
+// die Regel des aufbauenden Budgets (bis Paket 3 `topfKosten` in `ergebnis.ts`), jetzt je Zyklus.
 // Ausgenommen sind nur Zyklen, die vor der Umstellung mit einer verknüpften Buchung
 // ausgebucht wurden: für die gilt die alte Regel weiter (`altabschlussKosten`), damit
 // kein vergangener Monat anders kostet als vorher.
 
 import { addMonate, addTage, parseIso, toIso } from "../basis/datum";
 import type { Cent } from "../basis/geld";
+import type { Budget } from "../budgets/budget";
 import { hatGeschichte, type Ruecklage, type Ruecklagenart, type Ruecklagenrate, type Ruecklagenzyklus } from "./ruecklage";
 
 /** Die Sorte einer Rücklage; ohne Angabe `abschliessend`, wie jede vor Migration 79. */
@@ -118,28 +118,7 @@ export function zyklen(r: Ruecklage, abschluesse: readonly Ruecklagenzyklus[]): 
   const raus: Zyklus[] = [];
   let letztesEnde: string | undefined;
   for (const a of eigene) {
-    const bekannt = hatGeschichte(a);
-    const mitZiel = zyklusHatZiel({ ziel: a.zyklusZiel, fristMonate: a.zyklusFrist });
-    const raten: readonly Ruecklagenrate[] =
-      !bekannt || mitZiel
-        ? []
-        : a.zyklusRate != null
-          ? [{ abMonat: monatVon(a.zyklusBeginn as string), betrag: a.zyklusRate }]
-          : (r.raten ?? []);
-    raus.push({
-      ruecklageId: r.id,
-      art,
-      beginn: bekannt ? a.zyklusBeginn : undefined,
-      ende: a.datum,
-      entnahmenAb: bekannt
-        ? letztesEnde ? spaeter(a.zyklusBeginn as string, tagDanach(letztesEnde)) : a.zyklusBeginn
-        : undefined,
-      ziel: mitZiel ? a.zyklusZiel : undefined,
-      fristMonate: mitZiel ? a.zyklusFrist : undefined,
-      raten,
-      abschlussId: a.id,
-      istbuchungId: a.istbuchungId,
-    });
+    raus.push(abgeschlossenerZyklus(a, art, r.raten ?? [], letztesEnde));
     letztesEnde = a.datum;
   }
 
@@ -156,6 +135,41 @@ export function zyklen(r: Ruecklage, abschluesse: readonly Ruecklagenzyklus[]): 
     });
   }
   return raus;
+}
+
+/**
+ * Ein abgeschlossener Zyklus aus dem, was sein Abschluss festgehalten hat. `reihe` ist die
+ * Ratenreihe der Rücklage — sie gilt, wo der Abschluss bei einem freien Zyklus keine Rate
+ * festgehalten hat; `letztesEnde` der Abschluss davor, ab dessen Folgetag entnommen wird.
+ */
+export function abgeschlossenerZyklus(
+  a: Ruecklagenzyklus,
+  art: Ruecklagenart = "abschliessend",
+  reihe: readonly Ruecklagenrate[] = [],
+  letztesEnde?: string,
+): Zyklus {
+  const bekannt = hatGeschichte(a);
+  const mitZiel = zyklusHatZiel({ ziel: a.zyklusZiel, fristMonate: a.zyklusFrist });
+  const raten: readonly Ruecklagenrate[] =
+    !bekannt || mitZiel
+      ? []
+      : a.zyklusRate != null
+        ? [{ abMonat: monatVon(a.zyklusBeginn as string), betrag: a.zyklusRate }]
+        : reihe;
+  return {
+    ruecklageId: a.ruecklageId,
+    art,
+    beginn: bekannt ? a.zyklusBeginn : undefined,
+    ende: a.datum,
+    entnahmenAb: bekannt
+      ? letztesEnde ? spaeter(a.zyklusBeginn as string, tagDanach(letztesEnde)) : a.zyklusBeginn
+      : undefined,
+    ziel: mitZiel ? a.zyklusZiel : undefined,
+    fristMonate: mitZiel ? a.zyklusFrist : undefined,
+    raten,
+    abschlussId: a.id,
+    istbuchungId: a.istbuchungId,
+  };
 }
 
 /** Der letzte Monat, dessen Rate der Zyklus trägt — beim laufenden keiner. */
@@ -230,7 +244,7 @@ const ersterTag = (monat: string) => `${monat}-01`;
 
 /**
  * Was der Zyklus in `monat` KOSTET, positiv — die Regel des aufbauenden Budgets
- * (`topfKosten`), je Zyklus:
+ * (bis Paket 3 `topfKosten`), je Zyklus:
  *
  *     Kosten bis M = max(Raten bis M, Entnahmen bis Ende M)
  *
@@ -254,7 +268,7 @@ export function zyklusKosten(z: Zyklus, entnahmen: readonly Ruecklagenentnahme[]
 
 /**
  * Was ein Zyklus kostet, der VOR der Umstellung mit einer verknüpften Buchung ausgebucht
- * wurde — die heutige Regel von `zyklusPosten` in `ergebnis.ts`, unverändert:
+ * wurde — die Regel, die bis Paket 3 inline in `ergebnis.ts` stand, unverändert:
  *
  *   • jeder Monat seine Rate (`rateIm`),
  *   • dazu im Monat des KAUFS, was der Kauf über dem Angesparten am Abschlusstag liegt:
@@ -273,8 +287,80 @@ export function altabschlussKosten(z: Zyklus, kauf: Ruecklagenentnahme | undefin
   if (!z.beginn) return 0;
   const rate = rateIm(z, monat);
   if (!kauf || monatVon(kauf.datum) !== monat || !z.ende) return rate;
+  return rate + (altabschlussUngedeckt(z, -kauf.betrag) ?? 0);
+}
+
+/**
+ * Was von einer Ausgabe (POSITIV) über dem lag, was der Zyklus am Abschlusstag angespart
+ * hatte — die Regel, die die Geschichte als „ungedeckt" zeigt und die
+ * `altabschlussKosten` im Kaufmonat kostet. EINE Stelle für beide: bis Paket 3 stand
+ * sie zweimal da (`zyklusUngedeckt` und inline in `ergebnis.ts`).
+ *
+ * `null` ohne Geschichte — „weiss man nicht", und der Kauf gilt als gedeckt. Eine
+ * Rückbuchung deckt nichts auf.
+ */
+export function altabschlussUngedeckt(z: Zyklus, ausgabe: Cent): Cent | null {
+  if (!z.beginn || !z.ende) return null;
   const angespart = ratenBis(z, monatVerschoben(monatVon(z.ende), -1));
-  return rate + Math.max(0, Math.max(0, -kauf.betrag) - angespart);
+  return Math.max(0, Math.max(0, ausgabe) - angespart);
+}
+
+/** Was ein Zyklus in `monat` getragen hat, vorzeichenbehaftet — fehlt, wenn nichts. */
+export function entnahmeIm(z: Zyklus, entnahmen: readonly Ruecklagenentnahme[], monat: string): Cent | undefined {
+  const eigene = entnahmen.filter((e) => monatVon(e.datum) === monat && imFenster(z, e.datum));
+  return eigene.length === 0 ? undefined : eigene.reduce((s, e) => s + e.betrag, 0) || 0;
+}
+
+/** Ein Zyklus und was er in einem Monat kostet — ein Posten der Ergebnisrechnung. */
+export interface Zyklusposten {
+  readonly zyklus: Zyklus;
+  /** Die Rate des Monats, positiv. */
+  readonly rate: Cent;
+  /** Was der Monat kostet, positiv (nach der Regel, die für den Zyklus gilt). */
+  readonly kosten: Cent;
+}
+
+/**
+ * Rate und Kosten je Zyklus — die Posten, aus denen die Ergebnisrechnung ihre Zeile
+ * „Rücklagen" baut. Je Zyklus EINE der beiden Regeln (siehe `ruecklagenKostenIm`).
+ */
+export function zyklenpostenIm(
+  r: Ruecklage,
+  abschluesse: readonly Ruecklagenzyklus[],
+  entnahmen: readonly Ruecklagenentnahme[],
+  monat: string,
+  altkaeufe: ReadonlyMap<string, Ruecklagenentnahme> = new Map(),
+): Zyklusposten[] {
+  return zyklen(r, abschluesse).map((z) => ({
+    zyklus: z,
+    rate: rateIm(z, monat),
+    kosten: z.istbuchungId ? altabschlussKosten(z, altkaeufe.get(z.istbuchungId), monat) : zyklusKosten(z, entnahmen, monat),
+  }));
+}
+
+/**
+ * Ein aufbauendes Budget, gelesen als Rücklage, die weiterläuft — ÜBERGANGSWEISE, bis
+ * Migration 81 die aufbauenden Budgets in die Tabelle `ruecklage` überführt (Paket 4).
+ * Dieselbe ID: eine Entnahme, die die Zuständigkeit dem Budget gibt, findet so ihre
+ * Rücklage.
+ *
+ * `findetAb` bleibt leer — bei einer fortlaufenden heisst das „ohne Anfang", wie die
+ * Einordnung ein aufbauendes Budget schon immer behandelt hat. Ohne `start` (nur in einer
+ * von Hand geänderten Datei) beginnt sie mit dem ersten Betragsmonat; vorher kosteten
+ * ihre Ausgaben dann gar nichts, weil `datum >= undefined` nie zutraf. Das ist die eine
+ * benannte Abweichung von Teil B des Entwurfs, festgehalten in `topf.test.ts`.
+ */
+export function alsRuecklage(b: Budget): Ruecklage {
+  const beginn = b.start ?? (b.betraege[0] ? `${b.betraege[0].abMonat}-01` : "");
+  return {
+    id: b.id,
+    bezeichnung: "",
+    beginn,
+    kategorieId: b.kategorieId,
+    kontoId: b.kontoId,
+    art: "fortlaufend",
+    raten: b.betraege,
+  };
 }
 
 /**
@@ -298,11 +384,9 @@ export function ruecklagenKostenIm(
 ): { readonly rate: Cent; readonly kosten: Cent } {
   let rate = 0;
   let kosten = 0;
-  for (const z of zyklen(r, abschluesse)) {
-    rate += rateIm(z, monat);
-    kosten += z.istbuchungId
-      ? altabschlussKosten(z, altkaeufe.get(z.istbuchungId), monat)
-      : zyklusKosten(z, entnahmen, monat);
+  for (const p of zyklenpostenIm(r, abschluesse, entnahmen, monat, altkaeufe)) {
+    rate += p.rate;
+    kosten += p.kosten;
   }
   return { rate, kosten };
 }

@@ -16,7 +16,7 @@ demselben Konto denselben Euro beanspruchte. Die Deckung sah besser aus, als sie
 
 | Anspruch | in Höhe von | warum |
 |---|---|---|
-| Rücklage mit Konto | ihr Soll bis heute | das soll beisammen sein |
+| Rücklage mit Konto | ihr Stand, wenn positiv: das Soll bis heute minus dem, was sie seit ihrem Fundfenster über die Kategorie gefunden hat | das soll beisammen sein — was sie schon getragen hat, ist vom Konto weg |
 | aufbauendes Budget | sein Rest, wenn positiv | er gehört weiter dem Budget |
 | monatliches Budget | **keiner** | sein Rest verfällt und bleibt einfach auf dem Konto, ohne Kommentar |
 
@@ -39,6 +39,14 @@ Blatt, mit derselben Tabelle wie „Gebunden auf …" (`ui/bausteine/BelegungTab
 die Kennzahlen des Bereichs (Soll, Tatsächlich da, Deckung) zählen über
 `ruecklagenDeckung` jetzt auch die Ansprüche der aufbauenden Budgets in ihre Summen, nicht
 nur in die Verteilung.
+
+**Seit Paket 3 des Umbaus (ADR-0006) sinkt der Anspruch einer Rücklage um ihre gefundenen
+Entnahmen** (`anspruchAm`, `ruecklagenEntnahmenAus`). Vorher fand eine Rücklage von Hand
+nichts über ihre Kategorie, und der Anspruch war schlicht das Soll; vor ihrem Fundfenster
+(`findet_ab`) ist er das weiterhin. Gefunden wird mit derselben Zuständigkeit wie im
+Verbrauch eines Budgets und in der Ergebnisrechnung — eine Rücklage im Minus beansprucht
+nichts. Wer die Belegung aufruft, gibt deshalb die Budget-Sicht MIT den Rücklagen herein
+(`budgetsichtMit`, `anspruchsbestand` in `application/konten/kontobelegung.ts`).
 
 Reicht der Stand nicht, wird **anteilig** verteilt, über alle Ansprüche gleich, ohne
 Reihenfolge. `budget.kontoId` heisst seither nur noch eines: hier liegt das Geld des

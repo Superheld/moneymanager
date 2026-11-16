@@ -38,7 +38,10 @@ import type {
   ZahlungskontoRepository,
   ZahlungsregelRepository,
   RuecklagenRepository,
+  RuecklagenzuordnungRepository,
 } from "../ports";
+import { ruecklagenbestandLaden } from "../ruecklagen/ruecklagenbestand";
+import { ruecklagenwahlJeBuchung, type Ruecklagenwahl } from "../ruecklagen/ruecklageZuordnen";
 
 export interface BuchungsdetailDeps {
   readonly kontoRepo: ZahlungskontoRepository;
@@ -52,8 +55,13 @@ export interface BuchungsdetailDeps {
   readonly freigabeRepo: DublettenfreigabeRepository;
   /** Für die Einordnung — dieselbe Begründung wie in `KontenDeps`. */
   readonly budgetRepo: BudgetRepository;
-  /** Für die Einordnung: nur ein Kauf, den eine Rücklage trug, gilt als Entnahme. */
+  /**
+   * Für die Einordnung: welche Rücklage eine Ausgabe über ihre Kategorie findet, und nur
+   * ein Kauf, den eine Rücklage trug, gilt als Entnahme.
+   */
   readonly ruecklagenRepo: RuecklagenRepository;
+  /** Für die Einordnung: die ausdrücklichen Zuordnungen zu einer Rücklage. */
+  readonly ruecklagenzuordnungRepo: RuecklagenzuordnungRepository;
   /**
    * Die Konto-Zuordnungen der Bankzugänge — daran hängt, welches Konto ONLINE geführt
    * wird. Optional, damit ein Aufrufer ohne Bankanbindung (Tests, Analyse) den Dialog
@@ -105,6 +113,11 @@ export interface Buchungsdetaildaten {
    * (Bezeichnung, Kategorie, Vertrag): die gehört dem Nutzer, nicht der Bank.
    */
   readonly onlineKonten: ReadonlySet<string>;
+  /**
+   * Buchungs-ID → die Anteile, für die eine Rücklage zu wählen ist (`ruecklagenwahlJeBuchung`).
+   * Fehlt eine Buchung, gibt es bei ihr nichts zu wählen.
+   */
+  readonly ruecklagenwahl: ReadonlyMap<string, readonly Ruecklagenwahl[]>;
 }
 
 export async function buchungsdetailLaden(
@@ -126,6 +139,11 @@ export async function buchungsdetailLaden(
   const zuordnungen_online = deps.kontozuordnungen ? await deps.kontozuordnungen() : [];
 
   const umsatzZuBuchung = belegZuBuchung(umsaetze);
+  const rb = await ruecklagenbestandLaden(deps.ruecklagenRepo, deps.ruecklagenzuordnungRepo);
+  const einordnungen = einordnungJeBuchung({ buchungen, kategorien, budgets, konten, zuordnungen, vertraege, ...rb });
+  // Welche Anteile gerade auf eine Zuordnung warten — aus derselben Einordnung wie die Pille.
+  const wartend = new Set<string>();
+  for (const [id, liste] of einordnungen) for (const e of liste) if (e.wartetAuf) wartend.add(`${id}\u0000${e.kategorieId ?? ""}`);
 
   const freigegeben = freigegebenePaare(freigaben);
 
@@ -137,10 +155,8 @@ export async function buchungsdetailLaden(
     dublettenverdacht: ledgerVerdacht(umsaetze, new Set(buchungen.map((b) => b.id)), freigegeben),
     freigegeben,
     freigaben,
-    einordnungen: einordnungJeBuchung({
-      buchungen, kategorien, budgets, konten, zuordnungen, vertraege,
-      ausbuchungen: await deps.ruecklagenRepo.ausbuchungen(),
-    }),
+    einordnungen,
     onlineKonten: new Set(zuordnungen_online.map((z) => z.zahlungskontoId)),
+    ruecklagenwahl: ruecklagenwahlJeBuchung(buchungen, kategorien, rb.ruecklagen, rb.ruecklagenzuordnungen, wartend),
   };
 }

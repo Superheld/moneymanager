@@ -32,6 +32,7 @@ import {
   waehlbareKonten,
   istGeteilt,
   type Buchungseinordnung,
+  type Ruecklagenwahl,
   type Buchungshistorie,
   type Charakter,
   type IstBuchung,
@@ -94,6 +95,7 @@ import { useDatum, useGeld, fehlerNachricht } from "../bausteine/einstellungenKo
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { BuchungsHerkunft } from "./BuchungsHerkunft";
 import { EinordnungsBlock } from "./EinordnungsBlock";
+import { RuecklagenwahlBlock } from "./RuecklagenwahlBlock";
 import { JournalBlock } from "./JournalBlock";
 import { Richtungswahl } from "./Richtungswahl";
 import { DublettenBlock, FreigabeHinweis, type Dublettenbefund } from "./DublettenBlock";
@@ -107,6 +109,8 @@ const LEERE_MENGE: ReadonlySet<string> = new Set();
 // Render eine neue Referenz, obwohl sich nichts geändert hat.
 const KEINE_EINORDNUNGEN: ReadonlyMap<string, readonly Buchungseinordnung[]> = new Map();
 const KEINE_EINORDNUNG: readonly Buchungseinordnung[] = [];
+const KEINE_WAHLEN: ReadonlyMap<string, readonly Ruecklagenwahl[]> = new Map();
+const KEINE_WAHL: readonly Ruecklagenwahl[] = [];
 
 /**
  * Die Maske selbst — alle drei Rollen in EINEM Formular.
@@ -198,6 +202,10 @@ interface FormularProps {
   historie?: Buchungshistorie;
   /** Was die GESPEICHERTE Buchung kaufmännisch ist — leer beim Anlegen und im Entwurf. */
   einordnung: readonly Buchungseinordnung[];
+  /** Die Anteile, für die eine Rücklage zu wählen ist — leer, wo es nichts zu wählen gibt. */
+  ruecklagenwahl: readonly Ruecklagenwahl[];
+  /** Nach einer Wahl: neu laden, damit die Einordnung den neuen Satz sagt. */
+  onRuecklageGewaehlt: () => void | Promise<void>;
   ausBankabruf?: boolean;
 
   // ── Dublettenverdacht ───────────────────────────────────────────────────────────────
@@ -258,6 +266,8 @@ function BuchungFormular({
   onSplitAufheben,
   historie,
   einordnung,
+  ruecklagenwahl,
+  onRuecklageGewaehlt,
   onZuruecksetzen,
 }: FormularProps) {
   const { t } = useTranslation();
@@ -809,6 +819,18 @@ function BuchungFormular({
           Auch am Umbuchungs-Bein: gerade dort fragt man, warum es nirgends mitzählt. */}
       {buchung && <EinordnungsBlock einordnung={einordnung} />}
 
+      {/* Welche Rücklage sie trägt — nur, wo mehrere an der Kategorie hängen oder schon
+          entschieden ist. Direkt unter der Einordnung, weil die Wahl genau deren Satz
+          ändert. */}
+      {buchung && (
+        <RuecklagenwahlBlock
+          buchungId={buchung.id}
+          wahl={ruecklagenwahl}
+          kategorieNamen={new Map(kategorien.map((k) => [k.id, k.name]))}
+          onGewaehlt={onRuecklageGewaehlt}
+        />
+      )}
+
       {/* Verlauf — was an dieser Zeile geändert wurde, und der Weg zurück. Über der
           Herkunft, weil er die eigene Arbeit betrifft: „was habe ich hier verstellt"
           fragt man eher als „woher kam die Zeile". */}
@@ -936,6 +958,7 @@ export function BuchungDetail(props: {
   const [onlineKonten, setOnlineKonten] = useState<ReadonlySet<string>>(LEERE_MENGE);
   const [historie, setHistorie] = useState<Buchungshistorie | undefined>(undefined);
   const [einordnungen, setEinordnungen] = useState<ReadonlyMap<string, readonly Buchungseinordnung[]>>(KEINE_EINORDNUNGEN);
+  const [ruecklagenwahl, setRuecklagenwahl] = useState<ReadonlyMap<string, readonly Ruecklagenwahl[]>>(KEINE_WAHLEN);
 
   async function laden() {
     const d = await buchungsdetail();
@@ -945,6 +968,7 @@ export function BuchungDetail(props: {
     setDublettenverdacht(d.dublettenverdacht); setFreigegeben(d.freigegeben); setFreigaben(d.freigaben);
     setOnlineKonten(d.onlineKonten);
     setEinordnungen(d.einordnungen);
+    setRuecklagenwahl(d.ruecklagenwahl);
     // Die gezeigte Buchung aus dem frischen Stand nachziehen (nach dem Speichern).
     setAktuelle((b) => (b ? d.buchungen.find((x) => x.id === b.id) ?? b : undefined));
   }
@@ -1207,6 +1231,8 @@ export function BuchungDetail(props: {
       onSplitAufheben={async () => { if (!aktuelle) return; await splitAufheben(aktuelle); await nachAenderung(); }}
       historie={historie}
       einordnung={(aktuelle && einordnungen.get(aktuelle.id)) || KEINE_EINORDNUNG}
+      ruecklagenwahl={(aktuelle && ruecklagenwahl.get(aktuelle.id)) || KEINE_WAHL}
+      onRuecklageGewaehlt={async () => { await nachAenderung(); }}
       // Kein `onClose()`: das Zurücknehmen ist ein Schritt IM Dialog. Man will danach
       // sehen, was jetzt dasteht — dieselbe Überlegung wie beim Aufheben der Aufteilung.
       onZuruecksetzen={async () => { if (!aktuelle) return; await buchungZuruecksetzen(aktuelle); await nachAenderung(); }}

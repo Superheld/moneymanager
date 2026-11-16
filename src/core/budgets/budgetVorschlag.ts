@@ -127,6 +127,11 @@ function gerundet(cent: Cent): Cent {
  *
  * Je Kategorie kommt höchstens EIN Vorschlag heraus, monatlich oder aufbauend — nie
  * beide. Welcher, entscheidet die Zahl der Monate mit Ausgaben (siehe Kopf).
+ *
+ * `vonRuecklagen` sind die Anteile (`buchungId#index`), die eine Rücklage über ihre
+ * Kategorie trägt oder die auf eine Zuordnung warten — dieselbe Zuständigkeit wie im
+ * Verbrauch (`budgetBuchungen`). Sie zählen nicht: ein Rahmen, gegen den sie danach
+ * nicht zählten, wäre zu hoch.
  */
 export function budgetvorschlaege(
   buchungen: readonly IstBuchung[],
@@ -135,6 +140,7 @@ export function budgetvorschlaege(
   vertragsBuchungIds: ReadonlySet<string> = new Set(),
   bestehende: ReadonlySet<string> = new Set(),
   optionen: BudgetvorschlagOptionen = {},
+  vonRuecklagen: ReadonlySet<string> = new Set(),
 ): Budgetvorschlag[] {
   const opt = { ...STANDARD, ...optionen };
   const byId = new Map(kategorien.map((k) => [k.id, k]));
@@ -173,8 +179,9 @@ export function budgetvorschlaege(
 
     // Über die Anteile, nicht über b.kategorieId: eine geteilte Buchung gehört
     // anteilig in mehrere Kategorien.
-    for (const anteil of kategorieAnteile(b)) {
+    for (const [i, anteil] of kategorieAnteile(b).entries()) {
       if (!anteil.kategorieId) continue;
+      if (vonRuecklagen.has(`${b.id}#${i}`)) continue;
       const haupt = hauptVon(anteil.kategorieId);
       if (!haupt) continue;
       // Vorzeichenrichtig: Abflüsse sind negativ und erhöhen den Verbrauch, eine

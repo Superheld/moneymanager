@@ -124,7 +124,11 @@ dort und nicht an dem Tag, an dem er die Datei braucht.
 
 Was NICHT drin ist, damit niemand danach sucht: unverbuchte Zeilen (Inbox, verworfen) —
 exportiert werden Buchungen, und eine Inbox-Zeile ist noch keine. Ebenso Budgets,
-Rücklagen, Depots und das Journal: sie hängen nicht an einer Buchung.
+Rücklagen, Depots und das Journal: sie hängen nicht an einer Buchung. **Die Zuordnung
+einer Buchung zu einer Rücklage** (`ruecklage_zuordnung`, seit Paket 3 des Umbaus) hängt
+zwar an einer, kommt aber ebenfalls nicht mit: sie beantwortet eine Frage über Rücklagen,
+die die Datei nicht kennt, und ein Bestand, der aus ihr zurückkommt, ordnet die Buchung
+über ihre Kategorie neu ein.
 
 **Die Datei liegt im KLARTEXT, der Bestand daneben nicht.** Seit 2026-08-27 ist die
 Datenbank verschlüsselt und ihre Sicherungen sind es mit; ein Bestandsexport legt eine

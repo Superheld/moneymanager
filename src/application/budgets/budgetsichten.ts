@@ -21,6 +21,7 @@ import { vertragsnamenLaden } from "../vertraege/vertragszuordnung";
 import {
   betragImMonat,
   budgetBuchungen,
+  vonRuecklagenGetragen,
   budgetFortschreibung,
   budgetMonatsstand,
   budgetStand,
@@ -36,13 +37,15 @@ import {
   type Zahlungskonto,
 } from "../../core";
 import { budgetvorschlaegeLaden, ignorierteBudgetvorschlaege } from "./budgetvorschlaege";
-import { belegungssicht } from "../konten/kontobelegung";
+import { belegungssicht, budgetsichtMit } from "../konten/kontobelegung";
+import { ruecklagenbestandLaden } from "../ruecklagen/ruecklagenbestand";
 import type {
   BudgetRepository,
   EinstellungenRepository,
   KategorieRepository,
   LedgerPort,
   RuecklagenRepository,
+  RuecklagenzuordnungRepository,
   UmsatzRepository,
   VertragRepository,
   VertragszuordnungRepository,
@@ -54,6 +57,12 @@ export interface BudgetsichtDeps {
   readonly kategorieRepo: KategorieRepository;
   readonly budgetRepo: BudgetRepository;
   readonly zuordnungRepo: VertragszuordnungRepository;
+  /**
+   * Seit eine Rücklage ihre Ausgaben über die Kategorie findet, nimmt sie dem Budget
+   * darüber ihre Buchungen ab — dieselbe Zuständigkeit wie in der Ergebnisrechnung.
+   */
+  readonly ruecklagenRepo: RuecklagenRepository;
+  readonly ruecklagenzuordnungRepo: RuecklagenzuordnungRepository;
 }
 
 /** Ein Budget mit allem, was ein Screen darüber anzeigt. */
@@ -122,13 +131,14 @@ export async function budgetuebersichtLaden(
   deps: BudgetsichtDeps,
   am: string,
 ): Promise<Budgetuebersicht> {
-  const [buchungen, kategorien, budgets, vertragsBuchungen] = await Promise.all([
+  const [buchungen, kategorien, budgets, vertragsBuchungen, rb] = await Promise.all([
     deps.ledger.alle(),
     deps.kategorieRepo.alle(),
     deps.budgetRepo.alle(),
     vertragsBuchungenLaden(deps.zuordnungRepo),
+    ruecklagenbestandLaden(deps.ruecklagenRepo, deps.ruecklagenzuordnungRepo),
   ]);
-  const sicht: BudgetSicht = { buchungen, kategorien, budgets, vertragsBuchungen };
+  const sicht = budgetsichtMit({ buchungen, kategorien, budgets, vertragsBuchungen }, rb);
   return { staende: budgetstaende(sicht, am), sicht };
 }
 
@@ -230,8 +240,6 @@ export interface BudgetbereichDeps extends BudgetsichtDeps {
   readonly vertragRepo: VertragRepository;
   readonly umsatzRepo: UmsatzRepository;
   readonly einstellungenRepo: EinstellungenRepository;
-  /** Rücklagen beanspruchen dieselben Konten — ohne sie sähe die Deckung besser aus, als sie ist. */
-  readonly ruecklagenRepo: RuecklagenRepository;
 }
 
 /** Wie viel vom Rest eines aufbauenden Budgets auf seinem Konto tatsächlich liegt. */
@@ -281,7 +289,7 @@ export async function budgetbereichLaden(
   ]);
   const vorschlaege = await budgetvorschlaegeLaden(
     deps.ledger, deps.umsatzRepo, deps.kategorieRepo, deps.budgetRepo,
-    heute.slice(0, 7), heute, ignoriert, deps.zuordnungRepo,
+    heute.slice(0, 7), heute, ignoriert, deps.zuordnungRepo, vonRuecklagenGetragen(uebersicht.sicht),
   );
   const belegung = belegungssicht(
     { konten, buchungen: [...uebersicht.sicht.buchungen], ruecklagen, sicht: uebersicht.sicht },

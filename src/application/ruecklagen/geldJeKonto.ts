@@ -10,7 +10,8 @@
 // ausgewählt, welche Konten etwas tragen, und welche Rücklage auf keinem liegt.
 
 import {
-  sollRuecklage,
+  anspruchAm,
+  type Anspruchsbestand,
   type Budget,
   type Cent,
   type Kontobelegung,
@@ -18,7 +19,8 @@ import {
   type Zahlungskonto,
 } from "../../core";
 import { vertragsBuchungenLaden } from "../budgets/budgetsichten";
-import { belegungssicht, type Belegungssicht, type KontobelegungDeps } from "../konten/kontobelegung";
+import { anspruchsbestand, belegungssicht, budgetsichtMit, type Belegungssicht, type KontobelegungDeps } from "../konten/kontobelegung";
+import { ruecklagenbestandLaden } from "./ruecklagenbestand";
 
 /** Ein Konto, auf dem mindestens eine Rücklage Geld beansprucht. */
 export interface GeldAufKonto {
@@ -69,6 +71,8 @@ export function geldJeKonto(
   ruecklagen: readonly Ruecklage[],
   budgets: readonly Budget[],
   heute: string,
+  /** Was die Rücklagen über ihre Kategorie gefunden haben (`anspruchsbestand`). */
+  bestand: Anspruchsbestand = {},
 ): GeldJeKonto {
   const bekannt = new Set(konten.map((k) => k.id));
 
@@ -95,7 +99,9 @@ export function geldJeKonto(
         id: r.id,
         form: "hand",
         name: r.bezeichnung,
-        anspruch: Math.max(0, sollRuecklage(r, heute)),
+        // Derselbe Anspruch wie auf einem Konto: das Soll, abzüglich dessen, was sie über
+        // ihre Kategorie gefunden hat.
+        anspruch: anspruchAm(r, heute, bestand),
       })),
     ...budgets
       .filter((b) => b.art === "aufbauend" && !bekannt.has(b.kontoId))
@@ -111,17 +117,16 @@ export function geldJeKonto(
 }
 
 export async function geldJeKontoLaden(deps: KontobelegungDeps, heute: string): Promise<GeldJeKonto> {
-  const [konten, buchungen, ruecklagen, kategorien, budgets, vertragsBuchungen] = await Promise.all([
+  const [konten, buchungen, rb, kategorien, budgets, vertragsBuchungen] = await Promise.all([
     deps.kontoRepo.alle(),
     deps.ledger.alle(),
-    deps.ruecklagenRepo.alle(),
+    ruecklagenbestandLaden(deps.ruecklagenRepo, deps.ruecklagenzuordnungRepo),
     deps.kategorieRepo.alle(),
     deps.budgetRepo.alle(),
     vertragsBuchungenLaden(deps.zuordnungRepo),
   ]);
-  const belegung = belegungssicht(
-    { konten, buchungen, ruecklagen, sicht: { buchungen, kategorien, budgets, vertragsBuchungen } },
-    heute,
-  );
-  return geldJeKonto(belegung, konten, ruecklagen, budgets, heute);
+  const ruecklagen = rb.ruecklagen;
+  const sicht = budgetsichtMit({ buchungen, kategorien, budgets, vertragsBuchungen }, rb);
+  const belegung = belegungssicht({ konten, buchungen, ruecklagen, sicht }, heute);
+  return geldJeKonto(belegung, konten, ruecklagen, budgets, heute, anspruchsbestand(sicht));
 }

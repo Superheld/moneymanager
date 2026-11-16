@@ -19,6 +19,7 @@ import {
 function memRuecklagen() {
   const daten: Ruecklage[] = [];
   const ausgebucht: RuecklagenAusbuchung[] = [];
+  const raten: { id: string; abMonat: string; betrag: number }[] = [];
   const repo: RuecklagenRepository = {
     alle: async () => daten,
     beendete: async () => daten.filter((r) => r.beendetAm),
@@ -27,8 +28,10 @@ function memRuecklagen() {
       if (i >= 0) daten[i] = r;
       else daten.push(r);
     },
-    // Die Reihe der Raten benutzt kein Use-Case dieser Datei (Migration 79, im Umbau).
-    rateSpeichern: async () => {},
+    // Die Reihe der Raten: hier nur mitgeschrieben, damit ein Test sieht, was ankam.
+    rateSpeichern: async (id, rate) => {
+      raten.push({ id, ...rate });
+    },
     rateLoeschen: async () => {},
     loeschen: async (id) => {
       const i = daten.findIndex((x) => x.id === id);
@@ -39,7 +42,7 @@ function memRuecklagen() {
     },
     ausbuchungen: async () => ausgebucht,
   };
-  return { repo, daten, ausgebucht };
+  return { repo, daten, ausgebucht, raten };
 }
 
 function memLedger(start: IstBuchung[] = []) {
@@ -82,10 +85,13 @@ describe("ruecklageAnlegen", () => {
     expect(r.fristMonate).toBe(120);
   });
 
-  it("legt auch eine Rücklage ohne Ziel an — nur mit Rate", async () => {
-    const { repo } = memRuecklagen();
+  it("legt auch eine Rücklage ohne Ziel an — nur mit Rate, und die steht in der Reihe", async () => {
+    const { repo, raten } = memRuecklagen();
     const r = await ruecklageAnlegen(repo, frei);
-    expect(r.rate).toBe(5000);
+    // Seit Migration 80 trägt die Reihe die freie Rate, ab dem Monat des Beginns.
+    expect(r.rate).toBeUndefined();
+    expect(r.raten).toEqual([{ abMonat: "2024-01", betrag: 5000 }]);
+    expect(raten).toEqual([{ id: r.id, abMonat: "2024-01", betrag: 5000 }]);
     expect(r.ziel).toBeUndefined();
     expect(r.fristMonate).toBeUndefined();
   });
@@ -141,12 +147,52 @@ describe("ruecklageAktualisieren", () => {
   it("behält die ID und wechselt die Form", async () => {
     const { repo, daten } = memRuecklagen();
     const r = await ruecklageAnlegen(repo, mitZiel);
-    const nachher = await ruecklageAktualisieren(repo, r.id, frei);
+    const nachher = await ruecklageAktualisieren(repo, r.id, frei, "2026-11-16");
     expect(nachher.id).toBe(r.id);
     expect(daten).toHaveLength(1);
     // Die alten Felder bleiben nicht stehen — sonst hätte sie danach beides.
     expect(nachher.ziel).toBeUndefined();
-    expect(nachher.rate).toBe(5000);
+    expect(nachher.raten).toEqual([{ abMonat: "2024-01", betrag: 5000 }]);
+  });
+
+  it("legt eine neue Rücklage mit Kategorie so an, dass sie ab ihrem Beginn findet", async () => {
+    const { repo } = memRuecklagen();
+    const r = await ruecklageAnlegen(repo, { ...mitZiel, kategorieId: "k-hamstede" });
+    expect(r.art).toBe("abschliessend");
+    expect(r.findetAb).toBe("2024-01-01");
+    const ohne = await ruecklageAnlegen(repo, mitZiel);
+    expect(ohne.findetAb).toBeUndefined();
+  });
+
+  it("behält Sorte und Fundfenster beim Bearbeiten", async () => {
+    // Vorher fiel ein gesetztes `findetAb` beim ersten Speichern auf leer — die
+    // Rücklage fand danach nichts mehr über ihre Kategorie.
+    const { repo, daten } = memRuecklagen();
+    daten.push({ id: "r-tolk", bezeichnung: "Tolkemit", ziel: 60000, fristMonate: 12, beginn: "2024-01-01", kategorieId: "k-tolk", art: "abschliessend", findetAb: "2026-11-16", raten: [] });
+    const nachher = await ruecklageAktualisieren(repo, "r-tolk", { ...mitZiel, bezeichnung: "Tolkemit neu", kategorieId: "k-tolk" }, "2027-02-03");
+    expect(nachher.findetAb).toBe("2026-11-16");
+    expect(nachher.art).toBe("abschliessend");
+    expect(daten[0].findetAb).toBe("2026-11-16");
+  });
+
+  it("lässt eine nachgetragene Kategorie erst ab heute finden", async () => {
+    const { repo } = memRuecklagen();
+    const r = await ruecklageAnlegen(repo, mitZiel);
+    const nachher = await ruecklageAktualisieren(repo, r.id, { ...mitZiel, kategorieId: "k-ruhn" }, "2026-12-04");
+    expect(nachher.findetAb).toBe("2026-12-04");
+  });
+
+  it("lässt eine geänderte freie Rate ab dem laufenden Monat gelten, die Monate davor behalten ihre", async () => {
+    const { repo, raten } = memRuecklagen();
+    const r = await ruecklageAnlegen(repo, frei);
+    const nachher = await ruecklageAktualisieren(repo, r.id, { ...frei, rate: 7000 }, "2026-12-04");
+    expect(nachher.rate).toBeUndefined();
+    expect(nachher.raten).toEqual([{ abMonat: "2024-01", betrag: 5000 }, { abMonat: "2026-12", betrag: 7000 }]);
+    expect(raten[raten.length - 1]).toEqual({ id: r.id, abMonat: "2026-12", betrag: 7000 });
+    // Dieselbe Rate noch einmal schreibt nichts Neues.
+    const vorher = raten.length;
+    await ruecklageAktualisieren(repo, r.id, { ...frei, rate: 7000 }, "2026-12-20");
+    expect(raten).toHaveLength(vorher);
   });
 });
 

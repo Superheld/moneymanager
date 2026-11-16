@@ -53,7 +53,7 @@ function buchung(over: Partial<IstBuchung> = {}): IstBuchung {
 
 function sicht(buchungen: IstBuchung[], over: Partial<EinordnungssichtEingabe> = {}) {
   return einordnungJeBuchung({
-    buchungen, kategorien: KATEGORIEN, budgets: BUDGETS, konten: KONTEN, ausbuchungen: [],
+    buchungen, kategorien: KATEGORIEN, budgets: BUDGETS, konten: KONTEN, ausbuchungen: [], ruecklagen: [], beendete: [], ruecklagenzuordnungen: [],
     zuordnungen: [], vertraege: [VERTRAG], ...over,
   });
 }
@@ -62,7 +62,7 @@ describe("einordnungJeBuchung", () => {
   it("nennt bei einer Entnahme aus dem aufbauenden Budget dessen Kategorie als Namen", () => {
     const e = sicht([buchung({ kategorieId: "kat-t" })]);
     expect(e.get("b1")).toEqual([
-      { art: "topf", budgetName: "Vorhaben Nordseite", vertragsname: undefined, intern: false },
+      { art: "ruecklage", budgetName: "Vorhaben Nordseite", vertragsname: undefined, intern: false, ruecklageId: "bu-t" },
     ]);
   });
 
@@ -114,7 +114,7 @@ describe("einordnungJeBuchung", () => {
       ],
     });
     const e = sicht([geteilt]);
-    expect(e.get("b1")!.map((x) => x.art)).toEqual(["laufend", "topf", "ungeplant"]);
+    expect(e.get("b1")!.map((x) => x.art)).toEqual(["laufend", "ruecklage", "ungeplant"]);
   });
 
   it("fasst Anteile mit derselben Art und demselben Budget zusammen, trennt aber zwei Töpfe", () => {
