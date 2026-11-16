@@ -20,8 +20,10 @@
 // Bis 2026-11-10 lag sein Zustand im `RuecklagenScreen`; als eigene Komponente mit eigenem
 // Zustand beginnt jeder Dialog frisch — der Screen sagt nur, für welche Rücklage.
 //
-// Er liegt in `bausteine/`, weil ihn zwei Bereiche öffnen: Rücklagen (anlegen, bearbeiten)
-// und Budgets (ein Vorschlag „Rücklage" legt eine an, die weiterläuft).
+// Er lag bis 2026-11-16 in `bausteine/`, weil ihn auch der Bereich Budgets öffnete: ein
+// Vorschlag der Art „Rücklage" legte von dort eine an. Seit der Vorschlag im Bereich
+// Rücklagen steht, öffnet ihn nur noch dieser — und ein Baustein, den ein Bereich
+// benutzt, ist ein Teil dieses Bereichs (`../bausteine/CLAUDE.md`).
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -37,19 +39,19 @@ import {
   type Zahlungskonto,
 } from "../../../application";
 import { ruecklageAktualisieren, ruecklageAnlegen, ruecklageRateLoeschen } from "../../dienste";
-import { Button, FormField } from ".";
-import { Auswahl } from "./Auswahl";
-import { CategoryPicker } from "./CategoryPicker";
-import { Datumsfeld } from "./Datumsfeld";
-import { IconButton, IconLeiste } from "./IconButton";
-import { Modal } from "./Modal";
-import { fehlerNachricht, useGeld } from "./einstellungenKontext";
-import { useLoeschfrage } from "./Loeschfrage";
+import { Button, FormField } from "../bausteine";
+import { Auswahl } from "../bausteine/Auswahl";
+import { CategoryPicker } from "../bausteine/CategoryPicker";
+import { Datumsfeld } from "../bausteine/Datumsfeld";
+import { IconButton, IconLeiste } from "../bausteine/IconButton";
+import { Modal } from "../bausteine/Modal";
+import { fehlerNachricht, useGeld } from "../bausteine/einstellungenKontext";
+import { useLoeschfrage } from "../bausteine/Loeschfrage";
 
 /** Die beiden Formen einer Rücklage — die Wahl im Dialog, nicht im Datenmodell. */
 type Form = "ziel" | "rate";
 
-/** Was ein Vorschlag aus dem Bereich Budgets beim Anlegen vorbelegt. */
+/** Was ein übernommener Rücklagenvorschlag beim Anlegen vorbelegt. */
 export interface RuecklageVorbelegung {
   readonly kategorieId: string;
   readonly bezeichnung: string;
@@ -231,7 +233,7 @@ export function RuecklageDialog({
           <FormField
             label={`${t("ruecklagen.feldRate")} ${geld.symbol}`}
             required
-            hint={r && reihe.length > 0 ? t("budgets.giltAbHinweis", { monat: rateAb }) : t("ruecklagen.feldRateHinweis")}
+            hint={r && reihe.length > 0 ? t("ruecklagen.rateGiltAbHinweis", { monat: rateAb }) : t("ruecklagen.feldRateHinweis")}
           >
             <input className="field" inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} placeholder={geld.format(0)} />
           </FormField>
@@ -251,14 +253,14 @@ export function RuecklageDialog({
                 style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", padding: "5px 8px", borderRadius: "var(--r-md)", background: v.abMonat === rateAb ? "var(--accent-soft)" : "transparent", fontSize: "var(--fs-ui)" }}
               >
                 <span className="num" style={{ color: "var(--ink-3)", fontWeight: "var(--fw-bold)", flex: "0 0 auto" }}>
-                  {t("budgets.versionAb", { monat: v.abMonat })}
+                  {t("ruecklagen.rateAb", { monat: v.abMonat })}
                 </span>
                 <span className="num" style={{ marginLeft: "auto", fontWeight: "var(--fw-semi)" }}>{geld.formatMitSymbol(v.betrag)}</span>
                 <IconLeiste>
-                  <IconButton icon="bearbeiten" label={t("budgets.versionAendern", { monat: v.abMonat })} onClick={() => versionBearbeiten(v.abMonat, v.betrag)} />
+                  <IconButton icon="bearbeiten" label={t("ruecklagen.rateAendern", { monat: v.abMonat })} onClick={() => versionBearbeiten(v.abMonat, v.betrag)} />
                   {reihe.length > 1 && (
-                    <IconButton icon="loeschen" ton="gefahr" label={t("budgets.versionLoeschen", { monat: v.abMonat })} onClick={() => loeschfrage.stellen({
-                        name: t("budgets.versionName", { monat: v.abMonat }),
+                    <IconButton icon="loeschen" ton="gefahr" label={t("ruecklagen.rateEntfernen", { monat: v.abMonat })} onClick={() => loeschfrage.stellen({
+                        name: t("ruecklagen.rateName", { monat: v.abMonat }),
                         folgen: t("ruecklagen.rateLoeschenFolgen"),
                         ausfuehren: () => versionLoeschen(v.abMonat),
                       })} />
@@ -268,7 +270,7 @@ export function RuecklageDialog({
             ))}
             {rateAb !== laufend && (
               <Button variant="link" type="button" onClick={() => setRateAb(laufend)}>
-                {t("budgets.wiederAbLaufend", { monat: laufend })}
+                {t("ruecklagen.rateWiederAbLaufend", { monat: laufend })}
               </Button>
             )}
           </div>

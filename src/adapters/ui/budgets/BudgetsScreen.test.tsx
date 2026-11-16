@@ -248,39 +248,31 @@ describe("BudgetsScreen — Vorschläge", () => {
   }
 
   /**
-   * Der Fall, der vorher ganz herausfiel: zweimal im Jahr etwas Großes. Er kam nicht
-   * als schlechter Vorschlag heraus, sondern gar nicht — zu wenige Monate mit
-   * Ausgaben für einen belastbaren Median.
+   * Zweimal im Jahr etwas Großes ist kein Fall für ein Budget, sondern für eine Rücklage
+   * — und deren Vorschlag steht seit 2026-11-16 im Bereich Rücklagen. Bis dahin stand er
+   * hier mit der Art „Rücklage" und öffnete den Dialog einer Rücklage; wer hier ein
+   * Budget erwartete, fand danach keins. Das Gegenstück steht in
+   * `ruecklagen/VorschlaegeKarte.test.tsx`.
    */
-  it("schlägt für seltene große Ausgaben eine Rücklage vor und legt sie an", async () => {
+  it("schlägt für seltene große Ausgaben nichts vor — das ist eine Rücklage", async () => {
     await stammdaten();
     await einkaufsreihe("e", "essen", 43700, "Nordhoff");
     await erfassen("r-1", `${monat(10)}-08`, 60000, "miete", "Bergblick");
     await erfassen("r-2", `${monat(4)}-08`, 60000, "miete", "Bergblick");
 
     rendere(<BudgetsScreen />);
-    await screen.findByText("Aus deinen Ausgaben abgeleitet");
-    const zeile = (await screen.findByText("Wohnen")).closest("tr");
-    // Die Art heisst wie der Bereich, in dem das Ergebnis landet: Rücklage.
-    expect(zeile?.textContent).toMatch(i18n.t("budgets.art.ruecklage"));
-    // Die Schwankung sagt bei einer Rücklage nichts — der eine teure Monat ist
-    // dort der Zweck. Eine Warnpille stünde als Warnung vor dem Erwarteten da.
-    expect(zeile?.textContent).not.toMatch(/schwankend|stabil/i);
-
-    // Und der Vorschlag öffnet den Dialog einer Rücklage: ein monatlicher Rahmen wäre
-    // hier die falsche Zusage. Vorbelegt mit Kategorie, Name und Rate; sie läuft weiter.
+    await screen.findByText("Lebenshaltung");
+    expect(screen.queryByText("Wohnen")).not.toBeInTheDocument();
+    // Kein Wort über Rücklagen in der Karte: keine Spalte „Art", kein Hinweis darauf.
+    // (Die Erklärung oben auf der Seite nennt Rücklagen zu Recht — geprüft wird die Karte.)
+    const titel = await screen.findByText(i18n.t("budgets.vorschlaegeTitel"));
+    const karte = titel.parentElement!.parentElement!.parentElement!;
+    expect(karte.textContent).not.toMatch(i18n.t("ruecklagen.ruecklage"));
+    // Und der eine Vorschlag führt in den Dialog eines Budgets, nicht einer Rücklage.
     const nutzer = userEvent.setup();
-    await nutzer.click(zeile!.querySelector("button[aria-label*='bernehmen']")!);
-    await screen.findByText(i18n.t("ruecklagen.modalAnlegen"));
-    const alle = screen.getAllByRole("button", { name: /speichern/i });
-    await nutzer.click(alle[alle.length - 1]);
-    await waitFor(async () => {
-      const [r] = await sqliteRuecklagenRepository.alle();
-      expect(r).toMatchObject({ bezeichnung: "Wohnen", kategorieId: "wohnen", art: "fortlaufend" });
-      expect(r?.raten?.map((x) => x.betrag)).toEqual([10000]);
-    });
-    // Ein Budget entsteht dabei nicht.
-    expect(await sqliteBudgetRepository.alle()).toEqual([]);
+    await nutzer.click(screen.getByRole("button", { name: i18n.t("budgets.vorschlagUebernehmen") }));
+    await waitFor(() => expect(screen.getByDisplayValue("440")).toBeInTheDocument());
+    expect(screen.queryByText(i18n.t("ruecklagen.modalAnlegen"))).not.toBeInTheDocument();
   });
 
   it("zeigt ohne Buchungen keine Vorschlagskarte", async () => {

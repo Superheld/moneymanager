@@ -44,7 +44,7 @@ ein Baustein; was einer benutzt, gehört in dessen Ordner** — auch wenn es all
 | `uebersicht/` | „wie stehe ich gerade da": Monatskarten, Budgets, Was da ist, Depotstand (Regeln in `uebersicht/CLAUDE.md`) |
 | `analyse/` | „wie war es über einen Zeitraum": Register Verlauf, Kategorien, Ausblick, Befunde, Depot, Bericht |
 | `budgets/` | die monatlichen Budgets: Tabelle, Dialog, Verlauf, Vorschläge |
-| `ruecklagen/` | Rücklagen beider Sorten in EINER Liste und ihr Verlauf (`RuecklageVerlauf`), Abschliessen (`AbschlussDialog`), „Wartet auf Zuordnung" (`WartetKarte`), Fluss, Tacho, „Wo das Geld liegt" (je Konto, `GeldJeKontoKarte`) |
+| `ruecklagen/` | Rücklagen beider Sorten in EINER Liste und ihr Verlauf (`RuecklageVerlauf`), Abschliessen (`AbschlussDialog`), „Wartet auf Zuordnung" (`WartetKarte`), Vorschläge (`VorschlaegeKarte`), Fluss, Tacho, „Wo das Geld liegt" (je Konto, `GeldJeKontoKarte`) |
 | `vermoegen/` | Nettovermögen mit Verlauf, Vermögenswerte und Schulden als Werte zum Stichtag |
 | `vertraege/` | Verträge und ihre Erkennung |
 | `konten/` | der Kontoauszug („Buchungen", `ScreenId` `konten`), Kontenverwaltung, Bankzugänge, Abgleich, Depotauszug |
@@ -96,7 +96,7 @@ Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlic
 | Ein Bereich, in dem noch nichts steht | `LeererZustand` — Satz, Erklärung, Knöpfe; keine Karte (unten, „Leere Zustände") |
 | Ein Schritt der Einrichtung samt Knopf in seinen Bereich | `Einrichtungsschritt` (`EinrichtungsschrittZeile`, `EINRICHTUNG_ZIEL`) |
 | Was auf einem Konto gebunden ist: Ansprüche, gedeckt, Stand, gebunden, frei | `BelegungTabelle` (ohne Karte; im Kontoauszug und in „Wo das Geld liegt") |
-| Eine Rücklage anlegen oder bearbeiten, beide Sorten | `RuecklageDialog` |
+| Eine Rücklage anlegen oder bearbeiten, beide Sorten | `ruecklagen/RuecklageDialog` (nur im Bereich Rücklagen) |
 | Verlauf als Balken mit Rahmen oder Stand | `BudgetVerlaufChart` (Form `monatlich` für ein Budget, `ruecklage` für eine Rücklage) |
 
 Was nicht in der Tabelle steht und an zwei Stellen gebraucht wird, ist ein Kandidat für
@@ -125,8 +125,15 @@ Was das für den Code hier heisst:
   Buchungswahl, seit Paket 5) — nur beim Altbestand ohne Kategorie weiter „ausgebucht"
   (`AusbuchungDialog`, mit Buchungswahl). Welcher Knopf, sagt die Sicht (`abschlussweg`). `RuecklageDialog` legt beide an:
   Kategorie Pflicht, Sorte beim Anlegen wählbar und danach nur angezeigt, Ziel mit Frist
-  ODER Rate als Reihe mit „gilt ab". Ein Vorschlag „Rücklage" unter Budgets öffnet ihn
-  vorbelegt; weil ihn damit zwei Bereiche öffnen, liegt er in `bausteine/`.
+  ODER Rate als Reihe mit „gilt ab". Ein übernommener Rücklagenvorschlag
+  (`VorschlaegeKarte`) öffnet ihn vorbelegt. Er liegt in `ruecklagen/`, seit nur noch
+  dieser Bereich ihn öffnet; bis 2026-11-16 lag er in `bausteine/`, weil der
+  Rücklagenvorschlag im Bereich Budgets stand.
+- **Jeder Bereich schlägt nur vor, was in ihm landet** (seit 2026-11-16): Budgets nur
+  Budgets, Rücklagen nur Rücklagen, aus EINER Einstufung (`src/core/budgets/CLAUDE.md`,
+  „Vorschläge"). Keine Karte trägt eine Spalte „Art", und kein Bereich öffnet den Dialog
+  des anderen. Die Texte stehen je Bereich (`budgets.vorschlaege…`,
+  `ruecklagen.vorschlaege.…`), auch wo sie gleich lauten.
 - **Gerechnet wird nicht hier.** Die Zeile „Rücklagen" der Ergebnisrechnung ist schon im
   Kern die Summe aller Rücklagen, und was aus einem Budget herausgerechnet ist, sagt
   `abgezogen` am Budgetstand (über die Zuständigkeit).

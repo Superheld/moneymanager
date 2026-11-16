@@ -86,7 +86,8 @@ export async function budgetAnlegen(
     kontoId: eingabe.kontoId,
     betraege,
     // Seit Migration 81 die einzige Art. Was sich ansammeln soll, legt `ruecklageAnlegen`
-    // als Rücklage an, die weiterläuft — auch aus einem Budgetvorschlag heraus.
+    // als Rücklage an, die weiterläuft; ihr Vorschlag steht seit 2026-11-16 im Bereich
+    // Rücklagen und nicht mehr unter den Budgetvorschlägen.
     art: "monatlich",
     start: `${eingabe.start.slice(0, 7)}-01`,
   };

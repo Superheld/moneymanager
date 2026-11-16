@@ -15,11 +15,9 @@ mitzurechnen.
 
 Drei Folgen, die man kennen muss:
 
-- **`budgetAnlegen` legt nur noch monatliche an**, der Dialog hat kein Feld „Art". Ein
-  Budgetvorschlag der Art `ruecklage` (der Fall, in dem selten etwas Grosses anfällt)
-  öffnet den Dialog einer Rücklage, die weiterläuft, vorbelegt mit Kategorie, Name und
-  Rate. An einer Kategorie, an der schon ein Budget oder eine Rücklage hängt, schlägt der
-  Vorschlag nichts vor — und `budgetAnlegen` weist ein NEUES Budget an der Kategorie einer
+- **`budgetAnlegen` legt nur noch monatliche an**, der Dialog hat kein Feld „Art", und
+  der Bereich schlägt nur Budgets vor (unten, „Vorschläge"). An einer Kategorie, an der
+  schon ein Budget oder eine Rücklage hängt, schlägt er nichts vor — und `budgetAnlegen` weist ein NEUES Budget an der Kategorie einer
   Rücklage ab (`budget.kategorieHatRuecklage`, seit Paket 5 des Umbaus), wie umgekehrt
   `ruecklage.kategorieHatBudget`. Dort gewönne das Budget, und die Rücklage fände still
   nichts mehr. Ein Altfall bleibt stehen.
@@ -49,8 +47,32 @@ ein fehlender Wert muss JA heissen, sonst fiele mit der Einführung der Spalte d
 Altbestand aus jedem Budget und die Rahmen sähen über Nacht grosszügig aus.
 
 Wer sie auswertet, muss sie an **beiden** Stellen auswerten: im Verbrauch
-(`budgetBuchungen`) und im Vorschlag (`budgetvorschlaege`). Nur im Verbrauch hiesse, einen
+(`budgetBuchungen`) und im Vorschlag (`ausgabenvorschlaege`). Nur im Verbrauch hiesse, einen
 Rahmen vorzuschlagen, gegen den die Buchung anschliessend nicht zählt.
+
+## Vorschläge: Budgets hier, Rücklagen dort, EINE Einstufung
+
+Aus den bisherigen Ausgaben stuft `core/ausgabenvorschlaege.ts` jede Hauptkategorie ein:
+Ausgaben in genug Monaten → ein **Budget** (Median), nur selten, dann viel → eine
+**Rücklage**, die weiterläuft (Durchschnitt über alle beobachteten Monate). Heraus kommen
+zwei Listen mit eigenen Typen (`Budgetvorschlag`, `Ruecklagenvorschlag`); der Bereich
+Budgets zeigt nur die erste, der Bereich Rücklagen nur die zweite.
+
+Bis 2026-11-16 war es EINE Liste mit einem Feld `art`, und sie stand ganz im Bereich
+Budgets: ein Vorschlag „Rücklage" öffnete dort den Dialog einer Rücklage, und wer ein
+Budget erwartete, fand das Ergebnis in einem anderen Bereich. Drei Dinge daran sind
+Entscheidung:
+
+- **Die Einstufung bleibt eine Rechnung** und liegt deshalb in der Wurzel von Kern und
+  Anwendung (`application/ausgabenvorschlaege.ts` lädt für beide Bereiche). Zwei
+  Funktionen mit je einer Hälfte der Schwelle könnten auseinanderlaufen, und eine
+  Kategorie stünde in beiden Karten oder in keiner.
+- **Die Zahlen sind dieselben wie vorher**: dieselbe Kategorie bekommt denselben Betrag,
+  nur im richtigen Bereich (`ausgabenvorschlaege.test.ts`).
+- **Der Merkzettel ist je Bereich getrennt** — mit einer Ausnahme: der Bereich Rücklagen
+  liest den alten Schlüssel `budgetvorschlag.ignoriert` mit, weil darin auch Rücklagen
+  stehen können, die vor der Trennung über „kein Budget" verworfen wurden. Geschrieben
+  wird dort nur `ruecklagenvorschlag.ignoriert`. Eine Migration braucht es nicht.
 
 ## Der Budgetbetrag ist eine Reihe, kein Wert
 

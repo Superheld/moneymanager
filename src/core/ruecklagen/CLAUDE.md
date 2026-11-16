@@ -288,6 +288,15 @@ negativ das Minus). So geht der Monat auf: Übertrag + Zuführung − Verbrauch 
 null an, und der Monat zeigte Buchungen, die in keiner Zahl darüber vorkamen. Die Zeile
 im Verlauf sagt dazu „abgeschlossen, frei geworden …" bzw. „im Minus abgeschlossen".
 
+## Vorschläge aus den Ausgaben
+
+Seit 2026-11-16 schlägt der Bereich Rücklagen selbst vor (`ui/ruecklagen/VorschlaegeKarte`,
+unter der Liste): für jede Hauptkategorie, in der nur selten etwas anfällt, dann viel,
+eine Rücklage, die weiterläuft — vorbelegt mit Kategorie, Name und Rate. Bis dahin stand
+dieser Vorschlag als Art „Rücklage" im Bereich Budgets. Eingestuft wird für beide Bereiche
+an einer Stelle; Regeln, Zahlen und der Merkzettel (der hier den alten Schlüssel der
+Budgets mitliest) stehen in `../budgets/CLAUDE.md` unter „Vorschläge".
+
 ## Wie der Umbau hierher kam (ADR-0006)
 
 Fünf Pakete, die Migrationen 79 bis 81; Paket 5 kam ohne Migration aus. Was davon noch wirkt:

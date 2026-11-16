@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { budgetvorschlaege } from "./budgetVorschlag";
-import type { Kategorie } from "../kategorien/kategorie";
-import type { IstBuchung } from "../buchung/istbuchung";
+import { ausgabenvorschlaege } from "./ausgabenvorschlaege";
+import type { Kategorie } from "./kategorien/kategorie";
+import type { IstBuchung } from "./buchung/istbuchung";
+
+/** Die Budget-Hälfte — die meisten Fälle unten fragen nur nach ihr. */
+const budgetvorschlaege = (...a: Parameters<typeof ausgabenvorschlaege>) => ausgabenvorschlaege(...a).budgets;
+/** Die Rücklagen-Hälfte. */
+const ruecklagenvorschlaege = (...a: Parameters<typeof ausgabenvorschlaege>) => ausgabenvorschlaege(...a).ruecklagen;
 
 const KATEGORIEN: Kategorie[] = [
   { id: "wohnen", name: "Wohnen", defaultCharakter: "Aufwand" },
@@ -206,33 +211,71 @@ describe("budgetvorschlaege", () => {
     // Elf statt zwölf Monate — der ausgenommene zählt nirgends mit.
     expect(v[0].monate).toBe(11);
   });
-
-  it("nennt bei jedem Vorschlag die Art", () => {
-    const v = budgetvorschlaege(HINTERGRUND, KATEGORIEN, "2026-08");
-    expect(v[0].art).toBe("monatlich");
-  });
 });
 
 /**
  * Der Fall, der vorher ganz herausfiel: zweimal im Jahr etwas Großes. Ein monatlicher
  * Rahmen wäre hier sinnlos — elf Monate bliebe er unberührt, im zwölften risse er.
+ * Seit 2026-11-16 kommt er in der zweiten Liste heraus, nicht mehr als Budget mit Art.
  */
-describe("budgetvorschlaege — Rücklage", () => {
-  it("schlägt für seltene große Ausgaben eine Rücklage vor", () => {
+describe("ausgabenvorschlaege — Rücklage", () => {
+  it("schlägt für seltene große Ausgaben eine Rücklage vor und kein Budget", () => {
     const selten = anStellen({ praefix: "s", kategorieId: "miete", betrag: 60000, stellen: [1, 7] });
-    const v = budgetvorschlaege([...HINTERGRUND, ...selten], KATEGORIEN, "2026-08");
-    const wohnen = v.find((x) => x.name === "Wohnen");
-    expect(wohnen?.art).toBe("ruecklage");
+    const { budgets, ruecklagen } = ausgabenvorschlaege([...HINTERGRUND, ...selten], KATEGORIEN, "2026-08");
+    const wohnen = ruecklagen.find((x) => x.name === "Wohnen");
     // 2 × 600 € über zwölf beobachtete Monate → 100 € im Monat.
     expect(wohnen?.proMonat).toBe(10000);
     expect(wohnen?.vorschlag).toBe(10000);
-    // Und die Kategorie mit Ausgaben in jedem Monat bleibt monatlich.
-    expect(v.find((x) => x.name === "Lebenshaltung")?.art).toBe("monatlich");
+    expect(budgets.find((x) => x.name === "Wohnen")).toBeUndefined();
+    // Und die Kategorie mit Ausgaben in jedem Monat bleibt ein Budget.
+    expect(budgets.map((x) => x.name)).toEqual(["Lebenshaltung"]);
+    expect(ruecklagen.map((x) => x.name)).toEqual(["Wohnen"]);
+  });
+
+  /**
+   * Die Zahlen sind durch die Trennung nicht anders geworden: dieselbe Kategorie bekommt
+   * denselben Betrag wie zuvor in der gemeinsamen Liste, nur steht sie jetzt in ihrer.
+   * Die Werte sind die, die vor der Trennung an der Art „monatlich" bzw. „Rücklage" hingen.
+   */
+  it("rechnet dieselben Beträge wie vor der Trennung", () => {
+    const selten = anStellen({ praefix: "s", kategorieId: "miete", betrag: 60000, stellen: [1, 7] });
+    const { budgets, ruecklagen } = ausgabenvorschlaege([...HINTERGRUND, ...selten], KATEGORIEN, "2026-08");
+    expect(budgets).toEqual([
+      { kategorieId: "leben", name: "Lebenshaltung", proMonat: 40000, vertragsanteil: 0, vorschlag: 40000, monate: 12, schwankung: 1 },
+    ]);
+    expect(ruecklagen).toEqual([
+      { kategorieId: "wohnen", name: "Wohnen", proMonat: 10000, vertragsanteil: 0, vorschlag: 10000, monate: 2 },
+    ]);
+  });
+
+  it("stellt jede Kategorie in höchstens eine der beiden Listen", () => {
+    // Ein Querschnitt: jeden Monat, selten, neu, zu klein — über alle Schwellen hinweg.
+    const kategorien: Kategorie[] = [
+      ...KATEGORIEN,
+      { id: "zelm", name: "Zelm", defaultCharakter: "Aufwand" },
+      { id: "quarn", name: "Quarn", defaultCharakter: "Aufwand" },
+      { id: "wibo", name: "Wibo", defaultCharakter: "Aufwand" },
+    ];
+    const buchungen = [
+      ...HINTERGRUND,
+      ...anStellen({ praefix: "s", kategorieId: "miete", betrag: 60000, stellen: [1, 7] }),
+      ...anStellen({ praefix: "z", kategorieId: "zelm", betrag: 30000, stellen: [0, 3, 5, 6, 8, 9] }),
+      ...anStellen({ praefix: "q", kategorieId: "quarn", betrag: 90000, stellen: [4] }),
+      ...anStellen({ praefix: "w", kategorieId: "wibo", betrag: 50000, stellen: [11] }),
+    ];
+    const { budgets, ruecklagen } = ausgabenvorschlaege(buchungen, kategorien, "2026-08");
+    const b = new Set(budgets.map((x) => x.kategorieId));
+    const r = new Set(ruecklagen.map((x) => x.kategorieId));
+    expect([...b].filter((id) => r.has(id))).toEqual([]);
+    // Sechs belegte Monate reichen für den Median — Zelm ist ein Budget, keine Rücklage.
+    expect([...b].sort()).toEqual(["leben", "zelm"]);
+    // Wibo liegt am jüngsten Ende: neu, nicht selten — in keiner Liste.
+    expect([...r].sort()).toEqual(["quarn", "wohnen"]);
   });
 
   it("mittelt über alle beobachteten Monate, nicht nur über die mit Ausgaben", () => {
     const einmal = anStellen({ praefix: "s", kategorieId: "miete", betrag: 120000, stellen: [2] });
-    const v = budgetvorschlaege([...HINTERGRUND, ...einmal], KATEGORIEN, "2026-08");
+    const v = ruecklagenvorschlaege([...HINTERGRUND, ...einmal], KATEGORIEN, "2026-08");
     // Über die belegten Monate gemittelt wären es 1200 € — der Vorschlag wäre
     // hundertmal zu hoch und das Budget nach einem Monat gesprengt.
     expect(v.find((x) => x.name === "Wohnen")?.proMonat).toBe(10000);
@@ -242,22 +285,30 @@ describe("budgetvorschlaege — Rücklage", () => {
     // Dieselbe Anzahl belegter Monate wie oben, aber sie liegen am jüngsten Ende:
     // das ist ein Posten, der gerade erst angefangen hat.
     const neu = anStellen({ praefix: "s", kategorieId: "miete", betrag: 60000, stellen: [10, 11] });
-    const v = budgetvorschlaege([...HINTERGRUND, ...neu], KATEGORIEN, "2026-08");
-    expect(v.find((x) => x.name === "Wohnen")).toBeUndefined();
+    const { budgets, ruecklagen } = ausgabenvorschlaege([...HINTERGRUND, ...neu], KATEGORIEN, "2026-08");
+    expect(budgets.find((x) => x.name === "Wohnen")).toBeUndefined();
+    expect(ruecklagen.find((x) => x.name === "Wohnen")).toBeUndefined();
   });
 
-  it("schlägt ohne genug Historie nichts Aufbauendes vor", () => {
+  it("schlägt ohne genug Historie keine Rücklage vor", () => {
     // Ein halbes Jahr Daten: eine jährliche Zahlung ist von einer einmaligen nicht zu
     // unterscheiden.
     const kurz = monatlich({ praefix: "hg", kategorieId: "essen", betrag: 40000, monate: 6 });
     const selten = anStellen({ praefix: "s", kategorieId: "miete", betrag: 60000, stellen: [6, 8] });
-    const v = budgetvorschlaege([...kurz, ...selten], KATEGORIEN, "2026-08");
-    expect(v.map((x) => x.name)).toEqual(["Lebenshaltung"]);
+    const { budgets, ruecklagen } = ausgabenvorschlaege([...kurz, ...selten], KATEGORIEN, "2026-08");
+    expect(budgets.map((x) => x.name)).toEqual(["Lebenshaltung"]);
+    expect(ruecklagen).toEqual([]);
+  });
+
+  it("überspringt auch als Rücklage, woran schon etwas hängt", () => {
+    const selten = anStellen({ praefix: "s", kategorieId: "miete", betrag: 60000, stellen: [1, 7] });
+    const v = ruecklagenvorschlaege([...HINTERGRUND, ...selten], KATEGORIEN, "2026-08", new Set(), new Set(["wohnen"]));
+    expect(v).toEqual([]);
   });
 
   it("zieht auch beim Vorschlag einer Rücklage den vertraglich gebundenen Teil ab", () => {
     const selten = anStellen({ praefix: "s", kategorieId: "miete", betrag: 60000, stellen: [1, 7] });
-    const v = budgetvorschlaege(
+    const v = ruecklagenvorschlaege(
       [...HINTERGRUND, ...selten],
       KATEGORIEN,
       "2026-08",

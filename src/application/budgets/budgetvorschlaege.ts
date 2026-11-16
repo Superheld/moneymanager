@@ -1,27 +1,19 @@
-// Budgetvorschläge — lädt zusammen, was die reine Funktion `core/budgetVorschlag`
-// braucht, und hält den Merkzettel der weggeklickten Vorschläge.
+// Budgetvorschläge — die Budget-Hälfte der Ausgabenvorschläge und der Merkzettel der
+// weggeklickten.
 //
-// Der interessante Teil ist, WELCHE Buchungen als vertraglich gebunden gelten. Hier ist
-// es die VEREINIGUNG aus zwei Quellen, und das ist Absicht:
+// Geladen und eingestuft wird in `../ausgabenvorschlaege.ts`, zusammen mit den
+// Rücklagen: eine Kategorie, in der nur selten etwas anfällt, steht hier nicht, sondern
+// im Bereich Rücklagen (`../ruecklagen/ruecklagenvorschlaege.ts`). Bis 2026-11-16 kam
+// sie hier mit der Art „Rücklage" heraus und öffnete im Bereich Budgets den Dialog einer
+// Rücklage — wer ein Budget erwartete, fand danach keins.
 //
-//   • `vertragskandidaten` — Wiederkehr-Erkennung über die Zahlungsspuren. Sie findet
-//     auch regelmäßige Zahlungen, zu denen NIEMAND einen Vertrag erfasst hat. Genau die
-//     braucht ein Vorschlag: er soll sagen, wieviel einer Kategorie überhaupt steuerbar
-//     ist, und ein nicht erfasster Dauerauftrag ist genauso wenig steuerbar wie ein
-//     erfasster.
-//   • die erfassten Zuordnungen (`vertrag_zuordnung`) — die harte Verknüpfung
-//     Buchung↔Vertrag, dieselbe, an der auch der VERBRAUCH hängt.
-//
-// Warum nicht eine Quelle für beides: die Fragen sind verschieden. Der Verbrauch fragt
-// „ist diese Zahlung schon anderswo verplant?" — dafür ist die erfasste Verknüpfung
-// richtig, eine Vermutung wäre zu wenig. Der Vorschlag fragt „wieviel hiervon kann ich
-// überhaupt beeinflussen?" — dafür wäre nur die Verknüpfung zu wenig, weil sie das noch
-// nicht Erfasste übersieht und der Rahmen dann zu hoch ausfiele.
+// Der Merkzettel `budgetvorschlag.ignoriert` ist älter als die Trennung. Was darin
+// steht, wurde womöglich als Rücklage verworfen; der Bereich Rücklagen liest ihn deshalb
+// mit, schreibt aber nur seinen eigenen.
 
 import { ignorierenVermerken, ignorierteLesen } from "../einstellungen";
-import { budgetvorschlaege as berechnen, vertragskandidaten } from "../../core";
 import type { Budgetvorschlag, Ruecklage } from "../../core";
-import { spurenAus } from "../buchung/zahlungsspuren";
+import { ausgabenvorschlaegeLaden, ohneVerworfene } from "../ausgabenvorschlaege";
 import type {
   BudgetRepository,
   EinstellungenRepository,
@@ -31,23 +23,24 @@ import type {
   VertragszuordnungRepository,
 } from "../ports";
 
-const SCHLUESSEL_IGNORIERT = "budgetvorschlag.ignoriert";
+/** Exportiert, weil der Bereich Rücklagen ihn mitliest (Kopf der Datei). */
+export const SCHLUESSEL_BUDGETVORSCHLAG_IGNORIERT = "budgetvorschlag.ignoriert";
 
 export async function ignorierteBudgetvorschlaege(
   repo: EinstellungenRepository,
 ): Promise<Set<string>> {
-  return ignorierteLesen(repo, SCHLUESSEL_IGNORIERT);
+  return ignorierteLesen(repo, SCHLUESSEL_BUDGETVORSCHLAG_IGNORIERT);
 }
 
 export async function budgetvorschlagIgnorieren(
   repo: EinstellungenRepository,
   kategorieId: string,
 ): Promise<void> {
-  await ignorierenVermerken(repo, SCHLUESSEL_IGNORIERT, kategorieId);
+  await ignorierenVermerken(repo, SCHLUESSEL_BUDGETVORSCHLAG_IGNORIERT, kategorieId);
 }
 
 /**
- * Vorschläge für Hauptkategorien ohne Budget.
+ * Budgetvorschläge für Hauptkategorien ohne Budget und ohne Rücklage.
  *
  * `bisMonat` ist „YYYY-MM" — der letzte Monat des Auswertungsfensters. `heute` braucht
  * nur die Vertragserkennung, um laufende von beendeten Verträgen zu trennen.
@@ -62,45 +55,14 @@ export async function budgetvorschlaegeLaden(
   ignoriert: ReadonlySet<string> = new Set(),
   /** Die erfassten Buchung↔Vertrag-Verknüpfungen; ohne sie zählen nur die Kandidaten. */
   zuordnungRepo?: VertragszuordnungRepository,
-  /**
-   * Die Anteile, die eine Rücklage trägt oder die auf eine Zuordnung warten
-   * (`ruecklagenAnteile`) — sie zählen in keinen Vorschlag.
-   */
+  /** Die Anteile, die eine Rücklage trägt oder die warten (`ruecklagenAnteile`). */
   vonRuecklagen: ReadonlySet<string> = new Set(),
-  /**
-   * Die laufenden Rücklagen: an ihrer Kategorie wird nichts vorgeschlagen — weder ein
-   * Budget (dort lässt die App keines neu anlegen) noch eine zweite Rücklage. Bis
-   * Migration 81 war die frühere aufbauende Rücklage ein Budget und fiel über `budgets`
-   * heraus; jetzt fällt sie hierüber heraus.
-   */
+  /** Die laufenden Rücklagen: an ihrer Kategorie wird kein Budget vorgeschlagen. */
   ruecklagen: readonly Pick<Ruecklage, "kategorieId">[] = [],
 ): Promise<Budgetvorschlag[]> {
-  const [buchungen, umsaetze, kategorien, budgets] = await Promise.all([
-    ledger.alle(),
-    umsatzRepo.alle(),
-    kategorieRepo.alle(),
-    budgetRepo.alle(),
-  ]);
-
-  const vertraglich = new Set(
-    vertragskandidaten(spurenAus(buchungen, umsaetze), heute).flatMap((k) => k.buchungIds),
+  const { budgets } = await ausgabenvorschlaegeLaden(
+    { ledger, umsatzRepo, kategorieRepo, budgetRepo, zuordnungRepo },
+    bisMonat, heute, vonRuecklagen, ruecklagen,
   );
-  // Dazu, was ausdrücklich an einem Vertrag hängt — auch wenn die Wiederkehr-Erkennung
-  // es nicht als Kandidat sieht (zu wenige Zahlungen, zu unregelmäßig, von Hand gesetzt).
-  for (const z of (await zuordnungRepo?.alle()) ?? []) {
-    if (z.vertragId) vertraglich.add(z.istbuchungId);
-  }
-
-  // Ein Budget auf einer UNTERkategorie deckt ihre Hauptkategorie mit ab: sonst schlüge
-  // die Karte „Lebenshaltung" vor, während schon ein Budget auf „Lebensmittel" läuft,
-  // und die beiden Rahmen zählten dieselben Buchungen doppelt.
-  const byId = new Map(kategorien.map((k) => [k.id, k]));
-  const belegt = new Set<string>();
-  for (const kategorieId of [...budgets.map((b) => b.kategorieId), ...ruecklagen.flatMap((r) => (r.kategorieId ? [r.kategorieId] : []))]) {
-    const k = byId.get(kategorieId);
-    belegt.add(k?.elternId ?? kategorieId);
-  }
-  for (const id of ignoriert) belegt.add(id);
-
-  return berechnen(buchungen, kategorien, bisMonat, vertraglich, belegt, {}, vonRuecklagen);
+  return ohneVerworfene(budgets, ignoriert);
 }

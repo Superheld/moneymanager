@@ -25,17 +25,21 @@ import {
   type RuecklagenDeckung,
   type Ruecklagenfluss,
   type Ruecklagensicht,
+  type Ruecklagenvorschlag,
   buchungswahlFuer,
 } from "../../../application";
 import {
   geldJeKonto,
   ruecklageLoeschen,
   ruecklagen as ruecklagenLaden,
+  ruecklagenvorschlaege,
+  ruecklagenvorschlagVerwerfen,
 } from "../../dienste";
 import { BuchungDetail } from "../buchung/BuchungDetail";
 import { Button, Card, CoverageTrack, KPIStat, Pill } from "../bausteine";
 import { FaustformelTacho } from "./FaustformelTacho";
-import { RuecklageDialog } from "../bausteine/RuecklageDialog";
+import { RuecklageDialog, type RuecklageVorbelegung } from "./RuecklageDialog";
+import { VorschlaegeKarte } from "./VorschlaegeKarte";
 import { RuecklageVerlauf } from "./RuecklageVerlauf";
 import { AusbuchungDialog } from "./AusbuchungDialog";
 import { AbschlussDialog } from "./AbschlussDialog";
@@ -75,10 +79,14 @@ export function RuecklagenScreen() {
   const [sicht, setSicht] = useState<Ruecklagensicht | null>(null);
   /** Je Konto, welche Rücklagen dort Geld haben — für die Karte „Wo das Geld liegt". */
   const [jeKonto, setJeKonto] = useState<GeldJeKonto | null>(null);
+  /** Wofür sich nach den bisherigen Ausgaben eine Rücklage lohnt (`VorschlaegeKarte`). */
+  const [vorschlaege, setVorschlaege] = useState<readonly Ruecklagenvorschlag[]>(LEERE_LISTE);
 
   // Welcher Dialog offen ist — sein Zustand gehört ihm (`RuecklageDialog`,
   // `AusbuchungDialog`), der Screen merkt sich nur, für welche Rücklage.
   const [bearbeitet, setBearbeitet] = useState<Ruecklage | "neu" | null>(null);
+  /** Was ein übernommener Vorschlag beim Anlegen vorbelegt — nur zusammen mit `"neu"`. */
+  const [vorbelegung, setVorbelegung] = useState<RuecklageVorbelegung | undefined>(undefined);
   const [ausbuchen, setAusbuchen] = useState<Ruecklage | null>(null);
   /** Eine Rücklage mit Kategorie, deren Abschluss gerade im Dialog steht. */
   const [abschliessen, setAbschliessen] = useState<Ruecklage | null>(null);
@@ -90,9 +98,10 @@ export function RuecklagenScreen() {
   // Verwandte Repos in EINEM Zug laden und zusammen setzen: gestaffelte setState lassen
   // die Deckung kurz gegen eine leere Kontenliste rechnen (jeder Stand wäre dann 0).
   async function laden() {
-    const [r, k] = await Promise.all([ruecklagenLaden(heute), geldJeKonto(heute)]);
+    const [r, k, v] = await Promise.all([ruecklagenLaden(heute), geldJeKonto(heute), ruecklagenvorschlaege(heute)]);
     setSicht(r);
     setJeKonto(k);
+    setVorschlaege(v);
   }
   useEffect(() => {
     laden();
@@ -110,8 +119,21 @@ export function RuecklagenScreen() {
   /** Die Zeile, deren Verlauf offen ist — sie kann nach einem Löschen weg sein. */
   const offeneZeile = zeilen.find((z) => z.ruecklage.id === offeneRuecklage);
 
-  const neu = () => setBearbeitet("neu");
-  const bearbeiten = (r: Ruecklage) => setBearbeitet(r);
+  const neu = () => { setVorbelegung(undefined); setBearbeitet("neu"); };
+  const bearbeiten = (r: Ruecklage) => { setVorbelegung(undefined); setBearbeitet(r); };
+  /**
+   * Ein Vorschlag öffnet den Dialog vorbelegt mit Kategorie, Name und Rate — als
+   * Rücklage, die weiterläuft: sie trägt Ausgaben, die immer wieder kommen, und beginnt
+   * nie neu. Bestätigt wird im Dialog.
+   */
+  const vorschlagUebernehmen = (v: Ruecklagenvorschlag) => {
+    setVorbelegung({ kategorieId: v.kategorieId, bezeichnung: v.name, rate: v.vorschlag, art: "fortlaufend" });
+    setBearbeitet("neu");
+  };
+  const vorschlagVerwerfen = async (v: Ruecklagenvorschlag) => {
+    await ruecklagenvorschlagVerwerfen(v.kategorieId);
+    await laden();
+  };
   const ausbuchenOeffnen = (r: Ruecklage) => setAusbuchen(r);
   const anlegenKnopf = (hauptknopf: boolean) => (
     <Button variant={hauptknopf ? "primary" : undefined} plus onClick={neu}>{t("ruecklagen.ruecklage")}</Button>
@@ -261,6 +283,8 @@ export function RuecklagenScreen() {
           // Rücklagen brauchen keine Buchungen — wer eine anlegen will, kann es sofort.
           <LeererZustand kopf={t("ruecklagen.leer")} aktionen={anlegenKnopf(true)}>
             {t("ruecklagen.leerErklaerung")}
+            {/* Gibt es Vorschläge, zeigt der Satz auf sie — wie bei den Budgets. */}
+            {vorschlaege.length > 0 && ` ${t("ruecklagen.leerMitVorschlaegen")}`}
           </LeererZustand>
         ) : (
           <Stapel abstand={5}>
@@ -358,6 +382,15 @@ export function RuecklagenScreen() {
           ist nichts offen, steht die Karte nicht da (`WartetKarte`). */}
       <WartetKarte zeilen={sicht?.wartend ?? LEERE_LISTE} onGewaehlt={laden} />
 
+      {/* Die Vorschläge unter der Liste, wie bei den Budgets: ein Nachtrag, kein
+          Einstieg — wer den Bereich öffnet, will zuerst seine eigenen Rücklagen sehen.
+          Nach „Wartet auf Zuordnung", weil dort schon etwas zu tun ist. */}
+      <VorschlaegeKarte
+        vorschlaege={vorschlaege}
+        onUebernehmen={vorschlagUebernehmen}
+        onVerwerfen={(v) => void vorschlagVerwerfen(v)}
+      />
+
       {/* Nach der Liste und nicht davor: dort wird gearbeitet (anlegen, ausbuchen),
           hier wird nachgesehen, auf welchem Konto das alles liegt. Vor den Listen schöbe
           eine Karte mit einem Abschnitt je Konto die Handlungen aus dem ersten Blick. */}
@@ -377,6 +410,7 @@ export function RuecklagenScreen() {
       {bearbeitet && (
         <RuecklageDialog
           ruecklage={bearbeitet === "neu" ? null : bearbeitet}
+          vorbelegung={bearbeitet === "neu" ? vorbelegung : undefined}
           heute={heute}
           konten={konten}
           kategorien={sicht?.kategorien ?? []}
