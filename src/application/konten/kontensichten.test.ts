@@ -69,7 +69,10 @@ function deps(
       async speichern() {}, async loeschen() {},
     } as unknown as KontenDeps["vertragRepo"],
     budgetRepo: { async alle() { return []; } } as unknown as KontenDeps["budgetRepo"],
-    ruecklagenRepo: { async ausbuchungen() { return []; } } as unknown as KontenDeps["ruecklagenRepo"],
+    ruecklagenRepo: {
+      async alle() { return []; }, async beendete() { return []; }, async ausbuchungen() { return []; },
+    } as unknown as KontenDeps["ruecklagenRepo"],
+    ruecklagenzuordnungRepo: { async alle() { return []; }, async setzen() {}, async entfernen() {} },
   };
 }
 

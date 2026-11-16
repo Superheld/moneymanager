@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { hatZiel, minorZuMajor, waehlbareKonten, type Kategorie, type Ruecklage, type Zahlungskonto } from "../../../application";
+import { hatZiel, minorZuMajor, monatsRuecklage, waehlbareKonten, type Kategorie, type Ruecklage, type Zahlungskonto } from "../../../application";
 import { ruecklageAktualisieren, ruecklageAnlegen } from "../../dienste";
 import { Button, FormField } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
@@ -43,7 +43,8 @@ export function RuecklageDialog({
   const [bezeichnung, setBezeichnung] = useState(r?.bezeichnung ?? "");
   const [ziel, setZiel] = useState(r?.ziel == null ? "" : String(minorZuMajor(r.ziel, geld.waehrung)));
   const [fristMonate, setFristMonate] = useState(r?.fristMonate == null ? "" : String(r.fristMonate));
-  const [rate, setRate] = useState(r?.rate == null ? "" : String(minorZuMajor(r.rate, geld.waehrung)));
+  // Die freie Rate steht seit Migration 80 in der Reihe; `monatsRuecklage` nimmt die, die zuletzt gilt.
+  const [rate, setRate] = useState(r && !hatZiel(r) ? String(minorZuMajor(monatsRuecklage(r), geld.waehrung)) : "");
   const [beginn, setBeginn] = useState(r?.beginn ?? heute);
   const [kontoId, setKontoId] = useState(r?.kontoId ?? "");
   const [kategorieId, setKategorieId] = useState(r?.kategorieId ?? "");
@@ -64,7 +65,7 @@ export function RuecklageDialog({
       kategorieId: kategorieId || undefined,
     };
     try {
-      if (r) await ruecklageAktualisieren(r.id, eingabe);
+      if (r) await ruecklageAktualisieren(r.id, eingabe, heute);
       else await ruecklageAnlegen(eingabe);
       await onGespeichert();
     } catch (e) {

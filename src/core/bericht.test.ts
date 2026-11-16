@@ -114,6 +114,7 @@ describe("Ein Jahr — die Summe seiner Monate", () => {
     ],
     ruecklagen: [{ id: "rl", bezeichnung: "Kesselmann", rate: 8000, beginn: "2025-01-01" }],
     ausbuchungen: [],
+    ruecklagenzuordnungen: [],
     ist: buchungen,
     kategorien: KATEGORIEN,
     konten: [konto("giro", "liquide"), konto("anlage", "investment")],

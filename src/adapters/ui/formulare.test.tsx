@@ -163,7 +163,9 @@ describe("Rücklagen — Formularpfade", () => {
 
     await waitFor(async () => {
       const [r] = await sqliteRuecklagenRepository.alle();
-      expect(r?.rate).toBe(15000);
+      // Seit Migration 80 steht die freie Rate in der Reihe, ab dem Monat des Beginns.
+      expect(r?.raten?.map((x) => x.betrag)).toEqual([15000]);
+      expect(r?.rate).toBeUndefined();
       expect(r?.ziel).toBeUndefined();
     });
   });

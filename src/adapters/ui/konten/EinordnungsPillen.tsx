@@ -17,7 +17,7 @@ import type { PillVariante } from "../bausteine/Pill";
 /**
  * Die Farbe folgt der Frage „kostet das den Monat?", nicht der Art einzeln:
  * grün, was hereinkommt; Akzent, was nur den Ort wechselt; kräftiger Rahmen, was schon
- * vorher bezahlt wurde (Topf, Rücklage). Alles, was den Monat als Kosten trifft, bleibt
+ * vorher bezahlt wurde (Rücklage). Alles, was den Monat als Kosten trifft, bleibt
  * neutral — auch „Ungeplant": es ist eine Auskunft und keine Mahnung, und eine
  * Warnfarbe an jeder zweiten Zeile läse nach einer Woche niemand mehr.
  */
@@ -26,7 +26,6 @@ const VARIANTE: Record<Einordnungsart, PillVariante> = {
   fixkosten: "neutral",
   laufend: "neutral",
   ungeplant: "neutral",
-  topf: "ist",
   ruecklage: "ist",
   vorsorge: "um",
   umbuchung: "um",
@@ -37,7 +36,9 @@ export function einordnungsText(
   t: (schluessel: string, werte?: Record<string, string>) => string,
   e: Buchungseinordnung,
 ): string {
-  return t(`einordnung.pille.${e.art}`, { budget: e.budgetName ?? "—" });
+  // Eine Rücklage mit Namen nennt ihn; eine Entnahme über eine alte Ausbuchung hat keinen.
+  const schluessel = e.art === "ruecklage" && (e.budgetName || e.ruecklageId) ? "ruecklageBenannt" : e.art;
+  return t(`einordnung.pille.${schluessel}`, { budget: e.budgetName ?? "—" });
 }
 
 /**

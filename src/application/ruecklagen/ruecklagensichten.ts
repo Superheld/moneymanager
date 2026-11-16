@@ -321,7 +321,7 @@ export async function ruecklagenLaden(
     konten,
     kategorien,
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
-    deckung: ruecklagenDeckung(ruecklagen, heute, kontostaende, budget.ansprueche),
+    deckung: ruecklagenDeckung(ruecklagen, heute, kontostaende, budget.ansprueche, budget.bestand),
     proMonat: fluss.bedarf,
     zielwert: zielwertGesamt(ruecklagen),
     mindest: mindestRuecklage(einnahmen),

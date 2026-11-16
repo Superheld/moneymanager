@@ -224,6 +224,7 @@ import { DATEINAME } from "./persistence/datenbankdatei";
 import { sqliteVertragszuordnungRepository } from "./persistence/sqliteVertragZuordnungRepositories";
 import { sqliteZahlungsregelRepository } from "./persistence/sqliteZahlungsregelRepository";
 import { sqliteRuecklagenRepository } from "./persistence/sqliteRuecklagenRepository";
+import { sqliteRuecklagenzuordnungRepository } from "./persistence/sqliteRuecklagenzuordnungRepository";
 import { sqliteUmsatzRepository } from "./persistence/sqliteImportRepositories";
 import { sqliteZahlungskontoRepository } from "./persistence/sqliteStammdatenRepositories";
 import { sqliteEinstellungenRepository } from "./persistence/sqliteEinstellungenRepository";
@@ -233,6 +234,8 @@ const BUDGET_DEPS = {
   kategorieRepo: sqliteKategorieRepository,
   budgetRepo: sqliteBudgetRepository,
   zuordnungRepo: sqliteVertragszuordnungRepository,
+  ruecklagenRepo: sqliteRuecklagenRepository,
+  ruecklagenzuordnungRepo: sqliteRuecklagenzuordnungRepository,
 };
 
 /** Budgetstände zum Stichtag `am` — fertig gerechnet, Verträge herausgerechnet. */
@@ -249,6 +252,7 @@ export function uebersicht(heute: string): Promise<Uebersichtsdaten> {
       umsatzRepo: sqliteUmsatzRepository,
       kontoRepo: sqliteZahlungskontoRepository,
       ruecklagenRepo: sqliteRuecklagenRepository,
+      ruecklagenzuordnungRepo: sqliteRuecklagenzuordnungRepository,
       vertragRepo: sqliteVertragRepository,
       vorsorge: VORSORGE_DEPS,
     },
@@ -280,6 +284,7 @@ export function budgetbereich(heute: string): Promise<Budgetbereich> {
       einstellungenRepo: sqliteEinstellungenRepository,
       vertragRepo: sqliteVertragRepository,
       ruecklagenRepo: sqliteRuecklagenRepository,
+      ruecklagenzuordnungRepo: sqliteRuecklagenzuordnungRepository,
     },
     heute,
   );
@@ -652,6 +657,7 @@ export function restschuldEntfernen(verbindlichkeitId: string, stichtag: string)
 const RUECKLAGEN_DEPS = {
   ...BUDGET_DEPS,
   ruecklagenRepo: sqliteRuecklagenRepository,
+  ruecklagenzuordnungRepo: sqliteRuecklagenzuordnungRepository,
   ledger: sqliteLedgerRepository,
   kontoRepo: sqliteZahlungskontoRepository,
   regelRepo: sqliteZahlungsregelRepository,
@@ -677,8 +683,8 @@ export function ruecklageAnlegen(eingabe: RuecklagenEingabe) {
   return ruecklageAnlegenUseCase(sqliteRuecklagenRepository, eingabe);
 }
 
-export function ruecklageAktualisieren(id: string, eingabe: RuecklagenEingabe) {
-  return ruecklageAktualisierenUseCase(sqliteRuecklagenRepository, id, eingabe);
+export function ruecklageAktualisieren(id: string, eingabe: RuecklagenEingabe, heute: string) {
+  return ruecklageAktualisierenUseCase(sqliteRuecklagenRepository, id, eingabe, heute);
 }
 
 export function ruecklageAusbuchen(
@@ -704,6 +710,7 @@ export function analyse(): Promise<Analysebasis> {
     budgetRepo: sqliteBudgetRepository,
     regelRepo: sqliteZahlungsregelRepository,
     ruecklagenRepo: sqliteRuecklagenRepository,
+    ruecklagenzuordnungRepo: sqliteRuecklagenzuordnungRepository,
     vormerkungRepo: sqliteVormerkungRepository,
     vorsorge: VORSORGE_DEPS,
   });
@@ -1084,6 +1091,7 @@ export function konten(): Promise<Kontensicht> {
     // Damit jede Zeile sagt, was sie kaufmännisch ist — ohne Budgets hiesse alles „ungeplant".
     budgetRepo: sqliteBudgetRepository,
     ruecklagenRepo: sqliteRuecklagenRepository,
+    ruecklagenzuordnungRepo: sqliteRuecklagenzuordnungRepository,
   });
 }
 
@@ -1178,6 +1186,7 @@ export function buchungsdetail(): Promise<Buchungsdetaildaten> {
     freigabeRepo: sqliteDublettenfreigabeRepository,
     budgetRepo: sqliteBudgetRepository,
     ruecklagenRepo: sqliteRuecklagenRepository,
+    ruecklagenzuordnungRepo: sqliteRuecklagenzuordnungRepository,
     kontozuordnungen: () => sqliteKontozuordnungRepository.alle(),
   });
 }

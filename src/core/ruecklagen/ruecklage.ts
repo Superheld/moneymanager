@@ -29,6 +29,7 @@ import type { Cent } from "../basis/geld";
 import { kontobelegung, type Anspruch, type Belegungsposten } from "../konten/kontobelegung";
 import { istLiquide, istRuecklagenkonto, type Zahlungskonto } from "../konten/konto";
 import { zufuehrungIm, type Budget } from "../budgets/budget";
+import { abgeschlossenerZyklus, altabschlussUngedeckt, ruecklagenstand, type Ruecklagenentnahme } from "./topf";
 
 /**
  * Wann eine Rücklage wieder bei null beginnt (ADR-0006, seit Migration 79):
@@ -40,8 +41,9 @@ import { zufuehrungIm, type Budget } from "../budgets/budget";
  * trennt genau diese beiden Fragen. Was nach dem Abschliessen folgt (neu beginnen oder
  * beenden), wählt der Nutzer beim Abschliessen — das ist eine dritte Frage.
  *
- * **Im Umbau:** gelesen wird das Feld bisher nur von den Bausteinen in `topf.ts` und
- * `zustaendigkeit.ts`, die noch niemand aufruft. Die laufende Rechnung behandelt jede Rücklage wie bisher.
+ * Seit Paket 3 liest die Rechnung das Feld über `topf.ts` und `zustaendigkeit.ts`. Bis
+ * Migration 81 ist jede Zeile der Tabelle `abschliessend`; `fortlaufend` sind dort nur
+ * die aufbauenden Budgets, übergangsweise als Rücklage gelesen (`alsRuecklage`).
  */
 export type Ruecklagenart = "fortlaufend" | "abschliessend";
 
@@ -91,8 +93,9 @@ export interface Ruecklage {
    */
   readonly findetAb?: string;
   /**
-   * Die Reihe der freien Raten, aufsteigend nach `abMonat`. Bis Migration 80 leer: die
-   * freie Rate steht noch in `rate`, und die laufende Rechnung liest nur dort.
+   * Die Reihe der freien Raten, aufsteigend nach `abMonat`. Migration 80 hat die freie
+   * Rate aus `rate` hierher überführt; ist sie leer, gilt `rate` ab dem Monat von `beginn`
+   * (ein Bestand vor der Migration rechnet so weiter wie zuvor).
    */
   readonly raten?: readonly Ruecklagenrate[];
 }
@@ -118,7 +121,17 @@ export function hatZiel(r: Ruecklage): boolean {
  */
 export function monatsRuecklage(r: Ruecklage): Cent {
   if (hatZiel(r)) return Math.round((r.ziel as Cent) / (r.fristMonate as number));
-  return r.rate ?? 0;
+  return freieRate(r);
+}
+
+/**
+ * Die freie Rate, die zuletzt gilt: der jüngste Eintrag der Reihe, ohne Reihe `rate`.
+ * Seit Migration 80 steht die freie Rate in der Reihe und `rate` ist leer — vorher
+ * stand sie nur in `rate`. Beide Bestände sagen hier dasselbe.
+ */
+export function freieRate(r: Pick<Ruecklage, "rate" | "raten">): Cent {
+  const reihe = r.raten ?? [];
+  return reihe.length > 0 ? reihe[reihe.length - 1].betrag : (r.rate ?? 0);
 }
 
 /**
@@ -139,7 +152,24 @@ export function sollRuecklage(r: Ruecklage, am: string): Cent {
     const ziel = r.ziel as Cent;
     return Math.min(Math.round((ziel * monate) / (r.fristMonate as number)), ziel);
   }
-  return (r.rate ?? 0) * monate;
+  const reihe = r.raten ?? [];
+  if (reihe.length === 0) return (r.rate ?? 0) * monate;
+  // Mit Reihe aufsummiert, Monat für Monat ab dem Beginn — dieselbe Zahl wie
+  // `rate × Monate`, solange die Reihe nur den einen Eintrag trägt, den Migration 80 aus
+  // `rate` gemacht hat; und eine spätere Änderung rechnet nicht rückwirkend.
+  const [j, m] = r.beginn.split("-").map(Number);
+  let summe = 0;
+  for (let i = 0; i < monate; i++) {
+    const n = j * 12 + (m - 1) + i;
+    const monat = `${String(Math.floor(n / 12)).padStart(4, "0")}-${String((n % 12) + 1).padStart(2, "0")}`;
+    let treffer = 0;
+    for (const v of reihe) {
+      if (v.abMonat > monat) break;
+      treffer = v.betrag;
+    }
+    summe += treffer;
+  }
+  return summe;
 }
 
 /**
@@ -251,10 +281,41 @@ export interface RuecklagenDeckung {
  * Eine Rücklage ohne Konto hat keinen: sie ist reine Rechnung, und es gibt keinen Stand,
  * gegen den sie etwas beanspruchen könnte.
  */
-export function ruecklagenAnsprueche(items: readonly Ruecklage[], am: string): Anspruch[] {
+export function ruecklagenAnsprueche(
+  items: readonly Ruecklage[],
+  am: string,
+  bestand: Anspruchsbestand = {},
+): Anspruch[] {
   return items
     .filter((r) => r.kontoId)
-    .map((r) => ({ art: "ruecklage", id: r.id, kontoId: r.kontoId as string, betrag: sollRuecklage(r, am) }));
+    .map((r) => ({ art: "ruecklage", id: r.id, kontoId: r.kontoId as string, betrag: anspruchAm(r, am, bestand) }));
+}
+
+/**
+ * Was über die Rücklagen hinaus bekannt sein muss, um ihren Anspruch zu rechnen: die
+ * Ausgaben, die jede über ihre Kategorie gefunden hat, und die Abschlüsse (für das
+ * Fenster des laufenden Zyklus). Fehlt beides, ist der Anspruch das Soll wie vor der
+ * Umstellung.
+ */
+export interface Anspruchsbestand {
+  readonly entnahmen?: ReadonlyMap<string, readonly Ruecklagenentnahme[]>;
+  readonly abschluesse?: readonly Ruecklagenzyklus[];
+}
+
+/**
+ * Was eine Rücklage am Tag `am` auf ihrem Konto beansprucht: ihr Stand, über null —
+ * eine im Minus beansprucht nichts (ADR-0006, Entscheidung 6).
+ *
+ * Der Stand rechnet je Sorte wie vor der Umstellung (`ruecklagenstand`): bei einer
+ * abschliessenden die Raten bis zum Vormonat, also genau das Soll — und davon gehen die
+ * Ausgaben ab, die die Rücklage seit ihrem Fundfenster gefunden hat. Vor `findet_ab`
+ * findet sie nichts, und der Anspruch ist das Soll wie bisher. Vor dem Beginn ihres
+ * laufenden Zyklus beansprucht sie nichts, wie `sollRuecklage` es sagt.
+ */
+export function anspruchAm(r: Ruecklage, am: string, bestand: Anspruchsbestand = {}): Cent {
+  if (am < r.beginn) return 0;
+  const stand = ruecklagenstand(r, bestand.abschluesse ?? [], bestand.entnahmen?.get(r.id) ?? [], am).stand;
+  return Math.max(0, stand);
 }
 
 /**
@@ -284,8 +345,9 @@ export function ruecklagenDeckung(
   am: string,
   kontostaende: ReadonlyMap<string, Cent>,
   weitere: readonly Anspruch[] = [],
+  bestand: Anspruchsbestand = {},
 ): RuecklagenDeckung {
-  const belegung = kontobelegung(kontostaende, [...ruecklagenAnsprueche(items, am), ...weitere]);
+  const belegung = kontobelegung(kontostaende, [...ruecklagenAnsprueche(items, am, bestand), ...weitere]);
   const gedeckt = new Map<string, Cent>();
   const ueberKategorie: Belegungsposten[] = [];
   for (const b of belegung.values()) {
@@ -297,7 +359,9 @@ export function ruecklagenDeckung(
 
   const posten = items.map((r): RuecklagenPosten => ({
     ruecklage: r,
-    soll: sollRuecklage(r, am),
+    // Das Soll ist der Anspruch: was auf dem Konto liegen sollte. Vor dem Fundfenster ist
+    // das `sollRuecklage`; danach gehen die gefundenen Ausgaben ab.
+    soll: anspruchAm(r, am, bestand),
     // Ein Soll von 0 ist kein Anspruch und steht deshalb in keiner Belegung — gedeckt ist
     // dann eben 0, nicht „unbekannt".
     tatsaechlich: r.kontoId ? (gedeckt.get(r.id) ?? 0) : null,
@@ -399,10 +463,11 @@ export function zyklusSoll(z: Ruecklagenzyklus, am: string): Cent {
  *
  * `ausgabe` ist positiv (was ausgegeben wurde). Eine Rückbuchung deckt nichts auf.
  *
- * Dieselbe Regel steht in `ergebnis.ts` noch einmal inline (`zyklusPosten`); wer eine
- * der beiden ändert, ändert beide — oder zieht die dortige auf diese Funktion um.
+ * Gerechnet in `topf.ts` (`altabschlussUngedeckt`), derselben Stelle, an der die
+ * Ergebnisrechnung das Ungedeckte im Kaufmonat kostet — bis Paket 3 stand die Regel dort
+ * ein zweites Mal inline.
  */
 export function zyklusUngedeckt(z: Ruecklagenzyklus, ausgabe: Cent): Cent | null {
   if (!hatGeschichte(z)) return null;
-  return Math.max(0, Math.max(0, ausgabe) - zyklusSoll(z, z.datum));
+  return altabschlussUngedeckt(abgeschlossenerZyklus(z), ausgabe);
 }

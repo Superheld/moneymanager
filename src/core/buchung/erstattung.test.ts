@@ -166,6 +166,7 @@ describe("Rückfluss in der Ergebnisrechnung", () => {
         budgets: [],
         ruecklagen: [],
         ausbuchungen: [],
+        ruecklagenzuordnungen: [],
         ist,
         kategorien: [LEBENSMITTEL],
         konten: [konto(0)],

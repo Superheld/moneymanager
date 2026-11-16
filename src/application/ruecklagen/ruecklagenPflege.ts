@@ -2,7 +2,7 @@
 // ist eine Rechnung und kein eigenes Sparvehikel. Wo das Geld liegt, sagt `kontoId`, und
 // der Abgleich passiert beim Anzeigen.
 
-import { FachlicherFehler, hatZiel, type Cent, type Ruecklage } from "../../core";
+import { FachlicherFehler, freieRate, hatZiel, type Cent, type Ruecklage } from "../../core";
 import type { LedgerPort, RuecklagenAusbuchung, RuecklagenRepository } from "../ports";
 
 export interface RuecklagenEingabe {
@@ -55,24 +55,92 @@ function baue(e: RuecklagenEingabe, id: string): Ruecklage {
   };
 }
 
+/**
+ * Legt eine Rücklage an. Sie ist `abschliessend` (die einzige Sorte, die es in der Tabelle
+ * vor Paket 4 gibt), und mit Kategorie findet sie ihre Ausgaben ab ihrem Beginn — eine
+ * neue Rücklage hat keine Vergangenheit, die sich verschieben könnte.
+ *
+ * Die freie Rate steht seit Migration 80 in der Reihe, nicht in `rate`: die erste Zeile
+ * gilt ab dem Monat des Beginns.
+ */
 export async function ruecklageAnlegen(
   repo: RuecklagenRepository,
   e: RuecklagenEingabe,
 ): Promise<Ruecklage> {
-  const r = baue(e, crypto.randomUUID());
+  const gebaut = baue(e, crypto.randomUUID());
+  const r: Ruecklage = {
+    ...gebaut,
+    rate: undefined,
+    art: "abschliessend",
+    findetAb: gebaut.kategorieId ? gebaut.beginn : undefined,
+    raten: gebaut.rate ? [{ abMonat: gebaut.beginn.slice(0, 7), betrag: gebaut.rate }] : [],
+  };
   await repo.speichern(r);
+  if (gebaut.rate) await repo.rateSpeichern(r.id, { abMonat: gebaut.beginn.slice(0, 7), betrag: gebaut.rate });
   return r;
 }
 
-/** Aktualisiert eine Rücklage (ID erhalten). */
+/**
+ * Aktualisiert eine Rücklage (ID erhalten).
+ *
+ * Drei Dinge trägt die Eingabe nicht, und sie dürfen beim Bearbeiten nicht verloren gehen:
+ *
+ *   • `art` und `findetAb` kommen von der gespeicherten Rücklage. Ohne sie fiele ein
+ *     gesetztes Fundfenster beim ersten Speichern auf leer, und die Rücklage fände
+ *     nichts mehr. **Wird eine Kategorie NACHGETRAGEN**, findet sie ab `heute` — nicht ab
+ *     ihrem Beginn, sonst änderte das Nachtragen vergangene Monate.
+ *   • Die freie Rate ist eine Reihe. Eine geänderte Rate gilt ab dem laufenden Monat (oder
+ *     ab dem Beginn, wenn der später liegt); die Monate davor behalten ihre. Eine Rücklage
+ *     ohne Reihe (vor Migration 80, oder nie mit Rate) bekommt ihre erste Zeile ab dem
+ *     Monat des Beginns. `rate` bleibt danach leer: zwei Stellen für dieselbe Zahl wären
+ *     zwei Wahrheiten.
+ */
 export async function ruecklageAktualisieren(
   repo: RuecklagenRepository,
   ruecklageId: string,
   e: RuecklagenEingabe,
+  heute: string,
 ): Promise<Ruecklage> {
-  const r = baue(e, ruecklageId);
+  const gebaut = baue(e, ruecklageId);
+  const vorher = (await repo.alle()).find((r) => r.id === ruecklageId);
+  const reihe = vorher?.raten ?? [];
+  const nachgetragen = !!gebaut.kategorieId && !vorher?.kategorieId;
+  const findetAb = nachgetragen ? heute : vorher?.findetAb;
+
+  let raten = reihe;
+  if (gebaut.rate) {
+    const beginnMonat = gebaut.beginn.slice(0, 7);
+    if (reihe.length === 0) {
+      raten = [{ abMonat: beginnMonat, betrag: gebaut.rate }];
+    } else if (freieRateIm(reihe, heute.slice(0, 7)) !== gebaut.rate) {
+      const ab = heute.slice(0, 7) > beginnMonat ? heute.slice(0, 7) : beginnMonat;
+      raten = [...reihe.filter((x) => x.abMonat !== ab), { abMonat: ab, betrag: gebaut.rate }].sort((a, b) =>
+        a.abMonat.localeCompare(b.abMonat),
+      );
+    }
+  }
+  const r: Ruecklage = {
+    ...gebaut,
+    rate: undefined,
+    art: vorher?.art ?? "abschliessend",
+    findetAb,
+    raten,
+  };
   await repo.speichern(r);
+  for (const x of raten) {
+    if (!reihe.some((y) => y.abMonat === x.abMonat && y.betrag === x.betrag)) await repo.rateSpeichern(ruecklageId, x);
+  }
   return r;
+}
+
+/** Die Rate der Reihe in `monat` — die jüngste, die nicht später gilt; davor die erste. */
+function freieRateIm(reihe: readonly { abMonat: string; betrag: Cent }[], monat: string): Cent {
+  let treffer = reihe[0]?.betrag ?? 0;
+  for (const v of reihe) {
+    if (v.abMonat > monat) break;
+    treffer = v.betrag;
+  }
+  return treffer;
 }
 
 export interface AusbuchenEingabe {
@@ -128,7 +196,11 @@ export async function ruecklageAusbuchen(
     zyklusBeginn: ruecklage.beginn,
     zyklusZiel: ruecklage.ziel,
     zyklusFrist: ruecklage.fristMonate,
-    zyklusRate: ruecklage.rate,
+    // Seit Migration 80 steht die freie Rate in der Reihe. Trägt die nur EINE Zeile, wird
+    // sie hier festgehalten, wie vorher `rate` — die Geschichte rechnet ihr „angespart"
+    // aus dem Abschluss allein. Mit mehreren Zeilen trägt die Reihe den Zyklus selbst
+    // (`zyklen` in `core/ruecklagen/topf.ts`); eine einzelne Zahl wäre dann falsch.
+    zyklusRate: hatZiel(ruecklage) ? undefined : (ruecklage.raten?.length ?? 0) > 1 ? undefined : freieRate(ruecklage) || undefined,
   };
   // Zuerst die Aufzeichnung, dann der Zustandswechsel: bricht es dazwischen ab, steht
   // eine Ausbuchung ohne Folgen da. Andersherum wäre der Zyklus neu gestartet und

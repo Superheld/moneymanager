@@ -157,8 +157,8 @@ export interface RuecklagenRepository {
  * Die ausdrücklichen Zuordnungen (`Ruecklagenzuordnung`, im Kern bei `zustaendigkeit`,
  * weil sie dort gelesen werden).
  *
- * **Im Umbau:** angelegt mit Migration 79 und von keinem Use-Case benutzt. Die Einordnung
- * fragt erst danach, wenn die Rechnung umgestellt ist.
+ * Seit Paket 3 des Umbaus liest jede Sicht, die einordnet, sie mit
+ * (`ruecklagenbestandLaden`): die Einordnung fragt zuerst nach ihr.
  */
 export interface RuecklagenzuordnungRepository {
   alle(): Promise<Ruecklagenzuordnung[]>;

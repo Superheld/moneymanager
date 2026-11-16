@@ -18,6 +18,8 @@
 import {
   einordner,
   einordnungskontext,
+  type Ruecklage,
+  type Ruecklagenzuordnung,
   type Ruecklagenzyklus,
   type Budget,
   type Einordnungsart,
@@ -32,10 +34,21 @@ import {
 export interface Buchungseinordnung {
   readonly art: Einordnungsart;
   /**
-   * Der Name des tragenden Budgets, also der seiner Kategorie — bei `laufend` und `topf`.
-   * Fehlt, wenn die Kategorie des Budgets nicht mehr existiert.
+   * Der Name dessen, was den Anteil trägt: bei `laufend` und bei einer Rücklage aus einem
+   * aufbauenden Budget der Name seiner Kategorie, bei einer Rücklage von Hand ihre
+   * Bezeichnung. Fehlt, wenn es nichts zu benennen gibt (eine alte Ausbuchung) oder die
+   * Kategorie nicht mehr existiert.
    */
   readonly budgetName?: string;
+  /** Bei `ruecklage`: welche Rücklage den Anteil trägt (bei einer alten Ausbuchung keine). */
+  readonly ruecklageId?: string;
+  /**
+   * Bei `ungeplant`: die Rücklagen, zwischen denen zu wählen ist (`Einordnung.wartetAuf`).
+   * Gesetzt heisst: die Buchung wartet auf eine Zuordnung.
+   */
+  readonly wartetAuf?: readonly string[];
+  /** Die Kategorie des Anteils — eine Zuordnung gilt je Anteil, benannt über sie. */
+  readonly kategorieId?: string;
   /**
    * Der Anbieter des zugeordneten Vertrags. Bei `fixkosten` ist er die Begründung; er
    * fehlt dort nur, wenn die Zuordnung auf einen Vertrag zeigt, den es nicht mehr gibt.
@@ -59,6 +72,11 @@ export interface EinordnungssichtEingabe {
   readonly vertraege: readonly Vertrag[];
   /** Roh aus `RuecklagenRepository.ausbuchungen()` — welche Käufe eine Rücklage trug. */
   readonly ausbuchungen: readonly Ruecklagenzyklus[];
+  /** Die laufenden Rücklagen. */
+  readonly ruecklagen: readonly Ruecklage[];
+  /** Die beendeten — eine beendete trägt ihre Kategorie bis zu ihrem Ende. */
+  readonly beendete: readonly Ruecklage[];
+  readonly ruecklagenzuordnungen: readonly Ruecklagenzuordnung[];
 }
 
 const LEER: readonly Buchungseinordnung[] = [];
@@ -84,11 +102,15 @@ export function einordnungJeBuchung(
       konten: e.konten,
       vertragJeBuchung,
       ausbuchungen: e.ausbuchungen,
+      ruecklagen: e.ruecklagen,
+      beendete: e.beendete,
+      ruecklagenzuordnungen: e.ruecklagenzuordnungen,
     }),
   );
 
   const kategorieNamen = new Map(e.kategorien.map((k) => [k.id, k.name]));
-  const budgetNamen = new Map(e.budgets.map((b) => [b.id, kategorieNamen.get(b.kategorieId)]));
+  const budgetNamen = new Map<string, string | undefined>(e.budgets.map((b) => [b.id, kategorieNamen.get(b.kategorieId)]));
+  const ruecklagenNamen = new Map([...e.ruecklagen, ...e.beendete].map((r) => [r.id, r.bezeichnung]));
   const anbieter = new Map(e.vertraege.map((v) => [v.id, v.anbieter]));
 
   const ergebnis = new Map<string, readonly Buchungseinordnung[]>();
@@ -96,15 +118,21 @@ export function einordnungJeBuchung(
     const gesehen = new Set<string>();
     const liste: Buchungseinordnung[] = [];
     for (const x of ordne(buchung)) {
-      // Art UND Budget: zwei Anteile aus zwei verschiedenen Töpfen sind zwei Aussagen.
-      const schluessel = `${x.art}|${x.budgetId ?? ""}`;
+      // Art UND Träger: zwei Anteile aus zwei verschiedenen Rücklagen sind zwei Aussagen —
+      // und ein wartender Anteil ist eine eigene, weil an ihm etwas zu tun ist.
+      const traeger = x.ruecklageId ?? x.budgetId ?? "";
+      const schluessel = `${x.art}|${traeger}|${x.wartetAuf ? `wartet:${x.kategorieId ?? ""}` : ""}`;
       if (gesehen.has(schluessel)) continue;
       gesehen.add(schluessel);
       liste.push({
         art: x.art,
-        budgetName: x.budgetId ? budgetNamen.get(x.budgetId) : undefined,
+        budgetName: x.budgetId ? budgetNamen.get(x.budgetId) : x.ruecklageId ? ruecklagenNamen.get(x.ruecklageId) : undefined,
         vertragsname: x.vertragId ? anbieter.get(x.vertragId) : undefined,
         intern: x.intern,
+        // Nur, wo es etwas sagt: die Rücklage, die trägt, und beim Warten die Wahl samt dem
+        // Anteil, dem sie gilt.
+        ...(x.ruecklageId ? { ruecklageId: x.ruecklageId } : {}),
+        ...(x.wartetAuf ? { wartetAuf: x.wartetAuf, kategorieId: x.kategorieId } : {}),
       });
     }
     ergebnis.set(buchung.id, liste);

@@ -34,6 +34,7 @@ import {
   type KostenZeileId,
   type ErgebnisSchulden,
   type Ruecklage,
+  type Ruecklagenzuordnung,
   blindeFlecken,
   budgetKategorien,
   budgetStand,
@@ -99,7 +100,8 @@ import {
   type VermoegensEingabe,
   type Vermoegensvergleich,
 } from "../core";
-import { belegungssicht } from "./konten/kontobelegung";
+import { belegungssicht, budgetsichtMit } from "./konten/kontobelegung";
+import { ruecklagenbestandLaden } from "./ruecklagen/ruecklagenbestand";
 import type { Umsatz } from "./import";
 import { vertragsbindungLaden } from "./vertraege/vertragszuordnung";
 import { vermoegensbestandLaden } from "./vermoegen/vermoegensichten";
@@ -109,6 +111,7 @@ import type {
   KategorieRepository,
   LedgerPort,
   RuecklagenRepository,
+  RuecklagenzuordnungRepository,
   UmsatzRepository,
   VertragRepository,
   VertragszuordnungRepository,
@@ -133,6 +136,8 @@ export interface AnalyseDeps {
   readonly regelRepo: ZahlungsregelRepository;
   /** Für die Kostensicht: Rücklagen kosten ihre Rate, und ihre Ausbuchungen begrenzen den Rückblick. */
   readonly ruecklagenRepo: RuecklagenRepository;
+  /** Für die Einordnung: die ausdrücklichen Zuordnungen zu einer Rücklage. */
+  readonly ruecklagenzuordnungRepo: RuecklagenzuordnungRepository;
   /** Für „Reicht das Geld?": was die Bank schon kennt, ist vom Stand faktisch weg. */
   readonly vormerkungRepo: VormerkungRepository;
   /** Für die Kostensicht: mit Vorsorgeziel kostet ein Monat dessen Rate, nicht die Überweisung. */
@@ -154,6 +159,10 @@ export interface Analysebasis {
   readonly vertraege: readonly Vertrag[];
   readonly regeln: readonly Zahlungsregel[];
   readonly ruecklagen: readonly Ruecklage[];
+  /** Die beendeten Rücklagen — eine beendete trägt ihre Kategorie bis zu ihrem Ende. */
+  readonly beendete: readonly Ruecklage[];
+  /** Die ausdrücklichen Zuordnungen zu einer Rücklage. */
+  readonly ruecklagenzuordnungen: readonly Ruecklagenzuordnung[];
   /**
    * Die Tage aller Ausbuchungen — auch von Rücklagen, die es nicht mehr gibt. Nur die
    * Daten, weil die Kostensicht nur eines daraus liest: vor welchem Monat ihr eine Rate
@@ -193,7 +202,7 @@ export interface Analysebasis {
 
 export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
   const bestand = vermoegensbestandLaden(deps.vorsorge);
-  const [buchungen, konten, kategorien, umsaetze, bindung, budgets, vertraege, regeln, ruecklagen, ausbuchungen, zuordnungen, vormerkungen, vorsorge] =
+  const [buchungen, konten, kategorien, umsaetze, bindung, budgets, vertraege, regeln, rb, zuordnungen, vormerkungen, vorsorge] =
     await Promise.all([
       deps.ledger.alle(),
       deps.kontoRepo.alle(),
@@ -203,14 +212,14 @@ export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
       deps.budgetRepo.alle(),
       deps.vertragRepo.alle(),
       deps.regelRepo.alle(),
-      deps.ruecklagenRepo.alle(),
-      deps.ruecklagenRepo.ausbuchungen(),
+      ruecklagenbestandLaden(deps.ruecklagenRepo, deps.ruecklagenzuordnungRepo),
       deps.zuordnungRepo.alle(),
       deps.vormerkungRepo.alle(),
       ergebnisvorsorgeLaden(deps.vorsorge, bestand),
     ]);
   const vermoegen = await bestand;
   const { verbindlichkeiten, staende } = vermoegen;
+  const { ruecklagen, beendete, ausbuchungen, ruecklagenzuordnungen } = rb;
   const umsatzZuBuchung = belegZuBuchung(umsaetze);
   const vertragJeBuchung = new Map<string, string>();
   for (const z of zuordnungen) if (z.vertragId) vertragJeBuchung.set(z.istbuchungId, z.vertragId);
@@ -226,6 +235,8 @@ export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
     vertraege,
     regeln,
     ruecklagen,
+    beendete,
+    ruecklagenzuordnungen,
     // Nur Ausbuchungen OHNE festgehaltenen Zyklus lassen Monate unvollständig: seit
     // Migration 76 kennt jede neue ihre Geschichte, und die Rate davor wird gerechnet.
     ausbuchungsdaten: ausbuchungen.filter((a) => !hatGeschichte(a)).map((a) => a.datum),
@@ -383,12 +394,15 @@ export function analyseBefunde(basis: Analysebasis, von: string, bis: string): B
   for (const b of basis.budgets) {
     for (const id of budgetKategorien(b, basis.budgets, basis.kategorien)) budgetierte.add(id);
   }
-  const sicht: BudgetSicht = {
-    buchungen: basis.buchungen,
-    kategorien: basis.kategorien,
-    budgets: basis.budgets,
-    vertragsBuchungen,
-  };
+  const sicht: BudgetSicht = budgetsichtMit(
+    {
+      buchungen: basis.buchungen,
+      kategorien: basis.kategorien,
+      budgets: basis.budgets,
+      vertragsBuchungen,
+    },
+    basis,
+  );
   const budgetJeId = new Map(basis.budgets.map((b) => [b.id, b]));
 
   return {
@@ -577,7 +591,9 @@ function kostenbasis(basis: Analysebasis, heute: string) {
     regeln: basis.regeln,
     budgets: basis.budgets,
     ruecklagen: basis.ruecklagen,
+    beendete: basis.beendete,
     ausbuchungen: basis.ausbuchungen,
+    ruecklagenzuordnungen: basis.ruecklagenzuordnungen,
     ist: basis.buchungen,
     kategorien: basis.kategorien,
     konten: basis.konten,
@@ -799,12 +815,15 @@ export function analyseReichweite(basis: Analysebasis, heute: string): Reichweit
       konten: basis.konten,
       buchungen: [...basis.buchungen],
       ruecklagen: basis.ruecklagen,
-      sicht: {
-        buchungen: [...basis.buchungen],
-        kategorien: basis.kategorien,
-        budgets: basis.budgets,
-        vertragsBuchungen: new Set(basis.vertragJeBuchung.keys()),
-      },
+      sicht: budgetsichtMit(
+        {
+          buchungen: [...basis.buchungen],
+          kategorien: basis.kategorien,
+          budgets: basis.budgets,
+          vertragsBuchungen: new Set(basis.vertragJeBuchung.keys()),
+        },
+        basis,
+      ),
     },
     heute,
   );

@@ -18,12 +18,14 @@
 import { useTranslation } from "react-i18next";
 import type { Buchungseinordnung } from "../../../application";
 
-/** Der Schlüssel des Satzes — zwei Arten haben zwei Begründungen. */
+/** Der Schlüssel des Satzes — drei Arten haben zwei Begründungen. */
 function grundSchluessel(e: Buchungseinordnung): string {
   if (e.art === "fixkosten") return e.vertragsname ? "einordnung.grund.fixkosten" : "einordnung.grund.fixkostenOhneName";
   // Aufs Vorsorgekonto überwiesen oder ohne Gegenbein aus der App hinaus: dieselbe Art,
   // aber wer den Satz liest, will wissen, welcher der beiden Fälle seiner ist.
   if (e.art === "vorsorge") return e.intern ? "einordnung.grund.vorsorgeKonto" : "einordnung.grund.vorsorgeUmschichtung";
+  // Eine Rücklage mit Namen nennt ihn; eine Entnahme über eine alte Ausbuchung hat keinen.
+  if (e.art === "ruecklage" && (e.budgetName || e.ruecklageId)) return "einordnung.grund.ruecklageBenannt";
   return `einordnung.grund.${e.art}`;
 }
 
