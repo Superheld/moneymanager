@@ -123,9 +123,6 @@ export {
 // ---------------------------------------------------------------------------
 export {
   budgetuebersichtLaden,
-  nachArtGetrennt,
-  type Budgetgruppen,
-  type GruppierterStand,
   budgetstaende,
   budgetzeilenZu,
   budgetzeilenImMonat,
@@ -309,6 +306,10 @@ export {
   ruecklagenLaden,
   // Sortiert eine schon geladene Auswahl für EINE Rücklage — wie `budgetstaende(sicht, am)`.
   buchungswahlFuer,
+  // Verlauf und Buchungen EINER Rücklage aus der schon geladenen Sicht — wie `budgetVerlauf`.
+  ruecklagenVerlauf,
+  ruecklagenzeilenImMonat,
+  type Ruecklagenzeile,
   type Ausbuchungszeile,
   type Buchungswahl,
   type Buchungsvorschlag,
@@ -321,6 +322,7 @@ export {
   ruecklageAktualisieren,
   ruecklageAusbuchen,
   ruecklageLoeschen,
+  ruecklageRateLoeschen,
   type RuecklagenEingabe,
 } from "./ruecklagen/ruecklagenPflege";
 export {
@@ -367,7 +369,7 @@ export type { AbrufBefund, Abrufergebnis, DepotBefund } from "./fints/abrufAusfu
 export type { Abrufstand, Zugangsstand } from "./fints/abrufstand";
 export type { Belegungssicht } from "./konten/kontobelegung";
 export type { GeldAufKonto, GeldJeKonto, RuecklageOhneKonto } from "./ruecklagen/geldJeKonto";
-export type { Anspruch, Anspruchsart, Belegungsposten, Kontobelegung } from "../core";
+export type { Anspruch, Belegungsposten, Kontobelegung, Ruecklagenart } from "../core";
 // Was das Bankprofil hergibt, wird GERECHNET — also nicht in der Oberfläche: welcher
 // Speicherzeitraum gilt, wenn zwei Formate verschiedene nennen, und ob ein Konto einen
 // Vorfall überhaupt darf, sind Entscheidungen mit genau einer richtigen Antwort.

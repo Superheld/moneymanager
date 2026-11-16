@@ -33,13 +33,22 @@
 // auf die Buchungen des Monats. Benutzt wird sie vom Ausblick der Analyse, der nach dem
 // Saldo fragt.
 //
-// BUDGETS STEHEN IN ZWEI ZEILEN, monatlich und aufbauend — nach der Art JEDES Budgets,
-// wie in der Budgetliste (`nachArtGetrennt`), damit dasselbe Budget in Karte und Liste
-// in derselben Gruppe steht.
+// BUDGETS UND FORTLAUFENDE RÜCKLAGEN STEHEN IN ZWEI ZEILEN. Bis Migration 81 waren es
+// die beiden Arten eines Budgets (monatlich, aufbauend); das aufbauende ist seither eine
+// fortlaufende Rücklage und steht in derselben Zeile wie zuvor (`budgetsAufbauend`).
 
 import { addMonate, parseIso, toIso } from "./basis/datum";
 import type { Cent } from "./basis/geld";
-import { geglaetteterMonatsabfluss, budgetBuchungen, type Budget, type BudgetSicht } from "./budgets/budget";
+import {
+  geglaetteterMonatsabfluss,
+  budgetBuchungen,
+  getrageneBuchungen,
+  type Budget,
+  type BudgetSicht,
+  type Verbrauchsposten,
+} from "./budgets/budget";
+import type { Ruecklage } from "./ruecklagen/ruecklage";
+import { planrateIm, ruecklagenart } from "./ruecklagen/topf";
 import { istInterneUmbuchung } from "./buchung/historie";
 import type { Kategorie } from "./kategorien/kategorie";
 import { kategorieAnteile, type IstBuchung } from "./buchung/istbuchung";
@@ -130,6 +139,11 @@ const BETRAGS_TOLERANZ = 0.15;
 export interface MonatsAusblickEingabe {
   readonly regeln: readonly Zahlungsregel[];
   readonly budgets: readonly Budget[];
+  /**
+   * Die laufenden Rücklagen; gelesen werden nur die fortlaufenden (Zeile
+   * `budgetsAufbauend`). Fehlt die Angabe, gibt es diese Zeile nicht.
+   */
+  readonly ruecklagen?: readonly Ruecklage[];
   readonly ist: readonly IstBuchung[];
   readonly kategorien: readonly Kategorie[];
   /**
@@ -202,13 +216,18 @@ export function monatsAusblick(e: MonatsAusblickEingabe): MonatsAusblick {
   // Was noch keiner Zeile gehört — die Basis für Budgets und Sonstiges.
   const offenesIst = istImMonat.filter((b) => !verbraucht.has(b.id));
 
+  // Nur die fortlaufenden Rücklagen: sie stehen hier, wo bis Migration 81 die aufbauenden
+  // Budgets standen. Die abschliessenden bleiben aus der Sicht, wie vorher die Rücklagen
+  // von Hand — der Ausblick rechnet unverändert.
+  const fortlaufende = (e.ruecklagen ?? []).filter((r) => ruecklagenart(r) === "fortlaufend" && !r.beendetAm);
   const sicht: BudgetSicht = {
     buchungen: offenesIst,
     kategorien: e.kategorien,
     budgets: e.budgets,
     vertragsBuchungen: e.vertragsBuchungen,
+    ruecklagen: fortlaufende,
   };
-  const { zeilen: budgetZeilen, getragen } = budgetsZeilen(sicht, von, bis, zukunft);
+  const { zeilen: budgetZeilen, getragen } = budgetsZeilen(sicht, fortlaufende, von, bis, zukunft);
 
   // Was gebucht, aber von keiner Plan-Zeile erfasst ist, kommt EINZELN dazu — je Buchung
   // ein Posten. Früher stand hier eine Summe pro Zeile („weitere Einnahmen: 342,10"),
@@ -235,7 +254,7 @@ export function monatsAusblick(e: MonatsAusblickEingabe): MonatsAusblick {
     vertraege,
     budgetZeilen.monatlich,
   ];
-  // Aufbauende Budgets und Umschichtung nur, wenn es sie gibt: Zeilen voller Nullen
+  // Fortlaufende Rücklagen und Umschichtung nur, wenn es sie gibt: Zeilen voller Nullen
   // wären bei einem Haushalt ohne sie Lärm.
   if (budgetZeilen.aufbauend.posten.length > 0) zeilen.push(budgetZeilen.aufbauend);
   if (umschichtung.plan !== 0 || weitereUmschichtung.length > 0) {
@@ -351,44 +370,63 @@ function zeileAusRegeln(
 }
 
 /**
- * Budgets: geplant der geglättete Monatsanteil, gebucht der Verbrauch DES MONATS —
- * auch bei jährlicher Periode. Sonst stünde ein Zwölftel Plan gegen einen Jahresverbrauch.
+ * Budgets und fortlaufende Rücklagen: geplant der geglättete Monatsanteil, gebucht der
+ * Verbrauch DES MONATS. Sonst stünde ein Zwölftel Plan gegen einen Jahresverbrauch.
+ *
+ * Die Zeile `budgetsAufbauend` trägt seit Migration 81 die fortlaufenden Rücklagen — die
+ * früheren aufbauenden Budgets —, nach derselben Regel wie damals: Plan ist die Rate der
+ * Reihe in diesem Monat, Ist, was die Rücklage im Monat getragen hat. Die ID bleibt; sie
+ * ist ein Schlüssel, kein Name. Abschliessende Rücklagen stehen nicht darin, wie vorher.
  */
 function budgetsZeilen(
   sicht: BudgetSicht,
+  fortlaufende: readonly Ruecklage[],
   von: string,
   bis: string,
   zukunft: boolean,
 ): { zeilen: { monatlich: AusblickZeile; aufbauend: AusblickZeile }; getragen: Set<string> } {
-  const { budgets } = sicht;
+  const monat = von.slice(0, 7);
   // Welche ANTEILE ein Budget trägt, wird hier festgehalten: „Sonstiges" nimmt genau den
   // Rest. Ohne diese Menge verschwände eine Vertragszahlung auf einer Budgetkategorie
   // aus beiden Zeilen — das Budget nimmt sie nicht (Vertrag), Sonstiges nimmt sie nicht
   // (Budgetkategorie) —, und die Ist-Spalte summierte nicht mehr auf das Gebuchte.
   const getragen = new Set<string>();
-  const posten = budgets
-    .map((b): AusblickPosten & { art: Budget["art"] } => {
-      const beitraege = budgetBuchungen(sicht, b, von, bis);
-      for (const p of beitraege) getragen.add(`${p.buchung.id}#${p.anteil}`);
-      // `|| 0` fängt die negative Null: `-0` formatiert sich als „−0,00" und liest sich
-      // wie eine Ausgabe, die es nicht gab.
-      const roh = beitraege.reduce((sum, p) => sum + p.betrag, 0);
-      const verbrauch = zukunft ? null : -roh || 0;
-      return {
-        schluessel: b.id,
-        // Der Name der Kategorie steht nicht im Budget — die Oberfläche löst ihn auf.
-        bezeichnung: b.kategorieId,
-        // Der Monat der Zeile: seit der Betrag versioniert ist, plant ein Budget im
-        // September womöglich mit einer anderen Rate als im Juli.
-        plan: geglaetteterMonatsabfluss(b, von.slice(0, 7)),
-        ist: verbrauch,
-        status: verbrauch == null || verbrauch === 0 ? "offen" : "gebucht",
-        art: b.art === "aufbauend" ? "aufbauend" : "monatlich",
-      };
-    })
+  // `|| 0` fängt die negative Null: `-0` formatiert sich als „−0,00" und liest sich
+  // wie eine Ausgabe, die es nicht gab.
+  const verbrauchVon = (beitraege: readonly Verbrauchsposten[]): Cent | null => {
+    for (const p of beitraege) getragen.add(`${p.buchung.id}#${p.anteil}`);
+    const roh = beitraege.reduce((sum, p) => sum + p.betrag, 0);
+    return zukunft ? null : -roh || 0;
+  };
+  type Roh = { art: "monatlich" | "aufbauend"; schluessel: string; kategorieId: string; plan: Cent; ist: Cent | null };
+  const roh: Roh[] = [
+    ...sicht.budgets.map((b): Roh => ({
+      art: "monatlich",
+      schluessel: b.id,
+      kategorieId: b.kategorieId,
+      // Der Monat der Zeile: seit der Betrag versioniert ist, plant ein Budget im
+      // September womöglich mit einer anderen Rate als im Juli.
+      plan: geglaetteterMonatsabfluss(b, monat),
+      ist: verbrauchVon(budgetBuchungen(sicht, b, von, bis)),
+    })),
+    ...fortlaufende.map((r): Roh => ({
+      art: "aufbauend",
+      schluessel: r.id,
+      kategorieId: r.kategorieId ?? "",
+      plan: -planrateIm(r, monat) || 0,
+      ist: verbrauchVon(getrageneBuchungen(sicht, r.id, von, bis)),
+    })),
+  ];
+  const posten = roh
+    .map(({ kategorieId, ...p }): AusblickPosten & { art: Roh["art"] } => ({
+      ...p,
+      // Der Name der Kategorie steht nicht am Posten — die Oberfläche löst ihn auf.
+      bezeichnung: kategorieId,
+      status: p.ist == null || p.ist === 0 ? "offen" : "gebucht",
+    }))
     .sort((a, b) => a.plan - b.plan);
 
-  const zeile = (id: AusblickZeileId, art: Budget["art"]): AusblickZeile => {
+  const zeile = (id: AusblickZeileId, art: Roh["art"]): AusblickZeile => {
     const drin = posten.filter((p) => p.art === art).map(({ art: _art, ...p }) => p);
     return {
       id,
@@ -402,7 +440,6 @@ function budgetsZeilen(
     getragen,
   };
 }
-
 
 /** Hängt die ungeplanten Buchungen einer Zeile als eigene Posten an. */
 function mitEinzelposten(zeile: AusblickZeile, weitere: readonly AusblickPosten[]): AusblickZeile {

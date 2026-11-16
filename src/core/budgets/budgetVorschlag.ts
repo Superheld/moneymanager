@@ -12,16 +12,17 @@
 // Deshalb: Vorschlag = die übliche Monatssumme MINUS der vertraglich gebundene Teil,
 // und nur, wenn davon genug übrig bleibt.
 //
-// „Üblich" heißt dabei zweierlei, und daran entscheidet sich auch die vorgeschlagene
-// BUDGETART:
+// „Üblich" heißt dabei zweierlei, und daran entscheidet sich, WAS vorgeschlagen wird:
 //
 //   • Eine Kategorie, in der jeden Monat etwas passiert, bekommt einen MONATLICHEN
 //     Vorschlag über den Median. Der Median und nicht der Durchschnitt, weil ein
 //     einzelner teurer Monat den Rahmen sonst dauerhaft hochzöge.
 //   • Eine Kategorie, in der nur selten etwas passiert — die Jahresversicherung, die
-//     Autoreparatur —, bekommt einen AUFBAUENDEN Vorschlag über den Durchschnitt,
+//     Autoreparatur —, bekommt den Vorschlag einer RÜCKLAGE über den Durchschnitt,
 //     leere Monate eingerechnet. Ein monatlicher Rahmen wäre hier sinnlos: elf Monate
-//     bliebe er unberührt und im zwölften risse er um ein Vielfaches.
+//     bliebe er unberührt und im zwölften risse er um ein Vielfaches. Bis Migration 81
+//     hiess das ein aufbauendes Budget; es ist dieselbe Rechnung, angelegt wird eine
+//     Rücklage, die weiterläuft.
 //
 // Vorher fiel die zweite Sorte still ganz heraus. Nicht, weil ihr Median 0 gewesen
 // wäre — leere Monate stehen gar nicht erst in der Reihe —, sondern weil zu wenige
@@ -29,23 +30,25 @@
 // trennt jetzt die beiden Arten, statt die eine zu verschlucken.
 
 import type { Cent } from "../basis/geld";
-import type { Budgetart } from "./budget";
 import type { Kategorie } from "../kategorien/kategorie";
 import { kategorieAnteile, type IstBuchung } from "../buchung/istbuchung";
+
+/** Was vorgeschlagen wird: ein monatliches Budget oder eine Rücklage, die weiterläuft. */
+export type Vorschlagsart = "monatlich" | "ruecklage";
 
 export interface Budgetvorschlag {
   /** Die Hauptkategorie, für die der Rahmen gilt. */
   readonly kategorieId: string;
   readonly name: string;
   /**
-   * Welche Budgetart vorgeschlagen wird. Sie entscheidet mit, wie `proMonat`
-   * zustande kommt — siehe Kopf der Datei.
+   * Was vorgeschlagen wird. Es entscheidet mit, wie `proMonat` zustande kommt — siehe
+   * Kopf der Datei.
    */
-  readonly art: Budgetart;
+  readonly art: Vorschlagsart;
   /**
    * Was die Kategorie im Monat gekostet hat, positiv.
    *
-   * Bei `monatlich` der MEDIAN der Monate mit Ausgaben. Bei `aufbauend` der
+   * Bei `monatlich` der MEDIAN der Monate mit Ausgaben. Bei `ruecklage` der
    * DURCHSCHNITT über den ganzen beobachteten Zeitraum, leere Monate eingerechnet:
    * genau die sind der Grund, warum sich hier etwas ansammeln soll.
    */
@@ -61,7 +64,7 @@ export interface Budgetvorschlag {
    * 4 = ein Monat war viermal so teuer wie üblich.
    *
    * Aussagekräftig ist das nur bei `monatlich` — dort sagt es, wie oft der Rahmen
-   * reißen wird. Bei `aufbauend` ist ein hoher Wert der Normalfall und keine Warnung:
+   * reißen wird. Bei `ruecklage` ist ein hoher Wert der Normalfall und keine Warnung:
    * der Rahmen sammelt sich ja gerade an, um den einen teuren Monat zu tragen.
    */
   readonly schwankung: number;
@@ -122,10 +125,10 @@ function gerundet(cent: Cent): Cent {
  * erfasst). Sie zählen in den Median hinein — sie sind ja echte Ausgaben —, werden aber
  * vom Vorschlag abgezogen: was ein Vertrag abbucht, steuert kein Budget.
  *
- * `bestehende` sind Kategorien, für die schon ein Budget existiert; sie werden
- * übersprungen, damit die Vorschlagskarte nicht anbietet, was es längst gibt.
+ * `bestehende` sind Kategorien, an denen schon ein Budget oder eine Rücklage hängt; sie
+ * werden übersprungen, damit die Vorschlagskarte nicht anbietet, was es längst gibt.
  *
- * Je Kategorie kommt höchstens EIN Vorschlag heraus, monatlich oder aufbauend — nie
+ * Je Kategorie kommt höchstens EIN Vorschlag heraus, monatlich oder Rücklage — nie
  * beide. Welcher, entscheidet die Zahl der Monate mit Ausgaben (siehe Kopf).
  *
  * `vonRuecklagen` sind die Anteile (`buchungId#index`), die eine Rücklage über ihre
@@ -204,7 +207,7 @@ export function budgetvorschlaege(
     const belegte = werte.length;
     if (belegte === 0) continue;
 
-    let art: Budgetart;
+    let art: Vorschlagsart;
     let proMonat: Cent;
     /** Über wie viele Monate gemittelt wird — auch für den Vertragsanteil. */
     let teiler: number;
@@ -222,7 +225,7 @@ export function budgetvorschlaege(
       // Bruchteil dessen, was er in Wirklichkeit jeden Monat kostet.
       const erstes = beobachteteMonate.findIndex((m) => e.monate.has(m));
       if (erstes >= beobachteteMonate.length - belegte) continue;
-      art = "aufbauend";
+      art = "ruecklage";
       teiler = beobachteteMonate.length;
       proMonat = Math.round(werte.reduce((s, w) => s + w, 0) / teiler);
     }

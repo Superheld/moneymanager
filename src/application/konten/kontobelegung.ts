@@ -1,21 +1,20 @@
 // Kontobelegung laden — wem das Geld auf jedem Konto gehört, fertig gerechnet.
 //
 // Die Rechnung selbst steht in `core/konten/kontobelegung`; hier wird nur zusammengetragen,
-// WER Ansprüche hat. Das sind heute zwei: Rücklagen (ihr Stand über null — das Soll,
-// abzüglich dessen, was sie seit ihrem Fundfenster über die Kategorie gefunden haben) und
-// aufbauende Budgets (ihr Rest). Wer einen dritten einführt, trägt ihn HIER ein — und nur hier: die
-// Rücklagen-Deckung holt ihre fremden Ansprüche über `budgetAnspruecheLaden` von derselben
-// Stelle, damit sie nicht an einem Konto anders rechnet als die Kontenansicht, und die
-// Karte „Wo das Geld liegt" im Bereich Rücklagen liest `belegungssicht` selbst
-// (`application/ruecklagen/geldJeKonto.ts`).
+// WER Ansprüche hat. Seit Migration 81 ist das nur noch eine Sorte: die Rücklagen (ihr
+// Stand über null — das Soll, abzüglich dessen, was sie seit ihrem Fundfenster über die
+// Kategorie gefunden haben). Bis dahin kamen die Reste der aufbauenden Budgets als zweite
+// dazu; die sind jetzt selbst Rücklagen der Sorte `fortlaufend`. Wer einen neuen Anspruch
+// einführt, trägt ihn HIER ein — und nur hier: die Rücklagen-Deckung holt ihren Bestand
+// über `anspruchsbestandLaden` von derselben Stelle, damit sie nicht an einem Konto anders
+// rechnet als die Kontenansicht, und die Karte „Wo das Geld liegt" im Bereich Rücklagen
+// liest `belegungssicht` selbst (`application/ruecklagen/geldJeKonto.ts`).
 
 import {
-  aufbauendeAnsprueche,
   kontobelegung,
   realerKontostand,
   ruecklagenAnsprueche,
   ruecklagenEntnahmenAus,
-  type Anspruch,
   type Anspruchsbestand,
   type Budget,
   type BudgetSicht,
@@ -43,8 +42,8 @@ export interface BudgetanspruchDeps {
   readonly zuordnungRepo: VertragszuordnungRepository;
   /**
    * Die Rücklagen gehören dazu, seit eine Rücklage ihre Ausgaben über die Kategorie findet:
-   * eine auf einer Unterkategorie nimmt dem aufbauenden Budget darüber seine Buchungen ab,
-   * wie in der Ergebnisrechnung.
+   * was sie gefunden hat, beansprucht sie nicht mehr, und ein monatliches Budget darüber
+   * verliert die Buchungen an sie.
    */
   readonly ruecklagenRepo: RuecklagenRepository;
   readonly ruecklagenzuordnungRepo: RuecklagenzuordnungRepository;
@@ -55,9 +54,9 @@ export interface KontobelegungDeps extends BudgetanspruchDeps {
 }
 
 /**
- * Was der Anspruch einer Rücklage von Hand ausser ihr selbst braucht: was sie über ihre
- * Kategorie gefunden hat (dieselbe Auswahl wie der Verbrauch eines Budgets) und die
- * Abschlüsse, die das Fenster ihres laufenden Zyklus begrenzen.
+ * Was der Anspruch einer Rücklage ausser ihr selbst braucht: was sie über ihre Kategorie
+ * gefunden hat (dieselbe Auswahl wie der Verbrauch eines Budgets) und die Abschlüsse, die
+ * das Fenster ihres laufenden Zyklus begrenzen.
  */
 export function anspruchsbestand(sicht: BudgetSicht): Anspruchsbestand {
   return { entnahmen: ruecklagenEntnahmenAus(sicht), abschluesse: sicht.ausbuchungen ?? [] };
@@ -74,25 +73,25 @@ export function budgetsichtMit(
 export interface Belegungssicht {
   /** Je Konto — auch die ohne Anspruch. */
   readonly jeKonto: ReadonlyMap<string, Kontobelegung>;
-  /** Wie ein Anspruch heisst: Bezeichnung der Rücklage bzw. Kategorie des Budgets. */
+  /** Wie ein Anspruch heisst: die Bezeichnung der Rücklage. */
   readonly namen: ReadonlyMap<string, string>;
 }
 
 /**
- * Die Ansprüche der aufbauenden Budgets samt ihrer Namen.
+ * Der Bestand, den der Anspruch einer Rücklage braucht, samt der Budgets.
  *
- * Eigene Funktion, weil die Rücklagen-Deckung genau diese braucht — und sie bekommen soll,
- * ohne die Regel „welche Budgets beanspruchen was" ein zweites Mal aufzuschreiben.
+ * Eigene Funktion, weil die Rücklagen-Deckung genau diesen braucht — und ihn bekommen
+ * soll, ohne die Regel „was hat eine Rücklage gefunden" ein zweites Mal aufzuschreiben.
+ * Bis Migration 81 hiess sie `budgetAnspruecheLaden` und lieferte die Ansprüche der
+ * aufbauenden Budgets mit.
  */
-export async function budgetAnspruecheLaden(
-  deps: BudgetanspruchDeps,
-  heute: string,
-): Promise<{
-  ansprueche: Anspruch[];
-  namen: Map<string, string>;
-  budgets: readonly Budget[];
-  /** Für den Anspruch der Rücklagen von Hand (`anspruchsbestand`). */
+export async function anspruchsbestandLaden(deps: BudgetanspruchDeps): Promise<{
+  /** Für den Anspruch der Rücklagen (`anspruchsbestand`). */
   bestand: Anspruchsbestand;
+  /** Mitgegeben für die Hinweise im Dialog einer Rücklage (ein Budget an der Kategorie). */
+  budgets: readonly Budget[];
+  /** Die Sicht dahinter — für den Verlauf einer Rücklage und ihre Buchungen je Monat. */
+  sicht: BudgetSicht;
 }> {
   const [buchungen, kategorien, budgets, vertragsBuchungen, rb] = await Promise.all([
     deps.ledger.alle(),
@@ -101,22 +100,14 @@ export async function budgetAnspruecheLaden(
     vertragsBuchungenLaden(deps.zuordnungRepo),
     ruecklagenbestandLaden(deps.ruecklagenRepo, deps.ruecklagenzuordnungRepo),
   ]);
-  const kategorie = new Map(kategorien.map((k) => [k.id, k.name]));
   const sicht = budgetsichtMit({ buchungen, kategorien, budgets, vertragsBuchungen }, rb);
-  return {
-    bestand: anspruchsbestand(sicht),
-    ansprueche: aufbauendeAnsprueche(sicht, heute),
-    namen: new Map(budgets.map((b) => [b.id, kategorie.get(b.kategorieId) ?? "?"])),
-    // Mitgegeben, weil der Bereich Rücklagen die aufbauenden auch für Bedarf und
-    // Rücklagenkonten braucht — und sie sonst ein zweites Mal läse.
-    budgets,
-  };
+  return { bestand: anspruchsbestand(sicht), budgets, sicht };
 }
 
 /**
  * Die Belegung aus schon geladenen Daten — für Sichten, die ohnehin alles in der Hand
  * haben (die Übersicht). Dieselbe Zusammenstellung der Ansprüche wie in
- * `kontobelegungLaden`: wer einen dritten Anspruch einführt, trägt ihn HIER ein.
+ * `kontobelegungLaden`: wer einen neuen Anspruch einführt, trägt ihn HIER ein.
  */
 export function belegungssicht(
   e: {
@@ -127,15 +118,10 @@ export function belegungssicht(
   },
   heute: string,
 ): Belegungssicht {
-  const kategorie = new Map(e.sicht.kategorien.map((k) => [k.id, k.name]));
-  const namen = new Map(e.sicht.budgets.map((b) => [b.id, kategorie.get(b.kategorieId) ?? "?"]));
-  for (const r of e.ruecklagen) namen.set(r.id, r.bezeichnung);
+  const namen = new Map(e.ruecklagen.map((r) => [r.id, r.bezeichnung]));
   const staende = new Map(e.konten.map((k) => [k.id, realerKontostand(k, e.buchungen)]));
   return {
-    jeKonto: kontobelegung(staende, [
-      ...ruecklagenAnsprueche(e.ruecklagen, heute, anspruchsbestand(e.sicht)),
-      ...aufbauendeAnsprueche(e.sicht, heute),
-    ]),
+    jeKonto: kontobelegung(staende, ruecklagenAnsprueche(e.ruecklagen, heute, anspruchsbestand(e.sicht))),
     namen,
   };
 }

@@ -17,7 +17,6 @@ import i18n from "../../../i18n/i18n";
 import { frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import { RuecklagenScreen } from "./RuecklagenScreen";
 import { sqliteRuecklagenRepository } from "../../persistence/sqliteRuecklagenRepository";
-import { sqliteBudgetRepository } from "../../persistence/sqliteBudgetRepository";
 import { sqliteKategorieRepository, sqliteZahlungskontoRepository } from "../../persistence/sqliteStammdatenRepositories";
 
 let db: Database;
@@ -48,10 +47,9 @@ async function bestand() {
   await sqliteKategorieRepository.speichern({ id: "kat-q", name: "Rubrik Q", defaultCharakter: "Aufwand" });
   await sqliteRuecklagenRepository.speichern({ id: "r-kalmbach", bezeichnung: "Kalmbach", rate: 10000, beginn: monatsanfang(3), kontoId: "tg" });
   await sqliteRuecklagenRepository.speichern({ id: "r-wendhausen", bezeichnung: "Wendhausen", rate: 2000, beginn: monatsanfang(2) });
-  await sqliteBudgetRepository.speichern({
-    id: "b-q", kategorieId: "kat-q", kontoId: "spar", art: "aufbauend", start: monatsanfang(0),
-    betraege: [{ abMonat: monatsanfang(0).slice(0, 7), betrag: 30000 }],
-  });
+  // Läuft weiter — bis Migration 81 ein aufbauendes Budget.
+  await sqliteRuecklagenRepository.speichern({ id: "b-q", bezeichnung: "Rubrik Q", kategorieId: "kat-q", kontoId: "spar", art: "fortlaufend", beginn: monatsanfang(0) });
+  await sqliteRuecklagenRepository.rateSpeichern("b-q", { abMonat: monatsanfang(0).slice(0, 7), betrag: 30000 });
 }
 
 /** Die Karte zu einem Titel — der Titel sitzt drei Ebenen unter ihrer Fläche. */
@@ -78,10 +76,8 @@ describe("Rücklagen — Kennzahlen über beide Formen", () => {
   it("steht auch da, wenn es nur Rücklagen über die Kategorie gibt", async () => {
     await sqliteZahlungskontoRepository.speichern({ id: "spar", bezeichnung: "Sparkonto", typ: "Tagesgeld", klasse: "sparen", inhaberIds: [], saldo: 50000 });
     await sqliteKategorieRepository.speichern({ id: "kat-z", name: "Rubrik Z", defaultCharakter: "Aufwand" });
-    await sqliteBudgetRepository.speichern({
-      id: "b-z", kategorieId: "kat-z", kontoId: "spar", art: "aufbauend", start: monatsanfang(0),
-      betraege: [{ abMonat: monatsanfang(0).slice(0, 7), betrag: 12000 }],
-    });
+    await sqliteRuecklagenRepository.speichern({ id: "b-z", bezeichnung: "Rubrik Z", kategorieId: "kat-z", kontoId: "spar", art: "fortlaufend", beginn: monatsanfang(0) });
+    await sqliteRuecklagenRepository.rateSpeichern("b-z", { abMonat: monatsanfang(0).slice(0, 7), betrag: 12000 });
     rendere(<RuecklagenScreen />);
     const stand = await karte(i18n.t("ruecklagen.standTitel"));
     await waitFor(() => expect(stand.textContent).toMatch(/120,00/));

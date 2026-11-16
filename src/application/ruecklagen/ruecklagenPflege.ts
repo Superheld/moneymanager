@@ -1,8 +1,22 @@
 // Use-Cases rund um die Rücklagen. Die Rücklage steht für sich: was zurückgelegt ist,
 // ist eine Rechnung und kein eigenes Sparvehikel. Wo das Geld liegt, sagt `kontoId`, und
 // der Abgleich passiert beim Anzeigen.
+//
+// Seit Paket 4 des Umbaus (ADR-0006) gibt es EINE Pflege für beide Sorten — die Rücklage,
+// die weiterläuft (`fortlaufend`, bis Migration 81 das aufbauende Budget), und die, die
+// abgeschlossen wird (`abschliessend`). Drei Regeln gelten für beide:
+//
+//   • **Die Kategorie ist Pflicht** — beim Anlegen und bei jedem Speichern. Eine Rücklage
+//     ohne Kategorie aus der Zeit davor bleibt gültig und rechnet wie vorher, bis jemand
+//     sie bearbeitet (ADR-0006, „Konservativ gelöst"); erfunden wird keine.
+//   • **Ziel mit Frist ODER Rate**, nie beides. Die Rate ist eine Reihe mit dem Monat, ab
+//     dem sie gilt — wie der Budgetbetrag: eine Änderung schreibt die Vergangenheit nicht um.
+//   • **Die Sorte steht mit dem Anlegen fest.** Sie entscheidet, ob `findet_ab` leer
+//     „ohne Anfang" oder „findet nichts" heisst, und wie der Stand eines Monats zählt; ein
+//     Wechsel änderte vergangene Monate. Eine Rücklage, die nicht mehr weiterlaufen soll,
+//     ist eine neue Frage — sie gehört ins Abschliessen (Paket 5), nicht in diesen Dialog.
 
-import { FachlicherFehler, freieRate, hatZiel, type Cent, type Ruecklage } from "../../core";
+import { FachlicherFehler, freieRate, hatZiel, istCent, type Cent, type Ruecklage, type Ruecklagenart } from "../../core";
 import type { BudgetRepository, LedgerPort, RuecklagenAusbuchung, RuecklagenRepository } from "../ports";
 
 /**
@@ -30,10 +44,19 @@ export interface RuecklagenEingabe {
   fristMonate?: number;
   /** Freie Monatsrate in Minor Units — die Alternative zu Ziel und Frist. */
   rate?: Cent;
+  /**
+   * Ab welchem Monat (`YYYY-MM`) eine GEÄNDERTE Rate gilt — wie beim Budgetbetrag. Fehlt
+   * er, der laufende Monat (bzw. der Monat des Beginns, wenn der später liegt). Beim
+   * Anlegen gilt die Rate ab dem Beginn; dort wird er nicht gelesen.
+   */
+  rateAb?: string;
   beginn: string; // ISO
+  /** Pflicht beim Anlegen und beim Speichern (Kopf der Datei). */
   kategorieId?: string;
   /** Zahlungskonto, auf dem die Rücklage tatsächlich liegt. */
   kontoId?: string;
+  /** Die Sorte; nur beim Anlegen gelesen, Vorgabe `abschliessend`. */
+  art?: Ruecklagenart;
 }
 
 /**
@@ -46,6 +69,7 @@ export interface RuecklagenEingabe {
 function baue(e: RuecklagenEingabe, id: string): Ruecklage {
   const bezeichnung = e.bezeichnung.trim();
   if (!bezeichnung) throw new FachlicherFehler("bezeichnung.fehlt");
+  if (!e.kategorieId) throw new FachlicherFehler("ruecklage.kategorieFehlt");
 
   // Runden VOR dem Prüfen: sonst besteht 0.4 die Schwelle und wird danach zu 0 — die
   // Rücklage teilt dann durch null, und aus Infinity wird an anderer Stelle NaN.
@@ -56,10 +80,12 @@ function baue(e: RuecklagenEingabe, id: string): Ruecklage {
   if (mitZiel && mitRate) throw new FachlicherFehler("ruecklage.zielOderRate");
   if (!mitZiel && !mitRate) throw new FachlicherFehler("ruecklage.zielOderRate");
   if (mitZiel) {
-    if (!((e.ziel ?? 0) > 0)) throw new FachlicherFehler("ziel.groesserNull");
+    if (!((e.ziel ?? 0) > 0) || !istCent(e.ziel as Cent)) throw new FachlicherFehler("ziel.groesserNull");
     if (!((fristMonate ?? 0) > 0)) throw new FachlicherFehler("frist.groesserNull");
   }
+  if (mitRate && !istCent(e.rate as Cent)) throw new FachlicherFehler("rahmen.groesserNull");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(e.beginn)) throw new FachlicherFehler("beginn.ungueltig");
+  if (e.rateAb != null && !/^\d{4}-\d{2}$/.test(e.rateAb)) throw new FachlicherFehler("ruecklage.rateAbUngueltig");
 
   return {
     id,
@@ -68,15 +94,17 @@ function baue(e: RuecklagenEingabe, id: string): Ruecklage {
     fristMonate: mitZiel ? fristMonate : undefined,
     rate: mitRate ? e.rate : undefined,
     beginn: e.beginn,
-    kategorieId: e.kategorieId || undefined,
+    kategorieId: e.kategorieId,
     kontoId: e.kontoId || undefined,
   };
 }
 
 /**
- * Legt eine Rücklage an. Sie ist `abschliessend` (die einzige Sorte, die es in der Tabelle
- * vor Paket 4 gibt), und mit Kategorie findet sie ihre Ausgaben ab ihrem Beginn — eine
- * neue Rücklage hat keine Vergangenheit, die sich verschieben könnte.
+ * Legt eine Rücklage an, in der gewählten Sorte (ohne Angabe `abschliessend`). Mit ihrer
+ * Kategorie findet sie ihre Ausgaben ab ihrem Beginn — eine neue Rücklage hat keine
+ * Vergangenheit, die sich verschieben könnte. Das gilt auch für eine, die weiterläuft:
+ * „ohne Anfang" (`findet_ab` leer) haben nur die früheren aufbauenden Budgets, weil es
+ * für sie vorher galt.
  *
  * Die freie Rate steht seit Migration 80 in der Reihe, nicht in `rate`: die erste Zeile
  * gilt ab dem Monat des Beginns.
@@ -91,8 +119,8 @@ export async function ruecklageAnlegen(
   const r: Ruecklage = {
     ...gebaut,
     rate: undefined,
-    art: "abschliessend",
-    findetAb: gebaut.kategorieId ? gebaut.beginn : undefined,
+    art: e.art ?? "abschliessend",
+    findetAb: gebaut.beginn,
     raten: gebaut.rate ? [{ abMonat: gebaut.beginn.slice(0, 7), betrag: gebaut.rate }] : [],
   };
   await repo.speichern(r);
@@ -107,13 +135,14 @@ export async function ruecklageAnlegen(
  *
  *   • `art` und `findetAb` kommen von der gespeicherten Rücklage. Ohne sie fiele ein
  *     gesetztes Fundfenster beim ersten Speichern auf leer, und die Rücklage fände
- *     nichts mehr. **Wird eine Kategorie NACHGETRAGEN**, findet sie ab `heute` — nicht ab
- *     ihrem Beginn, sonst änderte das Nachtragen vergangene Monate.
- *   • Die freie Rate ist eine Reihe. Eine geänderte Rate gilt ab dem laufenden Monat (oder
- *     ab dem Beginn, wenn der später liegt); die Monate davor behalten ihre. Eine Rücklage
- *     ohne Reihe (vor Migration 80, oder nie mit Rate) bekommt ihre erste Zeile ab dem
- *     Monat des Beginns. `rate` bleibt danach leer: zwei Stellen für dieselbe Zahl wären
- *     zwei Wahrheiten.
+ *     nichts mehr — bei einer früheren aufbauenden fiele umgekehrt „ohne Anfang" weg.
+ *     **Wird eine Kategorie NACHGETRAGEN** (ein Altfall ohne), findet sie ab `heute` —
+ *     nicht ab ihrem Beginn, sonst änderte das Nachtragen vergangene Monate.
+ *   • Die freie Rate ist eine Reihe. Eine geänderte Rate gilt ab `rateAb` (ohne Angabe
+ *     der laufende Monat; nie vor dem Monat des Beginns); die Monate davor behalten ihre.
+ *     Eine Rücklage ohne Reihe (vor Migration 80, oder nie mit Rate) bekommt ihre erste
+ *     Zeile ab dem Monat des Beginns. `rate` bleibt danach leer: zwei Stellen für
+ *     dieselbe Zahl wären zwei Wahrheiten.
  */
 export async function ruecklageAktualisieren(
   repo: RuecklagenRepository,
@@ -132,10 +161,11 @@ export async function ruecklageAktualisieren(
   let raten = reihe;
   if (gebaut.rate) {
     const beginnMonat = gebaut.beginn.slice(0, 7);
+    const gewuenscht = e.rateAb ?? heute.slice(0, 7);
+    const ab = gewuenscht > beginnMonat ? gewuenscht : beginnMonat;
     if (reihe.length === 0) {
       raten = [{ abMonat: beginnMonat, betrag: gebaut.rate }];
-    } else if (freieRateIm(reihe, heute.slice(0, 7)) !== gebaut.rate) {
-      const ab = heute.slice(0, 7) > beginnMonat ? heute.slice(0, 7) : beginnMonat;
+    } else if (freieRateIm(reihe, ab) !== gebaut.rate) {
       raten = [...reihe.filter((x) => x.abMonat !== ab), { abMonat: ab, betrag: gebaut.rate }].sort((a, b) =>
         a.abMonat.localeCompare(b.abMonat),
       );
@@ -163,6 +193,21 @@ function freieRateIm(reihe: readonly { abMonat: string; betrag: Cent }[], monat:
     treffer = v.betrag;
   }
   return treffer;
+}
+
+/**
+ * Eine Version der Ratenreihe entfernen — aber nie die letzte, wie beim Budgetbetrag:
+ * eine freie Rücklage ohne Rate hätte nichts, was sie zurücklegt.
+ */
+export async function ruecklageRateLoeschen(
+  repo: RuecklagenRepository,
+  ruecklageId: string,
+  abMonat: string,
+): Promise<void> {
+  const r = (await repo.alle()).find((x) => x.id === ruecklageId);
+  if (!r) throw new FachlicherFehler("ruecklage.unbekannt");
+  if ((r.raten ?? []).length <= 1) throw new FachlicherFehler("ruecklage.letzteRate");
+  await repo.rateLoeschen(ruecklageId, abMonat);
 }
 
 export interface AusbuchenEingabe {
@@ -202,6 +247,10 @@ export async function ruecklageAusbuchen(
   ruecklage: Ruecklage,
   e: AusbuchenEingabe,
 ): Promise<Ruecklage | null> {
+  // Eine Rücklage, die weiterläuft, wird nie ausgebucht: sie trägt ihre Ausgaben über die
+  // Kategorie und beginnt nie neu (bis Migration 81 war sie das aufbauende Budget, das
+  // es auch nicht gab).
+  if (ruecklage.art === "fortlaufend") throw new FachlicherFehler("ruecklage.laeuftWeiter");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(e.datum)) throw new FachlicherFehler("ruecklage.datumUngueltig");
   if (e.ziel != null && !(e.ziel > 0)) throw new FachlicherFehler("ziel.groesserNull");
 

@@ -68,7 +68,7 @@ describe("Zeitraum und Stichtage", () => {
 
 /**
  * Ein Haushaltsjahr mit allem, was die Überleitung bewegt: ein Jahresbeitrag mitten im
- * Jahr (die Periodisierung hebt sich im Jahr NICHT auf), ein aufbauendes Budget mit
+ * Jahr (die Periodisierung hebt sich im Jahr NICHT auf), eine Rücklage, die weiterläuft, mit
  * Entnahme, eine Rücklage ohne Überweisung, eine Umbuchung auf ein Investmentkonto, dazu
  * Einnahmen und Ungeplantes.
  */
@@ -109,10 +109,12 @@ describe("Ein Jahr — die Summe seiner Monate", () => {
       { id: "r-lohn", bezeichnung: "Ohlert", betrag: 250000, rhythmus: "monatlich", startdatum: "2025-01-27", charakter: "Ertrag", kategorieId: "lohn", vertragId: "v-lohn" },
       { id: "r-beitrag", bezeichnung: "Vibora", betrag: -72000, rhythmus: "jaehrlich", startdatum: "2025-07-04", charakter: "Aufwand", kategorieId: "beitrag", vertragId: "v-beitrag" },
     ],
-    budgets: [
-      { id: "b-topf", kategorieId: "topf", kontoId: "giro", art: "aufbauend", start: "2025-01-01", betraege: [{ abMonat: "2025-01", betrag: 5000 }] },
+    budgets: [],
+    ruecklagen: [
+      // Läuft weiter — bis Migration 81 ein aufbauendes Budget.
+      { id: "b-topf", bezeichnung: "Topf", kategorieId: "topf", kontoId: "giro", art: "fortlaufend", beginn: "2025-01-01", raten: [{ abMonat: "2025-01", betrag: 5000 }] },
+      { id: "rl", bezeichnung: "Kesselmann", rate: 8000, beginn: "2025-01-01" },
     ],
-    ruecklagen: [{ id: "rl", bezeichnung: "Kesselmann", rate: 8000, beginn: "2025-01-01" }],
     ausbuchungen: [],
     ruecklagenzuordnungen: [],
     ist: buchungen,
@@ -146,7 +148,7 @@ describe("Ein Jahr — die Summe seiner Monate", () => {
     expect(v.zeilen.find((z) => z.id === "einnahmen")!.wert.jetzt).toBe(12 * 250000);
     // Sechs Zwölftel des Beitrags fallen in dieses Jahr.
     expect(v.zeilen.find((z) => z.id === "fixkosten")!.wert.jetzt).toBe(-36000);
-    // Rücklagen samt aufbauendem Budget, in einer Zeile: 80 + 50 je Monat.
+    // Rücklagen beider Sorten, in einer Zeile: 80 + 50 je Monat.
     expect(v.zeilen.find((z) => z.id === "abschreibungen")!.wert.jetzt).toBe(-12 * (8000 + 5000));
     // Ohne Vergleich gibt es keine zweite Zahl — und keine Null an ihrer Stelle.
     expect(v.ergebnis.vorher).toBeNull();

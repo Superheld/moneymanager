@@ -20,16 +20,23 @@
 // REIN KALKULATORISCH (Entscheidung 2026-08-16, unverändert): Die Rücklage führt kein
 // eigenes Sparvehikel. Was tatsächlich zurückgelegt ist, wird nicht gebucht, sondern
 // ABGEGLICHEN: die Rücklage nennt das Konto, auf dem das Geld liegt, und der reale Stand
-// dieses Kontos wird anteilig auf ALLE verteilt, die darauf Anspruch haben — Rücklagen
-// wie aufbauende Budgets (`core/konten/kontobelegung`). Deckung = Wirklichkeit ÷
+// dieses Kontos wird anteilig auf ALLE Rücklagen verteilt, die darauf Anspruch haben
+// (`core/konten/kontobelegung`). Deckung = Wirklichkeit ÷
 // Rechnung, ohne Buchungslogik.
 
 import { monateZwischen } from "../basis/datum";
 import type { Cent } from "../basis/geld";
-import { kontobelegung, type Anspruch, type Belegungsposten } from "../konten/kontobelegung";
+import { kontobelegung, type Anspruch } from "../konten/kontobelegung";
 import { istLiquide, istRuecklagenkonto, type Zahlungskonto } from "../konten/konto";
-import { zufuehrungIm, type Budget } from "../budgets/budget";
-import { abgeschlossenerZyklus, altabschlussUngedeckt, ruecklagenstand, type Ruecklagenentnahme } from "./topf";
+import {
+  abgeschlossenerZyklus,
+  altabschlussUngedeckt,
+  rateIm,
+  ruecklagenart,
+  ruecklagenstand,
+  zyklen,
+  type Ruecklagenentnahme,
+} from "./topf";
 
 /**
  * Wann eine Rücklage wieder bei null beginnt (ADR-0006, seit Migration 79):
@@ -41,9 +48,8 @@ import { abgeschlossenerZyklus, altabschlussUngedeckt, ruecklagenstand, type Rue
  * trennt genau diese beiden Fragen. Was nach dem Abschliessen folgt (neu beginnen oder
  * beenden), wählt der Nutzer beim Abschliessen — das ist eine dritte Frage.
  *
- * Seit Paket 3 liest die Rechnung das Feld über `topf.ts` und `zustaendigkeit.ts`. Bis
- * Migration 81 ist jede Zeile der Tabelle `abschliessend`; `fortlaufend` sind dort nur
- * die aufbauenden Budgets, übergangsweise als Rücklage gelesen (`alsRuecklage`).
+ * Seit Paket 3 liest die Rechnung das Feld über `topf.ts` und `zustaendigkeit.ts`.
+ * Migration 81 hat die aufbauenden Budgets als `fortlaufend` in die Tabelle überführt.
  */
 export type Ruecklagenart = "fortlaufend" | "abschliessend";
 
@@ -174,50 +180,55 @@ export function sollRuecklage(r: Ruecklage, am: string): Cent {
 
 /**
  * Die Konten, auf denen zurückgelegt wird: jedes der Klasse Rücklage, jedes, dem eine
- * Rücklage zugeordnet ist — gleich welcher Klasse —, und jedes NICHT liquide Konto, auf
- * dem eine Rücklage über die Kategorie (ein aufbauendes Budget) ihr Geld hat.
+ * abschliessende Rücklage zugeordnet ist — gleich welcher Klasse —, und jedes NICHT
+ * liquide Konto einer fortlaufenden.
  *
  * Bis 2026-11-09 zählte allein die Klasse. Wer seine Rücklagen auf einem Tagesgeldkonto
  * der Klasse „Sparen" führte, sah dann einen Tacho auf null und keinen einzigen
  * Eingang, obwohl die Zuordnung an jeder Rücklage dastand. Die Zuordnung ist die
  * genauere Aussage — sie ist je Rücklage getroffen, die Klasse nur einmal je Konto.
  *
- * **Warum beim Budget nur die nicht liquiden** (seit 2026-11-16): ein Budget MUSS ein
- * Konto nennen, und meist ist es das Girokonto, von dem auch bezahlt wird. Zählte das
- * mit, wäre jedes Gehalt dort ein „Eingang" in die Rücklagen und der Tacho mässe das
- * Girokonto. Eine Rücklage von Hand nennt ihr Konto dagegen freiwillig und eigens dafür.
+ * **Warum bei der fortlaufenden nur die nicht liquiden** (seit 2026-11-16, damals für das
+ * aufbauende Budget, aus dem die fortlaufende Rücklage mit Migration 81 wurde): ein Budget
+ * MUSSTE ein Konto nennen, und meist war es das Girokonto, von dem auch bezahlt wird.
+ * Zählte das mit, wäre jedes Gehalt dort ein „Eingang" in die Rücklagen und der Tacho
+ * mässe das Girokonto. Die Unterscheidung bleibt, damit kein Tacho nach der Umstellung
+ * anders steht (Teil B des Entwurfs zu ADR-0006, Abschnitt 5).
  */
 export function ruecklagenKonten(
   konten: readonly Zahlungskonto[],
-  items: readonly Pick<Ruecklage, "kontoId">[],
-  budgets: readonly Pick<Budget, "art" | "kontoId">[] = [],
+  items: readonly Pick<Ruecklage, "kontoId" | "art">[],
 ): Set<string> {
   const ids = new Set(konten.filter(istRuecklagenkonto).map((k) => k.id));
-  for (const r of items) if (r.kontoId) ids.add(r.kontoId);
   const jeId = new Map(konten.map((k) => [k.id, k]));
-  for (const b of budgets) {
-    const k = jeId.get(b.kontoId);
-    if (b.art === "aufbauend" && k && !istLiquide(k)) ids.add(k.id);
+  for (const r of items) {
+    if (!r.kontoId) continue;
+    if (ruecklagenart(r) !== "fortlaufend") ids.add(r.kontoId);
+    else {
+      const k = jeId.get(r.kontoId);
+      if (k && !istLiquide(k)) ids.add(k.id);
+    }
   }
   return ids;
 }
 
 /**
- * Was beide Formen zusammen in `monat` (`YYYY-MM`) verlangen: die Raten der Rücklagen
- * von Hand und die Zuführung jeder Rücklage über die Kategorie (`zufuehrungIm`).
+ * Was alle laufenden Rücklagen zusammen in `monat` (`YYYY-MM`) verlangen.
  *
- * Eine Rücklage über die Kategorie ist im Modell ein aufbauendes Budget; ein monatliches
- * zählt nicht, sein Rest verfällt und wird nicht zurückgelegt.
+ * Je Sorte wie vor Migration 81: eine abschliessende ihre Monatsrate (`monatsRuecklage`,
+ * Ziel ÷ Frist auch am Ziel), eine fortlaufende die Rate ihres laufenden Zyklus in DIESEM
+ * Monat — 0 vor ihrem Beginn, wie damals `zufuehrungIm` beim aufbauenden Budget.
  */
-export function ruecklagenBedarf(
-  items: readonly Ruecklage[],
-  budgets: readonly Budget[],
-  monat: string,
-): Cent {
-  const kategorie = budgets
-    .filter((b) => b.art === "aufbauend")
-    .reduce((s, b) => s + zufuehrungIm(b, monat), 0);
-  return monatsRuecklageGesamt(items) + kategorie;
+export function ruecklagenBedarf(items: readonly Ruecklage[], monat: string): Cent {
+  let summe = 0;
+  for (const r of items) {
+    if (ruecklagenart(r) !== "fortlaufend") summe += monatsRuecklage(r);
+    else {
+      const z = zyklen(r, []).find((x) => !x.ende);
+      summe += z ? rateIm(z, monat) : 0;
+    }
+  }
+  return summe;
 }
 
 /** Summe der monatlichen Rücklagen — der Betrag, der jeden Monat gebunden ist. */
@@ -238,57 +249,52 @@ export function zielwertGesamt(items: readonly Ruecklage[]): Cent {
 
 export interface RuecklagenPosten {
   readonly ruecklage: Ruecklage;
-  /** Was bis `am` zurückgelegt sein sollte. */
+  /** Was bis `am` auf dem Konto liegen sollte: der Stand über null (`anspruchAm`). */
   readonly soll: Cent;
   /** Anteil am realen Kontostand; `null` ohne Kontozuordnung (dann nur Rechnung). */
   readonly tatsaechlich: Cent | null;
 }
 
 /**
- * Die Deckung über BEIDE Formen (seit 2026-11-16): die Rücklagen von Hand als `posten`,
- * die über die Kategorie (aufbauende Budgets) als `ueberKategorie`, und die Summen über
- * beide. Vorher zählten die Summen nur die Rücklagen von Hand, obwohl die Überschrift
- * im Bereich beide meinte.
+ * Die Deckung über alle laufenden Rücklagen, beide Sorten — seit Migration 81 in EINER
+ * Liste. Bis dahin standen die aufbauenden Budgets daneben (`ueberKategorie`); in den
+ * Summen zählten sie schon seit 2026-11-16 mit, und an den Summen ändert sich nichts.
  */
 export interface RuecklagenDeckung {
-  /** Die Rücklagen von Hand, je eine. */
+  /** Je Rücklage eine. */
   readonly posten: readonly RuecklagenPosten[];
-  /**
-   * Die Rücklagen über die Kategorie mit einem Rest über null, so wie die Kontobelegung
-   * sie führt: Anspruch = Rest, `gedeckt` = was davon auf dem Konto liegt.
-   */
-  readonly ueberKategorie: readonly Belegungsposten[];
-  /** Σ Soll der Rücklagen von Hand + Σ Rest der Rücklagen über die Kategorie. */
+  /** Σ Soll. */
   readonly soll: Cent;
-  /**
-   * Nur, was einem Konto gegenübersteht — sonst stünde ein Soll ohne Gegenstück im
-   * Nenner. Eine Rücklage über die Kategorie hat immer ein Konto.
-   */
+  /** Nur, was einem Konto gegenübersteht — sonst stünde ein Soll ohne Gegenstück im Nenner. */
   readonly sollMitKonto: Cent;
   readonly tatsaechlich: Cent;
   /** 0–100, gedeckelt. 100, wenn nichts zu decken ist. */
   readonly grad: number;
   /**
-   * Gibt es nur Rücklagen von Hand, und nennt keine ein Konto? Dann ist alles reine
-   * Rechnung, und das sagt der Bereich einmal statt an jeder Zahl.
+   * Nennt keine Rücklage ein Konto? Dann ist alles reine Rechnung, und das sagt der
+   * Bereich einmal statt an jeder Zahl.
    */
   readonly nurRechnung: boolean;
 }
 
 /**
- * Die Ansprüche der Rücklagen auf ihre Konten — je Rücklage ihr Soll bis `am`.
+ * Die Ansprüche der Rücklagen auf ihre Konten — je Rücklage ihr Stand über null bis `am`.
  *
  * Eine Rücklage ohne Konto hat keinen: sie ist reine Rechnung, und es gibt keinen Stand,
  * gegen den sie etwas beanspruchen könnte.
+ *
+ * Die abschliessenden zuerst, dann die fortlaufenden: in dieser Reihenfolge standen sie
+ * vor Migration 81 auf jedem Konto (Rücklagen, dann die Reste der aufbauenden Budgets).
  */
 export function ruecklagenAnsprueche(
   items: readonly Ruecklage[],
   am: string,
   bestand: Anspruchsbestand = {},
 ): Anspruch[] {
-  return items
+  const fortlaufend = (r: Ruecklage) => ruecklagenart(r) === "fortlaufend";
+  return [...items.filter((r) => !fortlaufend(r)), ...items.filter(fortlaufend)]
     .filter((r) => r.kontoId)
-    .map((r) => ({ art: "ruecklage", id: r.id, kontoId: r.kontoId as string, betrag: anspruchAm(r, am, bestand) }));
+    .map((r) => ({ id: r.id, kontoId: r.kontoId as string, betrag: anspruchAm(r, am, bestand) }));
 }
 
 /**
@@ -310,10 +316,13 @@ export interface Anspruchsbestand {
  * abschliessenden die Raten bis zum Vormonat, also genau das Soll — und davon gehen die
  * Ausgaben ab, die die Rücklage seit ihrem Fundfenster gefunden hat. Vor `findet_ab`
  * findet sie nichts, und der Anspruch ist das Soll wie bisher. Vor dem Beginn ihres
- * laufenden Zyklus beansprucht sie nichts, wie `sollRuecklage` es sagt.
+ * laufenden Zyklus beansprucht eine abschliessende nichts, wie `sollRuecklage` es sagt.
+ *
+ * Eine fortlaufende rechnet wie das aufbauende Budget, das sie bis Migration 81 war: im
+ * Monat ihres Beginns hat sie die Rate auch an den Tagen davor (`budgetStand` tat das).
  */
 export function anspruchAm(r: Ruecklage, am: string, bestand: Anspruchsbestand = {}): Cent {
-  if (am < r.beginn) return 0;
+  if (ruecklagenart(r) !== "fortlaufend" && am < r.beginn) return 0;
   const stand = ruecklagenstand(r, bestand.abschluesse ?? [], bestand.entnahmen?.get(r.id) ?? [], am).stand;
   return Math.max(0, stand);
 }
@@ -322,10 +331,6 @@ export function anspruchAm(r: Ruecklage, am: string, bestand: Anspruchsbestand =
  * Gleicht die Rechnung gegen die Wirklichkeit ab — über die Kontobelegung
  * (`core/konten/kontobelegung`), nicht mit einer eigenen Verteilung.
  *
- * `weitere` sind die Ansprüche, die KEINE Rücklage sind und trotzdem auf denselben Konten
- * liegen — heute die Reste aufbauender Budgets. Ohne sie verteilte die Deckung Geld, das
- * schon jemand anderem gehört, und sähe besser aus, als sie ist.
- *
  * Bewusst KEINE Allokation nach Priorität: liegen auf dem Konto 60 % dessen, was alle
  * Ansprüche zusammen verlangen, dann ist jede Rücklage darauf zu 60 % gedeckt. Alles
  * andere würde eine Reihenfolge behaupten, die es nicht gibt.
@@ -333,29 +338,19 @@ export function anspruchAm(r: Ruecklage, am: string, bestand: Anspruchsbestand =
  * Überschuss wird gekappt (Grad ≤ 100 %): mehr als ihren Soll-Stand trägt eine Rücklage
  * nicht, auch wenn auf dem Konto mehr liegt.
  *
- * **Die Summen zählen die Ansprüche der Art `budget` mit** (seit 2026-11-16). Sie kommen
- * nur von aufbauenden Budgets (`aufbauendeAnsprueche`), und die heissen in der
- * Oberfläche Rücklage über die Kategorie. Ihr Soll ist ihr Rest — das, was heute auf
- * dem Konto liegen sollte; ein Ziel haben sie nicht, deshalb bleibt `zielwertGesamt`
- * bei den Rücklagen von Hand. Wer einen Anspruch einer dritten Art einführt, entscheidet
- * hier, ob er mitzählt.
+ * Bis Migration 81 kamen die Reste der aufbauenden Budgets als „weitere Ansprüche" von
+ * aussen herein. Seither sind sie Rücklagen und stehen in `items`; einen Anspruch, der
+ * keine Rücklage ist, gibt es nicht mehr.
  */
 export function ruecklagenDeckung(
   items: readonly Ruecklage[],
   am: string,
   kontostaende: ReadonlyMap<string, Cent>,
-  weitere: readonly Anspruch[] = [],
   bestand: Anspruchsbestand = {},
 ): RuecklagenDeckung {
-  const belegung = kontobelegung(kontostaende, [...ruecklagenAnsprueche(items, am, bestand), ...weitere]);
+  const belegung = kontobelegung(kontostaende, ruecklagenAnsprueche(items, am, bestand));
   const gedeckt = new Map<string, Cent>();
-  const ueberKategorie: Belegungsposten[] = [];
-  for (const b of belegung.values()) {
-    for (const p of b.posten) {
-      if (p.art === "ruecklage") gedeckt.set(p.id, p.gedeckt);
-      else if (p.art === "budget") ueberKategorie.push(p);
-    }
-  }
+  for (const b of belegung.values()) for (const p of b.posten) gedeckt.set(p.id, p.gedeckt);
 
   const posten = items.map((r): RuecklagenPosten => ({
     ruecklage: r,
@@ -367,20 +362,17 @@ export function ruecklagenDeckung(
     tatsaechlich: r.kontoId ? (gedeckt.get(r.id) ?? 0) : null,
   }));
 
-  const kategorieSoll = ueberKategorie.reduce((s, p) => s + p.betrag, 0);
-  const kategorieGedeckt = ueberKategorie.reduce((s, p) => s + p.gedeckt, 0);
-  const sollGesamt = posten.reduce((s, p) => s + p.soll, 0) + kategorieSoll;
-  const sollMitKonto = posten.reduce((s, p) => s + (p.tatsaechlich == null ? 0 : p.soll), 0) + kategorieSoll;
-  const tatsaechlich = posten.reduce((s, p) => s + (p.tatsaechlich ?? 0), 0) + kategorieGedeckt;
+  const sollGesamt = posten.reduce((s, p) => s + p.soll, 0);
+  const sollMitKonto = posten.reduce((s, p) => s + (p.tatsaechlich == null ? 0 : p.soll), 0);
+  const tatsaechlich = posten.reduce((s, p) => s + (p.tatsaechlich ?? 0), 0);
 
   return {
     posten,
-    ueberKategorie,
     soll: sollGesamt,
     sollMitKonto,
     tatsaechlich,
     grad: sollMitKonto > 0 ? Math.round((tatsaechlich / sollMitKonto) * 100) : 100,
-    nurRechnung: items.length > 0 && items.every((r) => !r.kontoId) && !weitere.some((a) => a.art === "budget"),
+    nurRechnung: items.length > 0 && items.every((r) => !r.kontoId),
   };
 }
 

@@ -20,14 +20,12 @@ import {
   type IstBuchung,
   type Zeilenkontext,
 } from "../../../application";
-import { Button, Card } from ".";
-import { Auswahl } from "./Auswahl";
-import { BudgetFortschreibung } from "./BudgetFortschreibung";
-import { Buchungsliste } from "./Buchungsliste";
-import { geldFarbe } from "./geldFarbe";
-import { useGeld } from "./einstellungenKontext";
-import { BudgetVerlaufChart } from "./BudgetVerlaufChart";
-import { budgetText } from "./budgetTexte";
+import { Button, Card } from "../bausteine";
+import { Auswahl } from "../bausteine/Auswahl";
+import { Buchungsliste } from "../bausteine/Buchungsliste";
+import { geldFarbe } from "../bausteine/geldFarbe";
+import { useGeld } from "../bausteine/einstellungenKontext";
+import { BudgetVerlaufChart } from "../bausteine/BudgetVerlaufChart";
 import { Collapsible } from "@base-ui/react/collapsible";
 
 interface Props {
@@ -51,8 +49,6 @@ export function BudgetVerlauf({ sicht, stand, heute, zeilenkontext, onSchliessen
   const { t } = useTranslation();
   const geld = useGeld();
 
-  // Das aufbauende Budget steht im Bereich Rücklagen und heisst dort so (`budgetTexte`).
-  const art = stand.budget.art;
   const monate = useMemo(() => budgetVerlauf(sicht, stand.budget, heute, 12), [sicht, stand.budget, heute]);
   /**
    * Vorbelegt ist der letzte Monat — derselbe, den die Zeile darüber zeigt. Ohne Auswahl
@@ -80,7 +76,7 @@ export function BudgetVerlauf({ sicht, stand, heute, zeilenkontext, onSchliessen
   if (monate.length === 0) {
     return (
       <Card title={t("budgets.verlaufTitel", { name: stand.kategorieName })} action={<Button variant="ghost" onClick={onSchliessen}>{t("budgets.verlaufSchliessen")}</Button>}>
-        <div className="muted">{t(budgetText(art, "verlaufVorStart"))}</div>
+        <div className="muted">{t("budgets.verlaufVorStart")}</div>
       </Card>
     );
   }
@@ -103,7 +99,7 @@ export function BudgetVerlauf({ sicht, stand, heute, zeilenkontext, onSchliessen
     >
       <BudgetVerlaufChart
         monate={monate}
-        art={art === "aufbauend" ? "aufbauend" : "monatlich"}
+        art="monatlich"
         aktivIndex={gewaehlt}
         onMonatClick={waehle}
       />
@@ -149,14 +145,11 @@ export function BudgetVerlauf({ sicht, stand, heute, zeilenkontext, onSchliessen
           )}
         </span>
         <span style={{ display: "inline-flex", gap: "var(--sp-3)", alignItems: "baseline", flexWrap: "wrap" }}>
-          {/* Der Übertrag hat nur beim Aufbauenden etwas zu sagen: beim Monatlichen ist er
-              immer 0, und eine Zeile „Übertrag 0,00" wäre eine Aussage über nichts. */}
-          {stand.budget.art === "aufbauend" && !monat.ohnePlan && <BudgetFortschreibung monat={monat} />}
           {/* Ohne Rahmen gibt es keinen Rest — „−70,00 von 0,00" läse sich als heftig
               überzogen, obwohl damals niemand etwas überzogen hat. */}
           {monat.ohnePlan ? (
             <span className="num" style={{ fontSize: "var(--fs-sm)", whiteSpace: "nowrap" }}>
-              <span className="muted">{t(budgetText(art, monat.verbraucht < 0 ? "verlaufOhnePlanZurueck" : "verlaufOhnePlan"), { verbraucht: geld.formatMitSymbol(Math.abs(monat.verbraucht)) })}</span>
+              <span className="muted">{t(monat.verbraucht < 0 ? "budgets.verlaufOhnePlanZurueck" : "budgets.verlaufOhnePlan", { verbraucht: geld.formatMitSymbol(Math.abs(monat.verbraucht)) })}</span>
             </span>
           ) : (
             <span className="num" style={{ fontSize: "var(--fs-sm)", whiteSpace: "nowrap" }}>
@@ -170,7 +163,7 @@ export function BudgetVerlauf({ sicht, stand, heute, zeilenkontext, onSchliessen
       <Collapsible.Panel>
         <Buchungsliste
           zeilen={zeilen}
-          leer={t(budgetText(art, "verlaufMonatLeer"), { monat: monat.monat })}
+          leer={t("budgets.verlaufMonatLeer", { monat: monat.monat })}
           onBuchung={onBuchung}
           summe
         />

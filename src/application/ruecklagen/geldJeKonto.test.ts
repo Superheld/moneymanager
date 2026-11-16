@@ -20,24 +20,28 @@ const KATEGORIEN: Kategorie[] = [
 
 const RUECKLAGEN: Ruecklage[] = [
   // Mit Ziel auf dem Tagesgeld: 1.200,00 in 12 Monaten seit Januar → Soll heute 600,00.
-  { id: "r-tessin", bezeichnung: "Tessin", ziel: 120000, fristMonate: 12, beginn: "2026-01-01", kontoId: "tg" },
+  { id: "r-tessin", bezeichnung: "Tessin", art: "abschliessend", ziel: 120000, fristMonate: 12, beginn: "2026-01-01", kontoId: "tg" },
   // Frei auf dem Sparkonto: 50,00 seit März → 200,00.
-  { id: "r-ohlert", bezeichnung: "Ohlert", rate: 5000, beginn: "2026-03-01", kontoId: "spar" },
+  { id: "r-ohlert", bezeichnung: "Ohlert", art: "abschliessend", rate: 5000, beginn: "2026-03-01", kontoId: "spar" },
   // Ohne Konto — reine Rechnung: 30,00 seit Mai → 60,00.
-  { id: "r-penzberg", bezeichnung: "Penzberg", rate: 3000, beginn: "2026-05-01" },
+  { id: "r-penzberg", bezeichnung: "Penzberg", art: "abschliessend", rate: 3000, beginn: "2026-05-01" },
 ];
 
-const aufbauend = (id: string, kategorieId: string, kontoId: string): Budget => ({
-  id, kategorieId, kontoId, art: "aufbauend", start: "2026-06-01", betraege: [{ abMonat: "2026-06", betrag: 15000 }],
+/** Eine Rücklage, die weiterläuft — bis Migration 81 ein aufbauendes Budget. */
+const weiter = (id: string, name: string, kategorieId: string, kontoId: string): Ruecklage => ({
+  id, bezeichnung: name, kategorieId, kontoId, art: "fortlaufend", beginn: "2026-06-01", raten: [{ abMonat: "2026-06", betrag: 15000 }],
 });
 
+const WEITERLAUFEND: Ruecklage[] = [
+  // Auf demselben Sparkonto: dort reicht der Stand dann nicht.
+  weiter("b-a", "Rubrik A", "rubrik-a", "spar"),
+  // Auf einem Konto, das es nicht mehr gibt.
+  weiter("b-b", "Rubrik B", "rubrik-b", "geloescht"),
+];
+
 const BUDGETS: Budget[] = [
-  // Über die Kategorie auf demselben Sparkonto: dort reicht der Stand dann nicht.
-  aufbauend("b-a", "rubrik-a", "spar"),
-  // Über die Kategorie auf einem Konto, das es nicht mehr gibt.
-  aufbauend("b-b", "rubrik-b", "geloescht"),
   // Ein monatliches beansprucht nichts und fällt nirgends auf.
-  { ...aufbauend("b-m", "rubrik-a", "giro"), art: "monatlich" },
+  { id: "b-m", kategorieId: "rubrik-a", kontoId: "giro", art: "monatlich", start: "2026-06-01", betraege: [{ abMonat: "2026-06", betrag: 15000 }] },
 ];
 
 const alle = <T,>(xs: readonly T[]) => ({ alle: async () => [...xs] });
@@ -45,7 +49,7 @@ const alle = <T,>(xs: readonly T[]) => ({ alle: async () => [...xs] });
 const DEPS = {
   kontoRepo: alle(KONTEN),
   ledger: alle([]),
-  ruecklagenRepo: { ...alle(RUECKLAGEN), beendete: async () => [], ausbuchungen: async () => [] },
+  ruecklagenRepo: { ...alle([...RUECKLAGEN, ...WEITERLAUFEND]), beendete: async () => [], ausbuchungen: async () => [] },
   ruecklagenzuordnungRepo: alle([]),
   kategorieRepo: alle(KATEGORIEN),
   budgetRepo: alle(BUDGETS),
@@ -59,15 +63,15 @@ describe("geldJeKontoLaden", () => {
     expect(s.konten[0].konto).toBe("Konto tg");
   });
 
-  it("zeigt je Konto Stand, Ansprüche beider Formen, Gedecktes und was frei bleibt", async () => {
+  it("zeigt je Konto Stand, Ansprüche beider Sorten, Gedecktes und was frei bleibt", async () => {
     const s = await geldJeKontoLaden(DEPS, HEUTE);
     const tg = s.konten[0].belegung;
     expect(tg).toMatchObject({ stand: 90000, gebunden: 60000, frei: 30000, anteil: 1 });
     expect(tg.posten).toEqual([expect.objectContaining({ id: "r-tessin", betrag: 60000, gedeckt: 60000 })]);
 
     const spar = s.konten[1].belegung;
-    // Beide Formen auf einem Konto, grösster Anspruch zuerst.
-    expect(spar.posten.map((p) => [p.id, p.art])).toEqual([["b-a", "budget"], ["r-ohlert", "ruecklage"]]);
+    // Beide Sorten auf einem Konto, grösster Anspruch zuerst.
+    expect(spar.posten.map((p) => p.id)).toEqual(["b-a", "r-ohlert"]);
     expect(s.namen.get("b-a")).toBe("Rubrik A");
     expect(s.namen.get("r-ohlert")).toBe("Ohlert");
   });
@@ -83,10 +87,10 @@ describe("geldJeKontoLaden", () => {
     expect(spar.posten.reduce((x, p) => x + p.gedeckt, 0)).toBe(spar.stand);
   });
 
-  it("nennt die Rücklagen ohne Konto, beide Formen, mit ihrem Anspruch", async () => {
+  it("nennt die Rücklagen ohne Konto, beide Sorten, mit ihrem Anspruch", async () => {
     const s = await geldJeKontoLaden(DEPS, HEUTE);
-    expect(s.ohneKonto.map((r) => [r.id, r.form])).toEqual(
-      expect.arrayContaining([["r-penzberg", "hand"], ["b-b", "kategorie"]]),
+    expect(s.ohneKonto.map((r) => [r.id, r.art])).toEqual(
+      expect.arrayContaining([["r-penzberg", "abschliessend"], ["b-b", "fortlaufend"]]),
     );
     expect(s.ohneKonto).toHaveLength(2);
     expect(s.ohneKonto.find((r) => r.id === "r-penzberg")).toMatchObject({ name: "Penzberg", anspruch: 6000 });

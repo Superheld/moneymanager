@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { euroZuCent } from "./basis/geld";
 import { monatsAusblick, monatsAusblicke, type AusblickZeileId } from "./monatsausblick";
 import type { Budget } from "./budgets/budget";
+import type { Ruecklage } from "./ruecklagen/ruecklage";
 import type { IstBuchung } from "./buchung/istbuchung";
 import type { Kategorie } from "./kategorien/kategorie";
 import type { Zahlungsregel } from "./basis/zahlungsregel";
@@ -43,6 +44,12 @@ function ist(over: Partial<IstBuchung> = {}): IstBuchung {
 }
 
 /** `betragProMonat` ist Bequemlichkeit der Fabrik und wird zur Reihe mit einer Version. */
+/** Eine Rücklage, die weiterläuft — die Zeile `budgetsAufbauend` trägt sie seit Migration 81. */
+const weiter = (over: { id?: string; kategorieId?: string; betrag: number }): Ruecklage => ({
+  id: over.id ?? "w", bezeichnung: "Tellwick", kategorieId: over.kategorieId ?? "lebensmittel", kontoId: "giro",
+  art: "fortlaufend", beginn: "2026-01-01", raten: [{ abMonat: "2026-01", betrag: over.betrag }],
+});
+
 const budget = (over: Partial<Budget> & { betragProMonat?: number } = {}): Budget => {
   const { betragProMonat = euroZuCent(430), ...rest } = over;
   const basis = {
@@ -114,13 +121,13 @@ describe("monatsAusblick — Plan-Spalte aus den Verträgen", () => {
     expect(zeile(a, "einnahmen")!.plan).toBe(0);
   });
 
-  it("rechnet ein aufbauendes Budget mit derselben Monatsrate ein — in seiner eigenen Zeile", () => {
+  it("rechnet eine Rücklage, die weiterläuft, mit ihrer Monatsrate ein — in ihrer eigenen Zeile", () => {
     // Auch was sich aufbaut, kostet jeden Monat seine Rate — es gibt sie nur am
     // Monatsende nicht zurück. Für die Aufrechnung „was bleibt" ist das dasselbe; es
-    // steht seit 2026-11-08 nur in einer eigenen Zeile.
+    // steht seit 2026-11-08 in einer eigenen Zeile, bis Migration 81 als aufbauendes Budget.
     const a = monatsAusblick({
       ...basis,
-      budgets: [budget({ art: "aufbauend", betragProMonat: euroZuCent(400) })],
+      ruecklagen: [weiter({ betrag: euroZuCent(400) })],
       monatAb: "2026-09-01",
     });
     expect(zeile(a, "budgetsAufbauend")!.plan).toBe(euroZuCent(-400));
@@ -130,15 +137,13 @@ describe("monatsAusblick — Plan-Spalte aus den Verträgen", () => {
   it("plant Dach und eingebettetes Budget je mit ihrem eigenen Betrag", () => {
     const a = monatsAusblick({
       ...basis,
-      budgets: [
-        budget({ id: "dach", kategorieId: "freizeit", betragProMonat: euroZuCent(200) }),
-        budget({ id: "kind", kategorieId: "sport", art: "aufbauend", betragProMonat: euroZuCent(80) }),
-      ],
+      budgets: [budget({ id: "dach", kategorieId: "freizeit", betragProMonat: euroZuCent(200) })],
+      ruecklagen: [weiter({ id: "kind", kategorieId: "sport", betrag: euroZuCent(80) })],
       monatAb: "2026-09-01",
     });
     // 280 insgesamt: das Dach gilt für alles ausser dem Kind, zwei getrennte Töpfe
     // (seit 2026-11-09; vorher zog das Kind seinen Betrag vom Dach ab). Jedes steht nach
-    // SEINER Art in seiner Zeile.
+    // SEINER Sorte in seiner Zeile.
     expect(zeile(a, "budgets")!.plan).toBe(euroZuCent(-200));
     expect(zeile(a, "budgetsAufbauend")!.plan).toBe(euroZuCent(-80));
   });

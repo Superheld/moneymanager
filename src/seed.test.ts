@@ -125,8 +125,9 @@ describe("Spielstand", () => {
     for (const [tabelle, mindestens] of [
       ["zahlungskonto", 4],
       ["kategorie", 10],
-      ["budget", 3],
-      ["budget_betrag", 4],
+      ["budget", 2],
+      ["budget_betrag", 3],
+      ["ruecklage_rate", 2],
       ["ist_buchung", 100],
       ["ist_buchung_aufteilung", 2],
       ["vertrag", 2],
@@ -150,14 +151,26 @@ describe("Spielstand", () => {
     }
   });
 
-  it("traegt die Ruecklagen so, wie Migration 79 einen Bestand hinterlaesst", () => {
-    // Bis die Rechnung umgestellt ist, soll der Spielstand aussehen wie ein migrierter
-    // Bestand: jede Ruecklage von Hand abschliessend, ohne Fundfenster, die Reihe leer.
-    // Stuende hier schon eine Reihe oder eine Zuordnung, saehe man in der App etwas, das
-    // kein echter Bestand hat.
+  it("traegt die Ruecklagen in beiden Sorten und mit beiden Faellen an einer Kategorie", () => {
+    // Die Ruecklagen von Hand von davor stehen da wie vor Migration 80 (abschliessend, ohne
+    // Fundfenster, die Rate noch in `rate`) — die Umstellungsprobe misst an ihnen. Daneben
+    // das fruehere aufbauende Budget, wie Migration 81 es hinterlaesst, und die beiden
+    // Faelle aus ADR-0006: eine Ruecklage allein an ihrer Kategorie, zwei an derselben.
     const db = mitSeed();
-    expect(zahl(db, "SELECT COUNT(*) FROM ruecklage WHERE art <> 'abschliessend' OR findet_ab IS NOT NULL")).toBe(0);
-    expect(zahl(db, "SELECT COUNT(*) FROM ruecklage_rate")).toBe(0);
+    expect(zahl(db, "SELECT COUNT(*) FROM budget WHERE art <> 'monatlich'")).toBe(0);
+    expect(
+      zahl(db, "SELECT COUNT(*) FROM ruecklage WHERE id = 'budget-anschaffung' AND art = 'fortlaufend' AND findet_ab IS NULL"),
+    ).toBe(1);
+    expect(zahl(db, "SELECT COUNT(*) FROM ruecklage_rate WHERE ruecklage_id = 'budget-anschaffung'")).toBe(1);
+    // Allein: an `kat-mobilitaet` haengt genau eine.
+    expect(zahl(db, "SELECT COUNT(*) FROM ruecklage WHERE kategorie_id = 'kat-mobilitaet'")).toBe(1);
+    // Zwei an derselben, die beide finden: die fortlaufende ohne Anfang und eine mit Fundfenster.
+    expect(
+      zahl(
+        db,
+        "SELECT COUNT(*) FROM ruecklage WHERE kategorie_id = 'kat-anschaffungen' AND (findet_ab IS NOT NULL OR art = 'fortlaufend')",
+      ),
+    ).toBe(2);
     expect(zahl(db, "SELECT COUNT(*) FROM ruecklage_zuordnung")).toBe(0);
   });
 

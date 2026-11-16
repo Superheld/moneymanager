@@ -72,6 +72,19 @@ function regel(over: Partial<Zahlungsregel>): Zahlungsregel {
   };
 }
 
+/**
+ * Eine Rücklage, die weiterläuft — so, wie Migration 81 ein aufbauendes Budget überführt
+ * (Kategorie, Konto, Start, eine Rate ab dem Startmonat). Die Fälle unten waren bis dahin
+ * aufbauende Budgets und rechnen jetzt als diese Rücklage.
+ */
+function weiterlaufend(over: { id: string; kategorieId: string; rate: number; start?: string }): Ruecklage {
+  const start = over.start ?? "2025-01-01";
+  return {
+    id: over.id, bezeichnung: over.kategorieId, beginn: start, kategorieId: over.kategorieId, kontoId: "giro",
+    art: "fortlaufend", raten: [{ abMonat: start.slice(0, 7), betrag: over.rate }],
+  };
+}
+
 function budget(over: Partial<Budget> & { rate: number }): Budget {
   const { rate, ...rest } = over;
   const start = rest.start ?? "2025-01-01";
@@ -159,12 +172,12 @@ describe("Fixkosten — der Jahresbeitrag", () => {
   });
 });
 
-describe("Das aufbauende Budget — in der Zeile der Rücklagen", () => {
-  const topf = budget({ id: "reise", kategorieId: "reise", art: "aufbauend", rate: 10000, start: "2025-01-01" });
+describe("Die Rücklage, die weiterläuft (früher das aufbauende Budget) — in der Zeile der Rücklagen", () => {
+  const topf = weiterlaufend({ id: "reise", kategorieId: "reise", rate: 10000, start: "2025-01-01" });
 
   it("kostet die Rate, auch wenn im Monat viel entnommen wird", () => {
     // Zwölf Raten bis Dezember = 1.200; im Dezember gehen 1.200 raus.
-    const e = eingabe({ budgets: [topf], ist: [ist("2025-12-05", -120000, { kategorieId: "flug" })] });
+    const e = eingabe({ ruecklagen: [topf], ist: [ist("2025-12-05", -120000, { kategorieId: "flug" })] });
     const r = erwarteAufgang(e, "2025-12");
     expect(zeile(r, "abschreibungen")?.ist).toBe(-10000);
     expect(zeile(r, "abschreibungen")?.posten[0].entnahme).toBe(-120000);
@@ -173,20 +186,20 @@ describe("Das aufbauende Budget — in der Zeile der Rücklagen", () => {
   });
 
   it("kostet die Rate in einem Monat ohne Entnahme", () => {
-    const r = erwarteAufgang(eingabe({ budgets: [topf] }), "2025-05");
+    const r = erwarteAufgang(eingabe({ ruecklagen: [topf] }), "2025-05");
     expect(zeile(r, "abschreibungen")?.ist).toBe(-10000);
     expect(r.ueberleitung?.kontoaenderung).toBe(0);
   });
 
   it("rechnet das Ungedeckte zu den Kosten des Monats", () => {
     // Bis Juni sind 600 im Topf, entnommen werden 900: 300 sind ungedeckt.
-    const e = eingabe({ budgets: [topf], ist: [ist("2025-06-20", -90000, { kategorieId: "reise" })] });
+    const e = eingabe({ ruecklagen: [topf], ist: [ist("2025-06-20", -90000, { kategorieId: "reise" })] });
     const r = erwarteAufgang(e, "2025-06");
     expect(zeile(r, "abschreibungen")?.ist).toBe(-40000);
   });
 
   it("zählt die Rate nicht noch einmal, solange sie nur das Loch füllt", () => {
-    const e = eingabe({ budgets: [topf], ist: [ist("2025-06-20", -90000, { kategorieId: "reise" })] });
+    const e = eingabe({ ruecklagen: [topf], ist: [ist("2025-06-20", -90000, { kategorieId: "reise" })] });
     expect(zeile(erwarteAufgang(e, "2025-07"), "abschreibungen")?.ist ?? 0).toBe(0);
     expect(zeile(erwarteAufgang(e, "2025-08"), "abschreibungen")?.ist ?? 0).toBe(0);
     // Ende September ist das Loch gefüllt (900 Raten gegen 900 Ausgaben), ab Oktober
@@ -195,35 +208,35 @@ describe("Das aufbauende Budget — in der Zeile der Rücklagen", () => {
   });
 
   it("kostet über die ganze Zeit nie weniger als ausgegeben und nie weniger als die Raten", () => {
-    const e = eingabe({ budgets: [topf], ist: [ist("2025-06-20", -90000, { kategorieId: "reise" })] });
+    const e = eingabe({ ruecklagen: [topf], ist: [ist("2025-06-20", -90000, { kategorieId: "reise" })] });
     const monate = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
     const gesamt = monate.reduce((s, m) => s + (zeile(rechne(e, `2025-${m}`), "abschreibungen")?.ist ?? 0), 0);
     expect(gesamt).toBe(-120000);
   });
 });
 
-describe("Rücklagen und aufbauende Budgets — EINE Zeile", () => {
+describe("Rücklagen beider Sorten — EINE Zeile", () => {
   // Seit 2026-11-15 heissen beide in der Oberfläche „Rücklagen"; die Ergebnisrechnung
   // führt sie deshalb in einer Zeile. Jeder Posten rechnet weiter nach seiner Regel —
   // die Probe hier ist, dass die Zeile die Summe beider ist und am Ergebnis nichts rückt.
-  const topf = budget({ id: "ferien", kategorieId: "ferien", art: "aufbauend", rate: 7000, start: "2025-01-01" });
+  const topf = weiterlaufend({ id: "ferien", kategorieId: "ferien", rate: 7000, start: "2025-01-01" });
   const geraet: Ruecklage = { id: "g", bezeichnung: "Gerät", ziel: 96000, fristMonate: 96, beginn: "2025-01-01" };
   const entnahme = ist("2025-06-20", -90000, { kategorieId: "ferien" });
 
-  it("ist die Summe aus Rücklage und aufbauendem Budget", () => {
-    const nurTopf = rechne(eingabe({ budgets: [topf], ist: [entnahme] }), "2025-06");
+  it("ist die Summe aus beiden Rücklagen", () => {
+    const nurTopf = rechne(eingabe({ ruecklagen: [topf], ist: [entnahme] }), "2025-06");
     const nurRuecklage = rechne(eingabe({ ruecklagen: [geraet], ist: [entnahme] }), "2025-06");
-    const beide = erwarteAufgang(eingabe({ budgets: [topf], ruecklagen: [geraet], ist: [entnahme] }), "2025-06");
+    const beide = erwarteAufgang(eingabe({ ruecklagen: [topf, geraet], ist: [entnahme] }), "2025-06");
 
     const z = zeile(beide, "abschreibungen")!;
-    expect(z.posten.map((p) => p.budgetId ?? p.ruecklageId).sort()).toEqual(["ferien", "g"]);
+    expect(z.posten.map((p) => p.ruecklageId).sort()).toEqual(["ferien", "g"]);
     expect(z.ist).toBe((zeile(nurTopf, "abschreibungen")?.ist ?? 0) + (zeile(nurRuecklage, "abschreibungen")?.ist ?? 0));
     expect(z.plan).toBe((zeile(nurTopf, "abschreibungen")?.plan ?? 0) + (zeile(nurRuecklage, "abschreibungen")?.plan ?? 0));
     expect(beide.zeilen.map((x) => x.id)).not.toContain("wagnisse");
   });
 
   it("lässt Ergebnis und Überleitung unverändert", () => {
-    const beide = erwarteAufgang(eingabe({ budgets: [topf], ruecklagen: [geraet], ist: [entnahme] }), "2025-06");
+    const beide = erwarteAufgang(eingabe({ ruecklagen: [topf, geraet], ist: [entnahme] }), "2025-06");
     // Von Hand gerechnet: Rate des Topfs 70, bis Juni 420 angespart gegen 900 Ausgaben —
     // der Monat kostet 70 + 410 (bis Mai 350 angespart, also max(420, 900) − max(350, 0)
     // = 550); die Rücklage kostet 10. Zusammen 560.
@@ -607,9 +620,8 @@ describe("die Stufen", () => {
       ],
       budgets: [
         budget({ id: "alltag", rate: 70000 }),
-        budget({ id: "reise", kategorieId: "reise", art: "aufbauend", rate: 20000 }),
       ],
-      ruecklagen: [{ id: "g", bezeichnung: "Gerät", rate: 15000, beginn: "2025-01-01" }],
+      ruecklagen: [weiterlaufend({ id: "reise", kategorieId: "reise", rate: 20000 }), { id: "g", bezeichnung: "Gerät", rate: 15000, beginn: "2025-01-01" }],
       ist: [gehalt, beitrag, ist("2025-06-07", -45000, { kategorieId: "markt" }), ist("2025-06-09", -3000, { kategorieId: "haushalt" })],
       vertragJeBuchung: new Map([
         [gehalt.id, "v-gehalt"],
@@ -639,10 +651,11 @@ describe("Einordnung", () => {
       ],
     });
     const e = eingabe({
-      budgets: [budget({ id: "alltag", rate: 70000 }), budget({ id: "reise", kategorieId: "reise", art: "aufbauend", rate: 20000 })],
+      budgets: [budget({ id: "alltag", rate: 70000 })],
+      ruecklagen: [weiterlaufend({ id: "reise", kategorieId: "reise", rate: 20000 })],
       ist: [b],
     });
-    expect(einordnen(e.ist, einordnungskontext(e)).map((x) => [x.art, x.budgetId, x.betrag])).toEqual([
+    expect(einordnen(e.ist, einordnungskontext(e)).map((x) => [x.art, x.budgetId ?? x.ruecklageId, x.betrag])).toEqual([
       ["laufend", "alltag", -3000],
       ["ruecklage", "reise", -2000],
     ]);
@@ -665,9 +678,8 @@ describe("Kennzahlen über mehrere Monate", () => {
       regeln: [regel({ id: "miete", bezeichnung: "Ohlert", betrag: -100000, rhythmus: "monatlich", startdatum: "2025-01-03", vertragId: "v-miete" })],
       budgets: [
         budget({ id: "alltag", rate: 50000 }),
-        budget({ id: "reise", kategorieId: "reise", art: "aufbauend", rate: 20000 }),
       ],
-      ruecklagen: [ruecklage({ rate: 10000 })],
+      ruecklagen: [weiterlaufend({ id: "reise", kategorieId: "reise", rate: 20000 }), ruecklage({ rate: 10000 })],
       ...over,
     });
   const monat = (m: string, gehalt: number) => {

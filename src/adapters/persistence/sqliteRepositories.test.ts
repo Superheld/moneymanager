@@ -221,15 +221,16 @@ describe("Stammdaten-Repositories", () => {
 });
 
 describe("Budget-Repository", () => {
-  it("macht die Rundreise für beide Arten", async () => {
+  it("macht die Rundreise — und liest nur monatliche", async () => {
     await budgetRepository.speichern({
       id: "b1", kategorieId: "k1", kontoId: "giro",
       betraege: [{ abMonat: "2026-08", betrag: 40000 }], art: "monatlich", start: "2026-08-01",
     });
-    await budgetRepository.speichern({
-      id: "b2", kategorieId: "k2", kontoId: "tagesgeld",
-      betraege: [{ abMonat: "2026-01", betrag: 5000 }], art: "aufbauend", start: "2026-01-01",
-    });
+    // Ein aufbauendes, das Migration 81 nicht überführen konnte (eine Id-Kollision): es
+    // bleibt in der Tabelle, wird aber nicht gelesen — und laut gemeldet.
+    const db = halter.lesen() as { execute: (sql: string, werte?: unknown[]) => Promise<unknown> };
+    await db.execute("INSERT INTO budget (id, kategorie_id, konto_id, art, start) VALUES ($1, $2, $3, $4, $5)", ["b2", "k2", "tagesgeld", "aufbauend", "2026-01-01"]);
+    const warnung = vi.spyOn(console, "warn").mockImplementation(() => {});
     // `speichern` rührt die Beträge nicht an — die Reihe hat ihren eigenen Weg. Genau
     // deshalb überlebt sie ein Bearbeiten von Konto oder Art.
     await budgetRepository.betragSpeichern("b1", { abMonat: "2026-08", betrag: 40000 });
@@ -237,7 +238,9 @@ describe("Budget-Repository", () => {
     await budgetRepository.betragSpeichern("b2", { abMonat: "2026-01", betrag: 5000 });
 
     const alle = await budgetRepository.alle();
-    expect(alle).toHaveLength(2);
+    expect(alle.map((b) => b.id)).toEqual(["b1"]);
+    expect(warnung).toHaveBeenCalledWith(expect.any(String), ["b2"]);
+    warnung.mockRestore();
 
     const monatlich = alle.find((b) => b.id === "b1");
     // Aufsteigend — `betragImMonat` verlässt sich darauf.
@@ -247,10 +250,6 @@ describe("Budget-Repository", () => {
     ]);
     expect(monatlich?.art).toBe("monatlich");
     expect(monatlich?.kontoId).toBe("giro");
-
-    const aufbauend = alle.find((b) => b.id === "b2");
-    expect(aufbauend?.art).toBe("aufbauend");
-    expect(aufbauend?.start).toBe("2026-01-01");
   });
 
   // Die Stelle, an der `speichern` die Reihe auf den uebergebenen Stand zurechtstutzt:
@@ -278,12 +277,12 @@ describe("Budget-Repository", () => {
 
   it("räumt die ganze Reihe, wenn kein Betrag mitkommt", async () => {
     await budgetRepository.speichern({
-      id: "b10", kategorieId: "k10", kontoId: "giro", art: "aufbauend", start: "2026-02-01",
+      id: "b10", kategorieId: "k10", kontoId: "giro", art: "monatlich", start: "2026-02-01",
       betraege: [{ abMonat: "2026-02", betrag: 7500 }],
     });
 
     await budgetRepository.speichern({
-      id: "b10", kategorieId: "k10", kontoId: "giro", art: "aufbauend", start: "2026-02-01",
+      id: "b10", kategorieId: "k10", kontoId: "giro", art: "monatlich", start: "2026-02-01",
       betraege: [],
     });
 

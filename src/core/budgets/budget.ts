@@ -1,14 +1,15 @@
-// Budget — was pro Monat für eine Kategorie vorgesehen ist. Zwei Arten, EIN Aggregat:
+// Budget — was pro Monat für eine Kategorie vorgesehen ist. Der Rahmen setzt sich zum
+// Ersten wieder auf den Monatsbetrag zurück: was im März übrig blieb, ist im April nicht
+// mehr da. Der Fall für laufende Ausgaben: Lebensmittel, Drogerie, Tanken.
 //
-//   • monatlich — der Rahmen setzt sich zum Ersten wieder auf den Monatsbetrag zurück.
-//     Was im März übrig blieb, ist im April nicht mehr da. Der Normalfall für laufende
-//     Ausgaben: Lebensmittel, Drogerie, Tanken.
-//   • aufbauend — der Rahmen wächst Monat für Monat weiter und wird NIE zurückgesetzt.
-//     Nicht Ausgegebenes bleibt liegen. Der Fall für alles, was sich sammelt, bis es
-//     gebraucht wird: Urlaub, Reparaturen, das neue Rad.
+// **Seit Migration 81 ist ein Budget nur noch monatlich.** Bis dahin gab es eine zweite
+// Art, `aufbauend`, deren Rahmen weiterwuchs und nie zurückgesetzt wurde — für alles, was
+// sich sammelt, bis es gebraucht wird. Das ist eine Rücklage (`ruecklagen/`, Sorte
+// `fortlaufend`), und dorthin ist sie umgezogen (ADR-0006). Die Spalte `budget.art` bleibt
+// im Schema; das Repository liest nur noch `monatlich`.
 //
-// Mehr unterscheidet die Arten nicht. Kein Ziel, keine Frist, kein Schätzbetrag —
-// eingegeben wird in beiden Fällen genau eine Zahl: der Betrag pro Monat. Der ändert sich
+// Kein Ziel, keine Frist, kein Schätzbetrag — eingegeben wird genau eine Zahl: der Betrag
+// pro Monat. Der ändert sich
 // über die Zeit, und deshalb steht er als REIHE am Budget (`betraege`) und nicht als Wert:
 // wer im August von 400 auf 450 geht, hat im Juli mit 400 geplant, und das soll so
 // stehenbleiben. Wer den Betrag eines Monats braucht, fragt `betragImMonat`.
@@ -34,19 +35,19 @@
 // dort still eine falsche Zahl erzeugt. Genau so ist dieser Fehler entstanden.
 //
 // **Verschachtelung: das Dach gilt für alles AUSSER seinen Unterbudgets.** Budgets dürfen
-// ineinander liegen: „Mobilität" aufbauend mit 50 €, darunter „Tanken" mit 100 €. Dann
-// sind die 50 € für alles in Mobilität ausser Tanken da, und die 100 € fürs Tanken — zwei
-// getrennte Töpfe, zusammen 150 € im Monat. Das Unterbudget hat auf das Dach KEINEN
+// ineinander liegen: „Mobilität" mit 50 €, darunter „Tanken" mit 100 €. Dann sind die
+// 50 € für alles in Mobilität ausser Tanken da, und die 100 € fürs Tanken — zwei
+// getrennte Rahmen, zusammen 150 € im Monat. Eine Rücklage darunter nimmt dem Dach
+// ihre Kategorie ebenso ab (`zustaendigkeit`). Das Unterbudget hat auf das Dach KEINEN
 // Einfluss: weder zählt sein Verbrauch gegen das Dach (`budgetKategorien` nimmt seinen
 // Unterbaum heraus), noch geht sein Betrag vom Dach ab.
 //
 // **Bis 2026-11-09 ging er ab.** Das Dach bekam „seinen Betrag minus die Beträge darin",
 // gedacht als Aufteilung EINES Rahmens auf seine Teile. So ist ein Budget aber nicht
 // gemeint, und es ergab Unsinn, sobald das Kind mehr bekam als das Dach: Mobilität bekam
-// jeden Monat −50 €, und ein aufbauendes Dach SANK Monat für Monat, ohne dass etwas
-// ausgegeben wurde. Wer den Abzug zurückbringt, bringt das mit.
+// jeden Monat −50 €, und ein aufbauendes Dach (damals gab es das) SANK Monat für Monat,
+// ohne dass etwas ausgegeben wurde. Wer den Abzug zurückbringt, bringt das mit.
 
-import type { Anspruch } from "../konten/kontobelegung";
 import type { Cent } from "../basis/geld";
 import { kategorieAnteile, type IstBuchung } from "../buchung/istbuchung";
 import { kategorieUnterbaum, type Kategorie } from "../kategorien/kategorie";
@@ -55,7 +56,8 @@ import type { Ruecklage, Ruecklagenzyklus } from "../ruecklagen/ruecklage";
 import type { Ruecklagenentnahme } from "../ruecklagen/topf";
 import { zustaendigkeit, type Ruecklagenzuordnung, type Zustaendig } from "../ruecklagen/zustaendigkeit";
 
-export type Budgetart = "monatlich" | "aufbauend";
+/** Seit Migration 81 die einzige Art; `aufbauend` ist eine Rücklage geworden. */
+export type Budgetart = "monatlich";
 
 /**
  * Ein Betrag und der Monat, ab dem er gilt (`YYYY-MM`).
@@ -83,9 +85,8 @@ export interface Budget {
    * Bedeutung, seit 2026-10-26 (vorher trug das Feld drei, und die versprochene vierte
    * wurde nirgends gerechnet).
    *
-   * Daraus folgt alles Weitere: beim aufbauenden Budget beansprucht sein Rest Geld auf
-   * diesem Konto (`aufbauendeAnsprueche` → `core/konten/kontobelegung`), die
-   * Liquiditätsvorschau lässt den Monatsrest eines monatlichen von hier abfliessen, und
+   * Daraus folgt alles Weitere: die Liquiditätsvorschau lässt den Monatsrest von hier
+   * abfliessen, und
    * die Übersicht plant die Rate eines Budgets auf einem nicht liquiden Konto nicht —
    * sie kommt dort über eine Umbuchung an.
    *
@@ -104,10 +105,9 @@ export interface Budget {
   readonly betraege: readonly Budgetbetrag[];
   readonly art: Budgetart;
   /**
-   * Ab wann gerechnet wird (ISO). Kein Ziel und keine Frist — nur der Anker, ohne den
-   * ein aufbauendes Budget nicht sagen kann, wie viele Monate es schon gesammelt hat.
-   * Bei `monatlich` ohne Wirkung, das Feld bleibt trotzdem gesetzt (ein Feld, das mal
-   * da ist und mal nicht, muss überall geprüft werden).
+   * Der Tag des Anlegens (ISO). Ohne Wirkung auf die Rechnung — er war der Sammelanker
+   * des aufbauenden Budgets; das Feld bleibt gesetzt (ein Feld, das mal da ist und mal
+   * nicht, muss überall geprüft werden).
    */
   readonly start: string;
 }
@@ -130,32 +130,16 @@ export function betragImMonat(budget: Budget, monat: string): Cent {
 }
 
 /**
- * Der erste Monat, für den dieses Budget etwas aussagt.
- *
- * Beim Aufbauenden zusätzlich durch `start` begrenzt: dort ist der Start der Anker, ab dem
- * gesammelt wird, und eine Betragsversion davor wäre eine Zuführung in ein Budget, das
- * noch nicht sammelt.
+ * Der erste Monat, für den dieses Budget etwas aussagt: der seiner ersten Betragsversion.
  *
  * **`start` wird hier nicht vorausgesetzt, obwohl der Typ es zusagt.** Die Spalte
- * `budget.start` ist nullable, und das Repository reicht sie unverändert durch — der Typ
- * sagt `string`, die Datenbank kann NULL liefern. Über die App entsteht das nicht
- * (`budgetAnlegen` schreibt immer eines, und die Migration hat die Altbestände gefüllt);
- * über eine von Hand geänderte Datei schon.
- *
- * Der Unterschied ist die Schadensgröße, und deshalb steht die Absicherung hier: ohne sie
- * warf `.slice` schon beim LADEN, und weil `budgetstaende` über alle Budgets läuft, riss
- * ein einziges kaputtes den ganzen Budgets-Screen mit — leere Seite, keine Meldung, kein
- * Hinweis welches. Mit ihr verhält sich genau dieses eine Budget wie eines ohne
- * Sammelanker, und die anderen rechnen weiter.
- *
- * Erfunden wird dabei nichts: ein fehlender Start wird zum leeren Monat, und der gewinnt
- * den Vergleich unten nie. Ein aufbauendes Budget ohne Anker zählt damit ab seiner ersten
- * Betragsversion — das ist die einzige Aussage über seinen Beginn, die dann noch dasteht.
+ * `budget.start` ist nullable, und das Repository reicht sie unverändert durch. Ohne
+ * Betragsversion (über die App nicht herzustellen) dient er als Rückfall; fehlt auch er,
+ * ist der Monat leer, und das Budget rechnet nichts — statt beim Laden zu werfen und den
+ * ganzen Budgets-Screen mitzureissen.
  */
 export function ersterBudgetmonat(budget: Budget): string {
-  const startMonat = (budget.start ?? "").slice(0, 7);
-  const erste = budget.betraege[0]?.abMonat ?? startMonat;
-  return budget.art === "aufbauend" && startMonat > erste ? startMonat : erste;
+  return budget.betraege[0]?.abMonat ?? (budget.start ?? "").slice(0, 7);
 }
 
 /**
@@ -227,11 +211,7 @@ export function budgetKategorien(
   return eigene;
 }
 
-/**
- * Geglätteter erwarteter Abfluss pro Monat (negativ) — was Planung und Monatsausblick
- * je Monat einrechnen. Für beide Arten derselbe Wert: auch ein aufbauendes Budget
- * kostet jeden Monat seine Rate, es gibt sie nur nicht am Monatsende zurück.
- */
+/** Geglätteter erwarteter Abfluss pro Monat (negativ) — was Planung und Monatsausblick je Monat einrechnen. */
 export function geglaetteterMonatsabfluss(budget: Budget, monat: string): Cent {
   return -betragImMonat(budget, monat);
 }
@@ -250,34 +230,18 @@ export function monatsFenster(am: string): { von: string; bis: string } {
 
 /**
  * Das Fenster, über das der Verbrauch eines Budgets zählt, wenn man auf den Monat von
- * `am` schaut:
- *   • monatlich — genau dieser Kalendermonat (Reset zum Ersten).
- *   • aufbauend — vom Start bis zum Ende dieses Monats (nie zurückgesetzt).
+ * `am` schaut: genau dieser Kalendermonat (Reset zum Ersten).
  */
-export function verbrauchsFenster(budget: Budget, am: string): { von: string; bis: string } {
-  const monat = monatsFenster(am);
-  return budget.art === "monatlich" ? monat : { von: budget.start, bis: monat.bis };
+export function verbrauchsFenster(_budget: Budget, am: string): { von: string; bis: string } {
+  return monatsFenster(am);
 }
 
 /**
- * Was bis zum Monat von `am` insgesamt hineingegangen ist:
- *   • monatlich — der Monatsbetrag, jeden Monat neu.
- *   • aufbauend — der Monatsbetrag mal der Zahl der Monate seit Start (der laufende
- *     zählt mit; wer im Januar 50 € einplant, hat im Januar 50 € zur Verfügung).
- *
- * Vor dem Start ist der Rahmen 0 — ein Budget rückwirkend zu füllen wäre erfunden.
+ * Was im Monat von `am` zur Verfügung steht: der Monatsbetrag, jeden Monat neu. Vor der
+ * ersten Version 0 — ein Budget rückwirkend zu füllen wäre erfunden.
  */
 export function budgetRahmen(budget: Budget, am: string): Cent {
-  const monat = am.slice(0, 7);
-  if (budget.art === "monatlich") return zufuehrungIm(budget, monat);
-  // Aufsummiert statt „Rate mal Monate": mit mehreren Betragsversionen ist die Rate nicht
-  // mehr über die ganze Laufzeit dieselbe, und eine Multiplikation rechnete den heutigen
-  // Betrag rückwirkend in jeden vergangenen Monat hinein.
-  let summe = 0;
-  for (let m = ersterBudgetmonat(budget); m <= monat; m = monatDanach(m)) {
-    summe += zufuehrungIm(budget, m);
-  }
-  return summe;
+  return zufuehrungIm(budget, am.slice(0, 7));
 }
 
 /** `YYYY-MM` einen Monat weiter — reine String-Arithmetik über die Datumshelfer. */
@@ -405,17 +369,19 @@ export function ruecklagenEntnahmenAus(sicht: BudgetSicht): Map<string, Ruecklag
 }
 
 /**
- * Die Anteile (`buchungId#index`), die eine Rücklage VON HAND über ihre Kategorie trägt
- * oder die auf eine Zuordnung warten — für den Budgetvorschlag, der sie auslässt. Die
- * aufbauenden Budgets zählen hier nicht: deren Kategorien schliesst der Vorschlag ohnehin
- * aus, weil dort schon ein Budget liegt.
+ * Die Anteile (`buchungId#index`), die eine Rücklage trägt oder die auf eine Zuordnung
+ * warten — für den Budgetvorschlag, der sie auslässt: was eine Rücklage trägt, soll kein
+ * Budget messen.
+ *
+ * Bis Migration 81 hiess das `vonRuecklagenGetragen` und nahm die aufbauenden Budgets
+ * aus (deren Kategorien schloss der Vorschlag ohnehin aus, weil dort ein Budget lag).
+ * Seither sind sie Rücklagen, und die eine Regel deckt beide.
  */
-export function vonRuecklagenGetragen(sicht: BudgetSicht): Set<string> {
-  const budgetIds = new Set(sicht.budgets.map((b) => b.id));
+export function ruecklagenAnteile(sicht: BudgetSicht): Set<string> {
   const raus = new Set<string>();
   for (const x of getrageneAnteile(sicht)) {
     const t = x.traeger;
-    if ((t.art === "ruecklage" && !budgetIds.has(t.ruecklageId)) || t.art === "wartet") raus.add(`${x.buchung.id}#${x.anteil}`);
+    if (t.art === "ruecklage" || t.art === "wartet") raus.add(`${x.buchung.id}#${x.anteil}`);
   }
   return raus;
 }
@@ -453,6 +419,20 @@ export function budgetBuchungen(
   von: string,
   bis: string,
 ): Verbrauchsposten[] {
+  return getrageneBuchungen(sicht, budget.id, von, bis);
+}
+
+/**
+ * Die Anteile im Fenster [von, bis), die `id` trägt — ein Budget oder eine Rücklage. Die
+ * eine Auswahl hinter dem Verbrauch eines Budgets und dem, was eine Rücklage im
+ * Monatsausblick getragen hat.
+ */
+export function getrageneBuchungen(
+  sicht: BudgetSicht,
+  id: string,
+  von: string,
+  bis: string,
+): Verbrauchsposten[] {
   // Wer den Anteil trägt, sagt die Zuständigkeit — dieselbe Frage wie in der Einordnung.
   // Ein eingebettetes Budget oder eine Rücklage darunter nimmt dem Dach seine Kategorien
   // ab (`budgetKategorien` beschreibt dasselbe für Budgets allein); die eine teure
@@ -460,7 +440,7 @@ export function budgetBuchungen(
   const raus: Verbrauchsposten[] = [];
   for (const x of getrageneAnteile(sicht)) {
     if (x.buchung.datum < von || x.buchung.datum >= bis) continue;
-    if (!x.kategorieId || !traegt(x.traeger, budget.id)) continue;
+    if (!x.kategorieId || !traegt(x.traeger, id)) continue;
     raus.push({ buchung: x.buchung, anteil: x.anteil, kategorieId: x.kategorieId, betrag: -x.betrag });
   }
   return raus.sort((x, y) => x.buchung.datum.localeCompare(y.buchung.datum));
@@ -476,22 +456,4 @@ export function budgetStand(
   const rahmen = budgetRahmen(budget, am);
   const verbraucht = budgetVerbrauch(sicht, budget, von, bis);
   return { rahmen, verbraucht, rest: rahmen - verbraucht };
-}
-
-/**
- * Was die AUFBAUENDEN Budgets auf ihren Konten beanspruchen: ihren Rest zum Monat von `am`.
- *
- * Nur die aufbauenden, und das ist die Entscheidung (siehe `core/konten/kontobelegung`):
- * der Rest eines monatlichen Budgets verfällt zum Monatsende und bleibt einfach auf dem
- * Konto, ein aufbauender gehört weiter dem Budget. Ein überzogenes Budget (Rest unter 0)
- * beansprucht nichts — es hat mehr ausgegeben, als hineinging, und schuldet dem Konto
- * nichts, was dort liegen müsste.
- *
- * Der Rest kommt aus der UNGEFILTERTEN Sicht: das Budget beansprucht, was ihm über alle
- * Konten hinweg geblieben ist — derselbe Wert, den der Bereich Budgets zeigt.
- */
-export function aufbauendeAnsprueche(sicht: BudgetSicht, am: string): Anspruch[] {
-  return sicht.budgets
-    .filter((b) => b.art === "aufbauend")
-    .map((b) => ({ art: "budget", id: b.id, kontoId: b.kontoId, betrag: budgetStand(sicht, b, am).rest }));
 }

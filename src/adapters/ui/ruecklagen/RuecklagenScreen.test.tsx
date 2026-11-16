@@ -36,6 +36,7 @@ async function mitRuecklage(bezeichnung: string, ziel: number, frist: number) {
     beginn: "2024-03-01",
     ziel,
     fristMonate: frist,
+    kategorieId: "kat-tellwick",
   });
   rendere(<RuecklagenScreen />);
   await waitFor(() => expect(document.body.textContent).toMatch(bezeichnung));

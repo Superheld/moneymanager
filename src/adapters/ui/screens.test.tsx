@@ -178,7 +178,8 @@ describe("RuecklagenScreen", () => {
       ziel: 60000, fristMonate: 120,
     });
     rendere(<RuecklagenScreen />);
-    expect(await screen.findByText(/Waschmaschine/)).toBeInTheDocument();
+    // In der Liste und unter „Ohne Konto" in der Karte „Wo das Geld liegt".
+    expect((await screen.findAllByText(/Waschmaschine/)).length).toBeGreaterThan(0);
   });
 });
 
@@ -344,17 +345,17 @@ describe("UebersichtScreen", () => {
   });
 
   /**
-   * Seit 2026-11-15 ist ein aufbauendes Budget in der Oberfläche eine Rücklage. In der
-   * Karte „Budgets" steht es deshalb nicht mehr; es zählt in der Zeile „Rücklagen" der
-   * Monatskarten und unter „Was da ist" als gebunden. Seine Fortschreibung (Übertrag,
-   * Rate, Verbrauch) zeigt der Bereich Rücklagen (`budgets/BudgetsScreen.test.tsx`).
+   * Seit Migration 81 ist das frühere aufbauende Budget eine Rücklage, die weiterläuft. In
+   * der Karte „Budgets" steht sie nicht; sie zählt in der Zeile „Rücklagen" der
+   * Monatskarten und unter „Was da ist" als gebunden. Ihren Verlauf zeigt der Bereich
+   * Rücklagen.
    */
-  it("zeigt ein aufbauendes Budget nicht in der Karte Budgets, sondern als Rücklage", async () => {
+  it("zeigt eine Rücklage, die weiterläuft, nicht in der Karte Budgets, sondern als Rücklage", async () => {
     await grunddaten();
-    await sqliteBudgetRepository.speichern({
-      id: "b1", kategorieId: "kat1", kontoId: "k1", betraege: [{ abMonat: monat(2), betrag: 10000 }],
-      art: "aufbauend", start: `${monat(2)}-01`,
+    await sqliteRuecklagenRepository.speichern({
+      id: "b1", bezeichnung: "Lebensmittel", kategorieId: "kat1", kontoId: "k1", art: "fortlaufend", beginn: `${monat(2)}-01`,
     });
+    await sqliteRuecklagenRepository.rateSpeichern("b1", { abMonat: monat(2), betrag: 10000 });
     await sqliteLedgerRepository.speichern({
       id: "i1", datum: `${monat(1)}-05`, betrag: -3000, kontoId: "k1",
       charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",

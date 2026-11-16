@@ -45,7 +45,6 @@ import { useTranslation } from "react-i18next";
 import {
   budgetzeilenZu,
   budgetstaende,
-  nachArtGetrennt,
   toIso,
   type Abrufstand,
   type Depotdaten,
@@ -151,8 +150,8 @@ export function UebersichtScreen({ onNavigate }: { onNavigate?: (id: ScreenId) =
     return monat === dieserMonat ? daten.staende : budgetstaende(daten.sicht, `${monat}-28`);
   }, [daten, monat, dieserMonat]);
 
-  /** Nur die monatlichen — die aufbauenden sind Rücklagen (Kopf der Datei). */
-  const monatliche = useMemo(() => nachArtGetrennt(staende).monatlich, [staende]);
+  /** Seit Migration 81 ist jedes Budget monatlich; das frühere aufbauende ist eine Rücklage. */
+  const monatliche = staende;
 
   return (
     <div className="screen">
@@ -264,9 +263,6 @@ export function UebersichtScreen({ onNavigate }: { onNavigate?: (id: ScreenId) =
                             {z.tiefe > 0 && <span style={{ color: "var(--ink-3)", flex: "0 0 auto" }}>└</span>}
                             <span style={{ color: "var(--ink-3)", flex: "0 0 auto" }}>{offen ? "▾" : "▸"}</span>
                             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={name}>{name}</span>
-                            {/* Hängt das Budget unter einem der anderen Art, steht dessen Name
-                                daneben — die Liste trennt je Zeile (`nachArtGetrennt`). */}
-                            {z.unter && <span className="muted" style={{ flex: "0 0 auto", fontWeight: "var(--fw-regular)", fontSize: "var(--fs-2xs)" }}>{t("budgets.unter", { name: z.unter })}</span>}
                             {/* Liegt eine Rücklage auf einer Unterkategorie, zählt ihr
                                 Verbrauch hier nicht — und sie steht nicht in dieser Karte. */}
                             {z.abgezogen && <span className="muted" style={{ flex: "0 0 auto", fontWeight: "var(--fw-regular)", fontSize: "var(--fs-2xs)" }}>{t("budgets.ruecklageAbgezogen", { count: z.abgezogen.length, namen: z.abgezogen.join(", ") })}</span>}

@@ -57,11 +57,11 @@ export function GeldJeKontoKarte({
                 render: (r: RuecklageOhneKonto) => r.name,
               },
               {
-                key: "form",
-                label: t("ruecklagen.geldJeKonto.spalteForm"),
+                key: "sorte",
+                label: t("ruecklagen.feldSorte"),
                 schmal: "zweitzeile",
                 render: (r: RuecklageOhneKonto) =>
-                  r.form === "hand" ? t("ruecklagen.abschnittHand") : t("ruecklagen.abschnittKategorie"),
+                  t(`ruecklagen.sorte.${r.art}`),
               },
               {
                 key: "anspruch",

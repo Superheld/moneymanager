@@ -20,7 +20,7 @@
 
 import { ignorierenVermerken, ignorierteLesen } from "../einstellungen";
 import { budgetvorschlaege as berechnen, vertragskandidaten } from "../../core";
-import type { Budgetvorschlag } from "../../core";
+import type { Budgetvorschlag, Ruecklage } from "../../core";
 import { spurenAus } from "../buchung/zahlungsspuren";
 import type {
   BudgetRepository,
@@ -63,10 +63,17 @@ export async function budgetvorschlaegeLaden(
   /** Die erfassten Buchung↔Vertrag-Verknüpfungen; ohne sie zählen nur die Kandidaten. */
   zuordnungRepo?: VertragszuordnungRepository,
   /**
-   * Die Anteile, die eine Rücklage über ihre Kategorie trägt oder die auf eine Zuordnung
-   * warten (`vonRuecklagenGetragen`) — sie zählen in keinen Vorschlag.
+   * Die Anteile, die eine Rücklage trägt oder die auf eine Zuordnung warten
+   * (`ruecklagenAnteile`) — sie zählen in keinen Vorschlag.
    */
   vonRuecklagen: ReadonlySet<string> = new Set(),
+  /**
+   * Die laufenden Rücklagen: an ihrer Kategorie wird nichts vorgeschlagen — weder ein
+   * Budget (dort lässt die App keines neu anlegen) noch eine zweite Rücklage. Bis
+   * Migration 81 war die frühere aufbauende Rücklage ein Budget und fiel über `budgets`
+   * heraus; jetzt fällt sie hierüber heraus.
+   */
+  ruecklagen: readonly Pick<Ruecklage, "kategorieId">[] = [],
 ): Promise<Budgetvorschlag[]> {
   const [buchungen, umsaetze, kategorien, budgets] = await Promise.all([
     ledger.alle(),
@@ -89,9 +96,9 @@ export async function budgetvorschlaegeLaden(
   // und die beiden Rahmen zählten dieselben Buchungen doppelt.
   const byId = new Map(kategorien.map((k) => [k.id, k]));
   const belegt = new Set<string>();
-  for (const b of budgets) {
-    const k = byId.get(b.kategorieId);
-    belegt.add(k?.elternId ?? b.kategorieId);
+  for (const kategorieId of [...budgets.map((b) => b.kategorieId), ...ruecklagen.flatMap((r) => (r.kategorieId ? [r.kategorieId] : []))]) {
+    const k = byId.get(kategorieId);
+    belegt.add(k?.elternId ?? kategorieId);
   }
   for (const id of ignoriert) belegt.add(id);
 

@@ -110,12 +110,11 @@ export function einrichtungsstand(e: EinrichtungEingabe): Einrichtungsstand {
     // Eine Zahlungsregel entsteht nur zusammen mit einem Vertrag; gezählt wird sie und
     // nicht der Vertrag, weil erst die Regel eine Zeile in der Ergebnisrechnung bildet.
     vertraege: da(e.regeln.length > 0),
-    // Nur das monatliche: ein aufbauendes Budget steht seit 2026-11-15 im Bereich
-    // Rücklagen und heisst dort so — es ist dieselbe Sache in anderer Form (ein Topf mit
-    // Rate). Zählte es hier, hiesse der Schritt „Budgets" erledigt, obwohl der Bereich
-    // Budgets leer ist.
-    budgets: da(e.budgets.some((b) => b.art === "monatlich")),
-    ruecklagen: da(e.ruecklagenAnzahl > 0 || e.budgets.some((b) => b.art === "aufbauend")),
+    // Seit Migration 81 ist jedes Budget monatlich; das frühere aufbauende ist eine
+    // Rücklage und zählt in `ruecklagenAnzahl` — wie schon seit 2026-11-15 für den
+    // Schritt „Rücklagen" und nicht für „Budgets".
+    budgets: da(e.budgets.length > 0),
+    ruecklagen: da(e.ruecklagenAnzahl > 0),
   };
 
   const schritte = EINRICHTUNGSSCHRITTE.map((id): Einrichtungsschritt => ({

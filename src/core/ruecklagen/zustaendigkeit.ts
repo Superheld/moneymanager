@@ -77,10 +77,14 @@ function traegtAm(r: Ruecklage, datum: string): boolean {
  *
  * `ruecklagen` sind ALLE, beendete eingeschlossen: eine beendete trägt ihre Kategorie bis
  * zu ihrem Ende, und ein Monat davor soll nicht anders aussehen, nur weil sie inzwischen
- * beendet ist. `budgets` sind alle: ein monatliches trägt als laufende Kosten, ein
- * aufbauendes als Rücklage mit seiner eigenen ID. Am selben Knoten gehen beide jeder
- * Rücklage von Hand vor — das monatliche, weil eine neue Rücklage dort nicht angelegt
- * werden darf (der Altfall), das aufbauende bis Paket 4 aus dem Grund oben.
+ * beendet ist. `budgets` sind die monatlichen — seit Migration 81 gibt es keine anderen.
+ * Am selben Knoten geht ein monatliches Budget jeder Rücklage vor: eine neue Rücklage
+ * darf dort nicht angelegt werden, und im Altfall gewinnt das Budget.
+ *
+ * Bis Migration 81 ging dort auch das aufbauende Budget vor. Seither ist es eine
+ * Rücklage der Sorte `fortlaufend` ohne Fundanfang (`findet_ab` leer). Hängen weitere
+ * Rücklagen an derselben Kategorie, wartet eine Buchung erst ab DEREN `findet_ab` auf eine
+ * Zuordnung — davor trägt die frühere allein, wie zuvor.
  *
  * Die Reihenfolge (Teil B des Entwurfs, Abschnitt 2):
  *
@@ -90,8 +94,8 @@ function traegtAm(r: Ruecklage, datum: string): boolean {
  *   2. `budgetrelevant = false`: mit alter Verknüpfung über eine Ausbuchung →
  *      `ausgebucht`, sonst `ungeplant` (eine von Hand aus den Budgets genommene Ausgabe
  *      kostet ihren Monat).
- *   3. Der nächste Vorfahr der Kategorie, an dem etwas hängt. Ein Budget gewinnt dort
- *      gegen eine Rücklage von Hand (siehe oben).
+ *   3. Der nächste Vorfahr der Kategorie, an dem etwas hängt. Ein monatliches Budget
+ *      gewinnt dort gegen jede Rücklage (siehe oben).
  *      Eine Rücklage hängt dort nur, wenn ihr Fenster den Tag enthält — sonst fällt der
  *      Anteil zum Dach durch, wie heute vor der Umstellung. Eine → `ruecklage`, mehrere
  *      → `wartet`.
@@ -109,11 +113,6 @@ export function zustaendigkeit(
   abschluesse: readonly Ruecklagenzyklus[],
 ): (anteil: Anteilsfrage) => Zustaendig {
   const eltern = new Map(kategorien.map((k) => [k.id, k.elternId]));
-  // Monatliche UND aufbauende: ein aufbauendes Budget ist bis Migration 81 noch ein Budget
-  // und trägt seine Kategorie VOR jeder Rücklage von Hand am selben Knoten. Liefe es als
-  // gewöhnliche Rücklage mit, wartete jede Buchung dort auf eine Zuordnung, die sich nicht
-  // speichern lässt — `ruecklage_zuordnung` verweist auf `ruecklage`, und dort steht das
-  // Budget erst ab Paket 4.
   const budgetAn = new Map<string, Budget>();
   for (const b of budgets) budgetAn.set(b.kategorieId, b);
   const ruecklagenAn = new Map<string, Ruecklage[]>();
@@ -157,10 +156,7 @@ export function zustaendigkeit(
     // Der Zähler schützt gegen einen Zyklus im Baum, wie in `elternBudget`.
     for (let i = 0; knoten && i < 100; i++) {
       const budget = budgetAn.get(knoten);
-      if (budget?.art === "monatlich") return { art: "laufend", budgetId: budget.id };
-      // „Ausdrücklich keine Rücklage" gilt auch für das aufbauende Budget: für den Nutzer
-      // ist es eine Rücklage.
-      if (budget && !ohneRuecklagen) return { art: "ruecklage", ruecklageId: budget.id };
+      if (budget) return { art: "laufend", budgetId: budget.id };
       const kandidaten = ohneRuecklagen
         ? []
         : (ruecklagenAn.get(knoten) ?? []).filter((r) => traegtAm(r, anteil.datum)).map((r) => r.id);
@@ -170,6 +166,72 @@ export function zustaendigkeit(
     }
     return { art: "ungeplant" };
   };
+}
+
+/** Was zwischen Budgets und Rücklagen herausgerechnet wird, je Seite. */
+export interface Herausgerechnet {
+  /** Budget-ID → die Rücklagen, die ihm Buchungen abnehmen (sie hängen darunter). */
+  readonly ausBudget: ReadonlyMap<string, readonly Ruecklage[]>;
+  /** Rücklagen-ID → die Budgets, die ihr Buchungen abnehmen (sie hängen darunter). */
+  readonly ausRuecklage: ReadonlyMap<string, readonly Budget[]>;
+}
+
+/**
+ * Wer wem Buchungen abnimmt, am Tag `am` — für den Hinweis „ohne …" an einem Budget (und
+ * an einer Rücklage), aus dem etwas herausgerechnet ist.
+ *
+ * Dieselbe Regel wie `zustaendigkeit`, nur über Knoten statt über Anteile: was an einer
+ * Kategorie hängt, trägt sie samt Unterkategorien, bis ein näherer Träger kommt. Hängt
+ * unter einem Budget eine Rücklage, deren Fenster den Tag enthält, fehlen dem Budget ihre
+ * Buchungen — und umgekehrt. Am selben Knoten gewinnt das Budget; dann nimmt niemand
+ * jemandem etwas ab. Eine Rücklage, die an diesem Tag nichts findet (eine
+ * abschliessende ohne `findet_ab`, eine beendete), nimmt auch nichts ab.
+ *
+ * Bis Migration 81 stand das als `abgezogen` an den Budgetständen und wurde aus dem
+ * Budgetbaum gelesen (`nachArtGetrennt`); seither ist die eine Seite eine Rücklage, und
+ * die Frage gehört der Zuständigkeit.
+ */
+export function herausgerechnet(
+  kategorien: readonly Kategorie[],
+  budgets: readonly Budget[],
+  ruecklagen: readonly Ruecklage[],
+  am: string,
+): Herausgerechnet {
+  const eltern = new Map(kategorien.map((k) => [k.id, k.elternId]));
+  const budgetAn = new Map<string, Budget>();
+  for (const b of budgets) budgetAn.set(b.kategorieId, b);
+  const ruecklagenAn = new Map<string, Ruecklage[]>();
+  for (const r of ruecklagen) {
+    if (!r.kategorieId || !traegtAm(r, am)) continue;
+    const liste = ruecklagenAn.get(r.kategorieId);
+    if (liste) liste.push(r);
+    else ruecklagenAn.set(r.kategorieId, [r]);
+  }
+  /** Der nächste Träger ÜBER dem Knoten (der Knoten selbst ausgenommen). */
+  const darueber = (knoten: string): { budget?: Budget; ruecklagen?: Ruecklage[] } | undefined => {
+    let k = eltern.get(knoten);
+    for (let i = 0; k && i < 100; i++) {
+      const b = budgetAn.get(k);
+      if (b) return { budget: b };
+      const rs = ruecklagenAn.get(k);
+      if (rs) return { ruecklagen: rs };
+      k = eltern.get(k);
+    }
+    return undefined;
+  };
+
+  const ausBudget = new Map<string, Ruecklage[]>();
+  const ausRuecklage = new Map<string, Budget[]>();
+  for (const [knoten, rs] of ruecklagenAn) {
+    if (budgetAn.has(knoten)) continue;
+    const t = darueber(knoten);
+    if (t?.budget) ausBudget.set(t.budget.id, [...(ausBudget.get(t.budget.id) ?? []), ...rs]);
+  }
+  for (const b of budgets) {
+    const t = darueber(b.kategorieId);
+    for (const r of t?.ruecklagen ?? []) ausRuecklage.set(r.id, [...(ausRuecklage.get(r.id) ?? []), b]);
+  }
+  return { ausBudget, ausRuecklage };
 }
 
 /**

@@ -103,7 +103,7 @@ auf" ausführbar macht.
 
 | Wort | meint | nicht verwechseln mit |
 |---|---|---|
-| **Topf** | Geld, das für etwas bestimmt ist: eine Rücklage, ein aufbauendes Budget, ein Vorsorgeziel | dem Konto — das sagt, WO Geld liegt, der Topf, WEM es gehört |
+| **Topf** | Geld, das für etwas bestimmt ist: eine Rücklage (seit Migration 81 auch das frühere aufbauende Budget), ein Vorsorgeziel | dem Konto — das sagt, WO Geld liegt, der Topf, WEM es gehört |
 | **Rate** | was ein Topf den Monat kostet, ob überwiesen wurde oder nicht | der Überweisung auf das Konto des Topfs |
 | **Zuführung** | die Rate, von der Geldseite gesehen: was in den Topf hineingeht | — |
 | **Entnahme** | eine Ausgabe, die ein Topf trägt | Kosten — die waren die Raten davor |
@@ -112,8 +112,8 @@ auf" ausführbar macht.
 
 ### Die Regeln
 
-- **Ein Topf kostet seine Rate, nicht seine Auszahlung.** Für Rücklage, aufbauendes
-  Budget und Vorsorge gleich. Sonst sieht der Monat der grossen Ausgabe schlecht aus und
+- **Ein Topf kostet seine Rate, nicht seine Auszahlung.** Für Rücklage und Vorsorge
+  gleich. Sonst sieht der Monat der grossen Ausgabe schlecht aus und
   jeder davor zu gut.
 - **Eine Entnahme ist kein zweites Mal Kosten — bis zur Höhe des Topfstands.** Was
   darüber hinausgeht, ist ungedeckt und zählt als Kosten des Monats. Ohne die Grenze
@@ -199,7 +199,7 @@ weil die Schuld sinkt. Vier Dinge daran:
 **Der Kauf aus einer Rücklage wird gegen ihren Stand geprüft** (seit Migration 76): die
 Ausbuchung hält den beendeten Zyklus fest, und was der Kauf über das Angesparte hinaus
 kostet, zählt im Kaufmonat (`altabschlussKosten` in `ruecklagen/topf.ts`). Jeder andere
-Zyklus — der laufende, ein aufbauendes Budget, eine Rücklage, die über ihre Kategorie
+Zyklus — der laufende, eine Rücklage, die weiterläuft, eine, die über ihre Kategorie
 findet — rechnet nach der max-Regel (`zyklusKosten`); beides trifft nie im selben Zyklus
 zusammen. **Eine nicht budgetrelevante Ausgabe ist nur Entnahme, wofür eine Rücklage
 ausgebucht wurde** — oder wenn jemand sie ausdrücklich einer Rücklage zugeordnet hat.

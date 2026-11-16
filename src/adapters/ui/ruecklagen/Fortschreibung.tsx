@@ -1,18 +1,19 @@
-// Die Aufrechnung eines Budgetmonats in einer Zeile: Übertrag, Zuführung, Verbrauch.
+// Die Aufrechnung eines Monats einer Rücklage in einer Zeile: Übertrag, Rate, Entnahmen.
 //
-// Sie steht da, wo vorher „140 von 200" stand. Bei einem aufbauenden Budget war die 200
-// der Betrag, der hineingegangen WÄRE, hätte man nie etwas ausgegeben — eine Zahl, die
-// mit jedem Monat weiterwächst und über den laufenden Monat nichts sagt. Der Übertrag
-// dagegen sagt genau das: soviel war da, soviel kam dazu, soviel ist weg.
+// Bis Paket 4 (ADR-0006) war das die Zeile des aufbauenden Budgets und lag in
+// `bausteine/` (als `BudgetFortschreibung`). Seither zeigt sie der Verlauf JEDER Rücklage
+// und nur er — deshalb liegt sie hier. Sie steht da, wo sonst „140 von 200" stünde: die
+// 200 wäre der Betrag, der hineingegangen WÄRE, hätte man nie etwas ausgegeben. Der
+// Übertrag sagt dagegen: soviel war da, soviel kam dazu, soviel ist weg.
 //
 // Das Ergebnis steht bewusst NICHT in dieser Zeile: es ist der grosse Betrag darüber.
 // Zweimal dieselbe Zahl in zwei Schriftgrössen liest sich wie zwei verschiedene.
 
 import { useTranslation } from "react-i18next";
 import type { Budgetmonat } from "../../../application";
-import { useGeld } from "./einstellungenKontext";
+import { useGeld } from "../bausteine/einstellungenKontext";
 
-export function BudgetFortschreibung({ monat }: { monat: Budgetmonat }) {
+export function Fortschreibung({ monat }: { monat: Budgetmonat }) {
   const { t } = useTranslation();
   const geld = useGeld();
 
@@ -42,9 +43,9 @@ export function BudgetFortschreibung({ monat }: { monat: Budgetmonat }) {
     <span
       className="muted"
       style={{ fontSize: "var(--fs-2xs)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}
-      title={t(zurueck ? "budgets.fortschreibungTitelZurueck" : "budgets.fortschreibungTitel", satz)}
+      title={t(zurueck ? "ruecklagen.fortschreibungTitelZurueck" : "ruecklagen.fortschreibungTitel", satz)}
     >
-      {t("budgets.fortschreibung", werte)}
+      {t("ruecklagen.fortschreibung", werte)}
     </span>
   );
 }

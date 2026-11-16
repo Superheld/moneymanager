@@ -1,12 +1,7 @@
-// Ein Budget anlegen oder bearbeiten — aus dem Bereich Budgets (monatlich) und aus dem
-// Bereich Rücklagen (aufbauend).
-//
-// Bis 2026-11-15 stand der Dialog im Budgets-Screen und trug ein Feld „Art". Seit die
-// aufbauenden Budgets im Bereich Rücklagen stehen, entscheidet der BEREICH über die Art:
-// wer unter Budgets anlegt, legt ein monatliches an, wer unter Rücklagen „über die
-// Kategorie" anlegt, ein aufbauendes. Ein Feld, mit dem man ein Budget in den anderen
-// Bereich schöbe, wäre ein Weg, es aus den Augen zu verlieren. Beim Bearbeiten bleibt die
-// Art, die das Budget hat.
+// Ein monatliches Budget anlegen oder bearbeiten. Seit Migration 81 gibt es keine andere
+// Art mehr: was sich ansammeln soll, ist eine Rücklage und hat ihren eigenen Dialog
+// (`bausteine/RuecklageDialog`). Bis dahin trug dieser Dialog beide Arten, die der
+// Bereich wählte, aus dem man anlegte.
 //
 // Der Dialog hält seinen eigenen Zustand (wie `RuecklageDialog`); der Screen merkt sich
 // nur, WAS bearbeitet wird, und reicht den aktuellen Stand herein — nach dem Entfernen
@@ -14,17 +9,16 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { minorZuMajor, waehlbareKonten, type Budgetart, type Budgetstand, type Kategorie, type Zahlungskonto } from "../../../application";
+import { minorZuMajor, waehlbareKonten, type Budgetstand, type Kategorie, type Zahlungskonto } from "../../../application";
 import { budgetAnlegen as budgetSpeichern, budgetBetragLoeschen } from "../../dienste";
-import { Button, FormField } from ".";
-import { Auswahl } from "./Auswahl";
-import { CategoryPicker } from "./CategoryPicker";
-import { Datumsfeld } from "./Datumsfeld";
-import { IconButton, IconLeiste } from "./IconButton";
-import { Modal } from "./Modal";
-import { useGeld, fehlerNachricht } from "./einstellungenKontext";
-import { useLoeschfrage } from "./Loeschfrage";
-import { budgetText } from "./budgetTexte";
+import { Button, FormField } from "../bausteine";
+import { Auswahl } from "../bausteine/Auswahl";
+import { CategoryPicker } from "../bausteine/CategoryPicker";
+import { Datumsfeld } from "../bausteine/Datumsfeld";
+import { IconButton, IconLeiste } from "../bausteine/IconButton";
+import { Modal } from "../bausteine/Modal";
+import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
+import { useLoeschfrage } from "../bausteine/Loeschfrage";
 
 /** Was ein Vorschlag beim Anlegen vorbelegt. */
 export interface BudgetVorbelegung {
@@ -33,7 +27,6 @@ export interface BudgetVorbelegung {
 }
 
 export function BudgetDialog({
-  art: neueArt,
   stand,
   vorbelegung,
   heute,
@@ -43,8 +36,6 @@ export function BudgetDialog({
   onGespeichert,
   onGeaendert,
 }: {
-  /** Die Art eines NEUEN Budgets — beim Bearbeiten gilt die des Budgets. */
-  art: Budgetart;
   /** Das bearbeitete Budget im aktuellen Stand; `null` beim Anlegen. */
   stand: Budgetstand | null;
   vorbelegung?: BudgetVorbelegung;
@@ -61,7 +52,6 @@ export function BudgetDialog({
   const loeschfrage = useLoeschfrage();
   const budget = stand?.budget;
   const editId = budget?.id ?? null;
-  const art: Budgetart = budget?.art ?? neueArt;
   const laufend = heute.slice(0, 7);
 
   const [kategorieId, setKategorieId] = useState(budget?.kategorieId ?? vorbelegung?.kategorieId ?? "");
@@ -114,7 +104,7 @@ export function BudgetDialog({
         // laufende (bzw. die angetippte Version). Ein geänderter Rahmen gilt ab jetzt —
         // die Monate davor behalten ihre Planung.
         {
-          kategorieId, kontoId, betragProMonat: geld.parse(betragText) ?? 0, art, start,
+          kategorieId, kontoId, betragProMonat: geld.parse(betragText) ?? 0, start,
           abMonat: editId ? zielMonat : start.slice(0, 7),
         },
         editId ?? undefined,
@@ -127,8 +117,8 @@ export function BudgetDialog({
 
   return (
     <Modal
-      title={editId ? t(budgetText(art, "modalBearbeiten")) : t(budgetText(art, "anlegen"))}
-      subtitle={t(budgetText(art, "modalUntertitel"))}
+      title={editId ? t("budgets.modalBearbeiten") : t("budgets.anlegen")}
+      subtitle={t("budgets.modalUntertitel")}
       onClose={onClose}
       footer={
         <>
@@ -147,7 +137,7 @@ export function BudgetDialog({
           <CategoryPicker kategorien={[...kategorien]} value={kategorieId} onChange={setKategorieId} />
         </FormField>
 
-        <FormField label={t("budgets.feldKonto")} required hint={t(budgetText(art, "feldKontoHinweis"))}>
+        <FormField label={t("budgets.feldKonto")} required hint={t("budgets.feldKontoHinweis")}>
           <Auswahl
             ariaLabel={t("budgets.feldKonto")}
             wert={kontoId}
@@ -212,26 +202,20 @@ export function BudgetDialog({
           </div>
         )}
 
-        {/* Beim ANLEGEN für beide Arten, und das ist der Punkt: das Feld sagt, ab
-            welchem Monat der erste Betrag gilt. Ohne es landete er zwangsläufig im
-            laufenden Monat, und wer ein Budget für etwas anlegt, das seit dem Frühjahr
-            läuft, sähe jeden Monat davor mit Rahmen 0 — die Auswertung zeigte dann
-            lauter Überziehungen, die nie welche waren. Rückwirkend ERFUNDEN wird
-            dabei nichts: der Monat ist eine Angabe und keine Annahme.
-
-            EIN Feld für beide Arten, nicht zwei: beim Aufbauenden setzt derselbe
-            Monat zugleich den Sammelanker. Zwei Felder für einen Zeitpunkt wären zwei
-            Wahrheiten, und die erste Abweichung fiele niemandem auf.
-
-            Beim BEARBEITEN bleibt es der Anker und damit nur beim Aufbauenden: ab
-            wann ein GEÄNDERTER Betrag gilt, sagt dort die Betragsreihe darüber. */}
-        {(!editId || art === "aufbauend") && (
+        {/* Beim ANLEGEN, und das ist der Punkt: das Feld sagt, ab welchem Monat der erste
+            Betrag gilt. Ohne es landete er zwangsläufig im laufenden Monat, und wer ein
+            Budget für etwas anlegt, das seit dem Frühjahr läuft, sähe jeden Monat davor mit
+            Rahmen 0 — die Auswertung zeigte dann lauter Überziehungen, die nie welche
+            waren. Rückwirkend ERFUNDEN wird dabei nichts: der Monat ist eine Angabe und
+            keine Annahme. Beim BEARBEITEN sagt die Betragsreihe darüber, ab wann ein
+            geänderter Betrag gilt. */}
+        {!editId && (
           <FormField
-            label={editId ? t("budgets.feldStart") : t("budgets.feldGiltAb")}
-            hint={editId ? t("budgets.feldStartHinweis") : t(`budgets.feldGiltAbHinweis.${art}`)}
+            label={t("budgets.feldGiltAb")}
+            hint={t("budgets.feldGiltAbHinweis.monatlich")}
           >
             <Datumsfeld
-              ariaLabel={editId ? t("budgets.feldStart") : t("budgets.feldGiltAb")}
+              ariaLabel={t("budgets.feldGiltAb")}
               wert={start}
               aufAenderung={setStart}
             />

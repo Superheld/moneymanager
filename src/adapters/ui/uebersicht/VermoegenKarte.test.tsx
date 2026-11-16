@@ -31,7 +31,7 @@ const text = (schluessel: string, werte?: Record<string, unknown>) => i18n.t(sch
 const LIQUIDE: Klassenbilanz = { klasse: "liquide", stand: 250000, kontenAnzahl: 1, gebunden: 0, frei: 250000, fehlt: 0, posten: [] };
 const RUECKLAGE: Klassenbilanz = {
   klasse: "ruecklage", stand: 500000, kontenAnzahl: 1, gebunden: 300000, frei: 200000, fehlt: 0,
-  posten: [{ art: "ruecklage", id: "r1", kontoId: "tg", betrag: 300000, gedeckt: 300000 }],
+  posten: [{ id: "r1", kontoId: "tg", betrag: 300000, gedeckt: 300000 }],
 };
 const NAMEN = new Map([["r1", "Gerät"]]);
 

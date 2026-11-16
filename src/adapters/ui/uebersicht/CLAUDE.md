@@ -39,8 +39,8 @@ Drei Stufen, jede mit ihrer Zwischensumme, weil jede eine eigene Frage beantwort
 Vorsorge wäre die zweite dieselbe Zahl wie das Ergebnis darunter.
 
 **Rücklagen stehen mit ihrer RATE da**, in „bisher" wie in „geplant" — die Rücklagen
-von Hand und die über die Kategorie (im Modell aufbauende Budgets) in EINER Zeile, seit
-2026-11-15. Zusammengelegt wird im Kern (`core/ergebnis.ts`), nicht hier; bis dahin
+beider Sorten in EINER Zeile, seit 2026-11-15 (seit Migration 81 sind die früheren
+aufbauenden Budgets auch im Modell Rücklagen). Zusammengelegt wird im Kern (`core/ergebnis.ts`), nicht hier; bis dahin
 standen zwei Zeilen untereinander, „Rücklagen" und „Aufbauende Budgets", für etwas, das
 für den Nutzer dasselbe ist. Was aus ihnen bezahlt wurde, ist eine Entnahme: sie steht
 am Posten daneben und in der Überleitung, nicht in den Kosten. Reicht eine Rücklage über
@@ -70,11 +70,12 @@ Budgetliste über alle; dasselbe Budget zeigte in Karte und Liste verschiedene Z
 der Untertitel der Seite musste es erklären. Der Satz ist weg, weil der Unterschied weg
 ist.
 
-**Die Karte „Budgets" zeigt nur die monatlichen** (seit 2026-11-15). Bis dahin standen
-dort beide Arten in zwei Gruppen; die aufbauenden heissen jetzt Rücklagen, stehen in deren
-Bereich und in den Karten oben in der Zeile „Rücklagen". Liegt eine auf einer
-Unterkategorie eines monatlichen Budgets, nennt dessen Zeile sie („ohne Rücklage …") —
-ihr Verbrauch zählt dort nicht, und sie steht nicht in derselben Karte.
+**Die Karte „Budgets" zeigt die Budgets — seit Migration 81 gibt es nur monatliche.** Bis
+2026-11-15 standen dort beide Arten in zwei Gruppen; die aufbauenden sind Rücklagen, stehen
+in deren Bereich und in den Karten oben in der Zeile „Rücklagen". Liegt eine Rücklage auf
+einer Unterkategorie eines Budgets, nennt dessen Zeile sie („ohne Rücklage …",
+`abgezogen` aus der Zuständigkeit) — ihr Verbrauch zählt dort nicht, und sie steht nicht
+in derselben Karte.
 
 Darunter steht die Karte **„Was da ist"** — die realen Stände je Kontoklasse, über ALLE
 Konten. Die Klasse ist die Rechenregel und jedes Konto hat genau eine, die Summen addieren

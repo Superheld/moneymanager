@@ -21,11 +21,12 @@ import { vertragsnamenLaden } from "../vertraege/vertragszuordnung";
 import {
   betragImMonat,
   budgetBuchungen,
-  vonRuecklagenGetragen,
+  ruecklagenAnteile,
   budgetFortschreibung,
   budgetMonatsstand,
   budgetStand,
   elternBudget,
+  herausgerechnet,
   verbrauchsFenster,
   verlaufsfenster,
   type Budget,
@@ -37,7 +38,7 @@ import {
   type Zahlungskonto,
 } from "../../core";
 import { budgetvorschlaegeLaden, ignorierteBudgetvorschlaege } from "./budgetvorschlaege";
-import { belegungssicht, budgetsichtMit } from "../konten/kontobelegung";
+import { budgetsichtMit } from "../konten/kontobelegung";
 import { ruecklagenbestandLaden } from "../ruecklagen/ruecklagenbestand";
 import type {
   BudgetRepository,
@@ -78,25 +79,25 @@ export interface Budgetstand {
    * einen Use-Case gehört (`ui/CLAUDE.md`).
    */
   readonly proMonat: Cent;
-  /**
-   * Rahmen und Verbrauch KUMULIERT — bei `aufbauend` also alles seit dem Start.
-   *
-   * Sie stehen hier als Beleg, nicht als Anzeigewert: `rest` ist ihre Differenz, und die
-   * Fortschreibung in `monat` muss auf denselben Rest kommen. Was eine Zeile ZEIGT, kommt
-   * aus `monat` — „140 von 200" sagte einem aufbauenden Budget nur, wieviel hineingegangen
-   * wäre, hätte man nie etwas ausgegeben.
-   */
+  /** Rahmen und Verbrauch des Monats; `rest` ist ihre Differenz. */
   readonly rahmen: Cent;
   readonly verbraucht: Cent;
   readonly rest: Cent;
-  /** Das Fenster, über das `verbraucht` zählt (monatlich vs. aufbauend). */
+  /** Das Fenster, über das `verbraucht` zählt: der Monat. */
   readonly von: string;
   readonly bis: string;
   /**
-   * Derselbe Stand als Aufrechnung DIESES Monats: Übertrag + Zuführung − Verbrauch = Rest.
-   * `monat.rest === rest`, immer — siehe `core/budgets/budgetverlauf`.
+   * Derselbe Stand als Aufrechnung DIESES Monats. `monat.rest === rest`, immer — siehe
+   * `core/budgets/budgetverlauf`.
    */
   readonly monat: Budgetmonat;
+  /**
+   * Die Namen der Rücklagen, die diesem Budget heute Buchungen abnehmen, weil sie
+   * darunter hängen (`herausgerechnet`). Ohne den Hinweis wäre der Verbrauch kleiner als
+   * die Ausgaben der Kategorie, und nichts sagte warum. Fehlt, wenn nichts
+   * herausgerechnet ist.
+   */
+  readonly abgezogen?: readonly string[];
 }
 
 export interface Budgetuebersicht {
@@ -155,6 +156,7 @@ export function budgetstaende(sicht: BudgetSicht, am: string): Budgetstand[] {
     else kinder.set(eltern, [b]);
   }
 
+  const { ausBudget } = herausgerechnet(kategorien, budgets, sicht.ruecklagen ?? [], am);
   const raus: Budgetstand[] = [];
   const gehe = (elternId: string | null, tiefe: number) => {
     const gruppe = [...(kinder.get(elternId) ?? [])].sort((a, b) =>
@@ -169,6 +171,7 @@ export function budgetstaende(sicht: BudgetSicht, am: string): Budgetstand[] {
         ...budgetStand(sicht, b, am),
         ...verbrauchsFenster(b, am),
         monat: budgetMonatsstand(sicht, b, am),
+        ...(ausBudget.has(b.id) ? { abgezogen: (ausBudget.get(b.id) ?? []).map((r) => r.bezeichnung) } : {}),
       });
       gehe(b.id, tiefe + 1);
     }
@@ -181,9 +184,7 @@ export function budgetstaende(sicht: BudgetSicht, am: string): Budgetstand[] {
  * Die Buchungen hinter dem Verbrauch EINES Budgets im gezeigten Monat — als
  * `Buchungszeile`, dieselbe Form wie in der Analyse.
  *
- * Bewusst der MONAT und nicht das kumulierte Fenster: darüber steht die Aufrechnung
- * dieses Monats, und eine Liste, die bei einem aufbauenden Budget alles seit dem Start
- * zeigte, summierte sich auf eine andere Zahl als die Zeile darüber. Wer die früheren
+ * Der MONAT: darüber steht die Aufrechnung dieses Monats. Wer die früheren
  * Monate sehen will, wählt sie — in der Übersicht über den Monatsumschalter, unter
  * Budgets über den Verlauf.
  *
@@ -217,8 +218,6 @@ export function budgetzeilenImMonat(
  *
  * Rein und ohne Ladevorgang — der Bereich hat seine Sicht schon, und ein Nachladen je
  * aufgeklappter Zeile rechnete gegen einen womöglich anderen Bestand als die Zeile selbst.
- * Kürzer als `anzahl` wird die Reihe, wenn ein aufbauendes Budget später angefangen hat;
- * ein Balken vor seinem Start zeigte Ausgaben, die es nie belastet haben.
  */
 export function budgetVerlauf(
   sicht: BudgetSicht,
@@ -242,14 +241,6 @@ export interface BudgetbereichDeps extends BudgetsichtDeps {
   readonly einstellungenRepo: EinstellungenRepository;
 }
 
-/** Wie viel vom Rest eines aufbauenden Budgets auf seinem Konto tatsächlich liegt. */
-export interface Budgetdeckung {
-  /** Der Rest, den das Budget auf seinem Konto beansprucht. */
-  readonly anspruch: Cent;
-  /** Was davon gedeckt ist — bei Unterdeckung anteilig, wie in der Kontobelegung. */
-  readonly gedeckt: Cent;
-}
-
 export interface Budgetbereich extends Budgetuebersicht {
   /** Für den Kategorie-Wähler im Dialog. */
   readonly kategorien: readonly Kategorie[];
@@ -265,14 +256,6 @@ export interface Budgetbereich extends Budgetuebersicht {
    * vorschlagen liesse — der leere Bereich führt dann zuerst in den Import.
    */
   readonly hatBuchungen: boolean;
-  /**
-   * Budget-ID → Deckung, nur für aufbauende Budgets mit einem Rest über null.
-   *
-   * Aus der Kontobelegung gelesen und nicht hier gerechnet: dieselbe Zahl steht in der
-   * Übersicht unter „Was da ist" und im Kontoauszug, und eine zweite Rechnung liefe
-   * von ihnen weg, sobald ein dritter Anspruch dazukommt.
-   */
-  readonly deckung: ReadonlyMap<string, Budgetdeckung>;
 }
 
 export async function budgetbereichLaden(
@@ -289,19 +272,10 @@ export async function budgetbereichLaden(
   ]);
   const vorschlaege = await budgetvorschlaegeLaden(
     deps.ledger, deps.umsatzRepo, deps.kategorieRepo, deps.budgetRepo,
-    heute.slice(0, 7), heute, ignoriert, deps.zuordnungRepo, vonRuecklagenGetragen(uebersicht.sicht),
+    heute.slice(0, 7), heute, ignoriert, deps.zuordnungRepo, ruecklagenAnteile(uebersicht.sicht), ruecklagen,
   );
-  const belegung = belegungssicht(
-    { konten, buchungen: [...uebersicht.sicht.buchungen], ruecklagen, sicht: uebersicht.sicht },
-    heute,
-  );
-  const deckung = new Map<string, Budgetdeckung>();
-  for (const b of belegung.jeKonto.values()) {
-    for (const p of b.posten) if (p.art === "budget") deckung.set(p.id, { anspruch: p.betrag, gedeckt: p.gedeckt });
-  }
   return {
     ...uebersicht,
-    deckung,
     kategorien: uebersicht.sicht.kategorien,
     konten,
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
@@ -318,80 +292,4 @@ export async function budgetbereichLaden(
  */
 export async function budgetLoeschen(repo: BudgetRepository, id: string): Promise<void> {
   await repo.loeschen(id);
-}
-
-/** Ein Budgetstand in seiner Gruppe — Tiefe gezählt nur über Budgets derselben Art. */
-export interface GruppierterStand extends Budgetstand {
-  /**
-   * Der Name des Budgets, unter dem dieses im Baum hängt, wenn das in der ANDEREN Gruppe
-   * steht. Ohne den Hinweis stünde „Urlaub" bei den aufbauenden, und woraus es
-   * herausgerechnet ist, sagte nichts mehr.
-   */
-  readonly unter?: string;
-  /**
-   * Die Gegenrichtung zu `unter`: die Namen der Budgets der ANDEREN Art, die direkt in
-   * diesem liegen. Ihr Verbrauch zählt hier nicht (`budgetKategorien`), und seit die
-   * aufbauenden im Bereich Rücklagen stehen, sieht man sie in der Liste daneben nicht
-   * mehr — ohne den Hinweis wäre der Verbrauch dieser Zeile kleiner als die Ausgaben ihrer
-   * Kategorie, und nichts sagte warum. Fehlt, wenn nichts herausgerechnet ist.
-   */
-  readonly abgezogen?: readonly string[];
-}
-
-/** Die Budgetstände, getrennt danach, ob ihr Rest verfällt oder bleibt. */
-export interface Budgetgruppen {
-  readonly monatlich: readonly GruppierterStand[];
-  readonly aufbauend: readonly GruppierterStand[];
-}
-
-/**
- * Trennt die Stände nach der Art JEDES Budgets.
- *
- * Monatlich und aufbauend beantworten verschiedene Fragen („was ist diesen Monat noch
- * da" gegen „was hat sich angesammelt"), und in einer gemeinsamen Liste las man das eine
- * mit dem Blick des anderen.
- *
- * **Bis 2026-11-09 wurde nach dem DACH getrennt**, nicht je Zeile: ein aufbauendes
- * „Urlaub" unter einem monatlichen „Freizeit" blieb bei den monatlichen, mit Pille, weil
- * es aus dem Dach herausgerechnet ist. Bei einem Baum, dessen Dächer alle monatlich
- * sind, stand damit jedes Budget in einer Liste, und die Trennung war unsichtbar. Jetzt
- * steht jedes bei seiner Art; den Zusammenhang hält `unter` fest, und die Tiefe zählt
- * nur noch Vorfahren derselben Art — sonst stünde ein Kind eingerückt unter nichts.
- *
- * Die Reihenfolge bleibt die des Baums: `budgetstaende` liefert ihn in Tiefensuche, ein
- * Dach steht also immer vor seinen Kindern.
- */
-export function nachArtGetrennt(staende: readonly Budgetstand[]): Budgetgruppen {
-  const monatlich: GruppierterStand[] = [];
-  const aufbauend: GruppierterStand[] = [];
-  /** Budget-ID → Namen der Kinder der anderen Art; nachgetragen, wenn das Kind kommt. */
-  const abgezogen = new Map<string, string[]>();
-  const artVon = (z: Budgetstand) => (z.budget.art === "aufbauend" ? "aufbauend" : "monatlich");
-  /** Die Vorfahren der aktuellen Zeile, Index = Tiefe. */
-  const pfad: Budgetstand[] = [];
-  for (const z of staende) {
-    pfad.length = z.tiefe;
-    const art = artVon(z);
-    const vorfahren = pfad.filter(Boolean);
-    const eltern = vorfahren[vorfahren.length - 1];
-    const eintrag: GruppierterStand = {
-      ...z,
-      tiefe: vorfahren.filter((v) => artVon(v) === art).length,
-      ...(eltern && artVon(eltern) !== art ? { unter: eltern.kategorieName } : {}),
-    };
-    (art === "aufbauend" ? aufbauend : monatlich).push(eintrag);
-    if (eltern && artVon(eltern) !== art) {
-      const liste = abgezogen.get(eltern.budget.id);
-      if (liste) liste.push(z.kategorieName);
-      else abgezogen.set(eltern.budget.id, [z.kategorieName]);
-    }
-    pfad[z.tiefe] = z;
-  }
-  // Nachgetragen statt beim Dach gesetzt: in Tiefensuche steht das Dach VOR seinen
-  // Kindern, wenn es in die Liste kommt, kennt es sie also noch nicht.
-  const mitAbzug = (g: GruppierterStand): GruppierterStand => {
-    const namen = abgezogen.get(g.budget.id);
-    return namen ? { ...g, abgezogen: namen } : g;
-  };
-  return { monatlich: monatlich.map(mitAbzug), aufbauend: aufbauend.map(mitAbzug) };
 }
