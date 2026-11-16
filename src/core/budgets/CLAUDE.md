@@ -19,7 +19,10 @@ Drei Folgen, die man kennen muss:
   Budgetvorschlag der Art `ruecklage` (der Fall, in dem selten etwas Grosses anfällt)
   öffnet den Dialog einer Rücklage, die weiterläuft, vorbelegt mit Kategorie, Name und
   Rate. An einer Kategorie, an der schon ein Budget oder eine Rücklage hängt, schlägt der
-  Vorschlag nichts vor.
+  Vorschlag nichts vor — und `budgetAnlegen` weist ein NEUES Budget an der Kategorie einer
+  Rücklage ab (`budget.kategorieHatRuecklage`, seit Paket 5 des Umbaus), wie umgekehrt
+  `ruecklage.kategorieHatBudget`. Dort gewönne das Budget, und die Rücklage fände still
+  nichts mehr. Ein Altfall bleibt stehen.
 - **Die Verschachtelung gilt weiter** (unten) — auch gegen eine Rücklage: hängt eine
   unter einem Budget, nimmt sie ihm ihre Buchungen ab (`zustaendigkeit`). Sie steht nicht
   in derselben Liste wie das Budget, und dessen Verbrauch wäre kleiner als die Ausgaben

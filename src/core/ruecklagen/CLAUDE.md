@@ -18,8 +18,9 @@ der beiden Bereiche es gehört. Eine Rücklage beantwortet drei Fragen, jede mit
 **Sorte und Form sind zwei Felder**, weil die Entscheidung genau diese beiden Fragen
 trennt: ein Urlaub kann ein Ziel haben und abgeschlossen werden, Reparaturen eine freie
 Rate und weiterlaufen. Bis Paket 4 entschied die Form allein, was nach dem Ausbuchen
-geschah (mit Ziel neu beginnen, frei beenden); für die abschliessende gilt das beim
-Ausbuchen weiter, bis Paket 5 das Abschliessen mit eigener Wahl bringt.
+geschah (mit Ziel neu beginnen, frei beenden). Seit Paket 5 wählt beim Abschliessen der
+Nutzer, ob sie neu beginnt oder endet (unten); nur das Ausbuchen des Altbestands ohne
+Kategorie folgt weiter der Form.
 
 **Die Sorte steht mit dem Anlegen fest** (`ruecklagenPflege`, im Dialog beim Bearbeiten nur
 angezeigt). Sie entscheidet, was ein leeres `findet_ab` heisst und wie der Stand eines
@@ -90,17 +91,56 @@ Drei Dinge daran sind Entscheidung:
 - **Die Zeile öffnet die Buchung nur, wenn eine dranhängt** (`DataTable` mit
   `istKlickbar`). Wiederaufnehmen oder Löschen einer beendeten Rücklage gibt es dort nicht.
 
+**Das Abschliessen schreibt dieselbe Aufzeichnung** (seit Paket 5): eine Zeile in
+`ruecklage_ausbuchung` mit dem festgehaltenen Zyklus, aber ohne Buchung und mit Betrag 0.
+Eine eigene Tabelle hätte eine Migration gekostet und zwei Stellen für dasselbe Ereignis
+geschaffen; `zyklen()` sieht den Zyklus so ohne Zutun als abgeschlossen. Die Geschichte
+erkennt ein Abschliessen an genau dem, was ihm fehlt (keine Buchung, kein Betrag, aber eine
+Kategorie und ein Zyklus) und zeigt dafür statt des Eingetragenen, was die Rücklage im
+Zyklus über ihre Kategorie trug, und was frei geworden ist (`abschlussstaende` in
+`topf.ts`, Spalte „Frei geworden"). Ein Minus steht unter „Ungedeckt".
+
 **Gebucht wird beim Ausbuchen nichts.** Der Kauf ist eine ganz normale Ausgabe vom Konto,
 und weil die Deckung gegen den REALEN Kontostand rechnet, fällt sie durch die Abbuchung von
 selbst. Eine zweite, kalkulatorische Buchung zeigte dieselbe Bewegung doppelt.
 
-## Ausbuchen gibt es nur an einer, die abgeschlossen wird
+## Abschliessen — und Ausbuchen nur noch im Altbestand
 
-**Eine Rücklage, die weiterläuft, wird nie ausgebucht** (`ruecklage.laeuftWeiter` in
-`ruecklageAusbuchen`; in der Liste steht der Knopf nur an den anderen). Sie trägt ihre
-Ausgaben über die Kategorie und beginnt nie neu — so rechnete auch das aufbauende Budget,
-aus dem sie mit Migration 81 wurde. Das Ausbuchen bleibt bis Paket 5 der bestehende
-Dialog mit Buchungswahl; danach wird daraus das Abschliessen.
+**Eine Rücklage, die weiterläuft, wird weder abgeschlossen noch ausgebucht**
+(`ruecklage.laeuftWeiterAbschluss`, `ruecklage.laeuftWeiter`; in der Liste steht an ihr
+kein Knopf). Sie trägt ihre Ausgaben über die Kategorie und beginnt nie neu — so rechnete
+auch das aufbauende Budget, aus dem sie mit Migration 81 wurde.
+
+**Eine, die abgeschlossen wird, wird ABGESCHLOSSEN, sobald sie eine Kategorie hat**
+(`application/ruecklagen/ruecklageAbschliessen.ts`, Dialog `ui/ruecklagen/AbschlussDialog`,
+seit Paket 5). „Mit dem Kauf" und „am Ende des Urlaubs" sind derselbe Handgriff, und es
+gibt keine Buchungswahl: die Ausgaben hat sie über die Kategorie oder die Zuordnung schon
+gefunden. Der Dialog zeigt den Stand am gewählten Tag (`abschlussvorschau`) und lässt
+wählen: **neu beginnen** (ab dem Abschlusstag bei null, mit Ziel auf Wunsch mit neuem Ziel)
+oder **beenden**. Vorbelegt ist, was das Ausbuchen bis Paket 4 von selbst tat — mit Ziel
+neu, frei beenden. Vorgeschlagen wird das Abschliessen nie von selbst.
+
+Was beim Abschliessen gilt, ist entschieden und keine Mechanik:
+
+- **Was übrig ist, wird frei — nur auf dem Konto.** Der Anspruch fällt auf den neuen Zyklus
+  bzw. weg; die Ergebnisrechnung bekommt KEINEN Posten dafür, die Raten bleiben Kosten
+  ihrer Monate (ADR-0006, „Konservativ gelöst"). Ein Minus hat seinen Monat schon gekostet.
+- **Die Rate des Abschlussmonats gehört dem neuen Zyklus** (die bestehende Regel in
+  `zyklen`). Beginnt sie neu, kostet der Monat dieselbe Rate wie ohne Abschluss; wird sie
+  beendet, entfällt sie — wie jede danach. Im Minus und neu begonnen kostet der Monat das
+  Ungedeckte des alten Zyklus und die erste Rate des neuen. Kein Monat VOR dem
+  Abschlussmonat ändert sich; `abschluss.test.ts` prüft jede Zeile und die Überleitung.
+- **Der Tag liegt im laufenden Monat, nicht nach heute und nicht vor dem Beginn des
+  laufenden Zyklus** (`ruecklage.abschlussVormonat`, `…Zukunft`, `…VorBeginn`). Ein
+  früherer Tag schöbe die Rate jenes Monats und die Ausgaben danach in den neuen Zyklus —
+  ein abgeschlossener Monat kostete dann anders. Der Preis: wer den Monatswechsel
+  verpasst, schliesst mit einem Tag im neuen Monat ab.
+
+**Ausgebucht wird nur noch eine Rücklage OHNE Kategorie**, der Altbestand von vor der
+Umstellung: wie vorher mit Buchungswahl (`buchungswahlFuer`), `budgetrelevant = false` an
+der verknüpften Buchung und der alten Kostenregel. Eine mit Kategorie weist
+`ruecklageAusbuchen` ab (`ruecklage.abschliessenStattAusbuchen`): eine verknüpfte Buchung
+ihrer Kategorie zählte sonst nach der alten Regel UND über die Kategorie.
 
 ## Was die Kategorie einer Rücklage tut
 
@@ -124,16 +164,20 @@ Drei Fälle, die man kennen muss:
 
 - **Mehrere Rücklagen an derselben Kategorie: die Buchung wartet** — aber nur an Tagen, an
   denen mehr als eine findet. Sie zählt dann als ungeplant und trägt die Pille „wartet auf
-  Zuordnung", bis jemand im Buchungsdialog wählt, welche Rücklage sie trägt — oder „keine
-  Rücklage" (`ruecklageZuordnen`, Tabelle `ruecklage_zuordnung`, je Anteil über seine
-  Kategorie benannt). Vorbelegt wird nichts. Der Dialog der Rücklage sagt vorher, wenn an
-  der gewählten Kategorie schon eine hängt. **Hängt ein früheres aufbauendes Budget mit
+  Zuordnung", bis jemand im Buchungsdialog oder auf der Karte „Wartet auf Zuordnung" im
+  Bereich wählt, welche Rücklage sie trägt — oder „keine Rücklage" (`ruecklageZuordnen`,
+  Tabelle `ruecklage_zuordnung`, je Anteil über seine Kategorie benannt). Vorbelegt wird
+  nichts. Was auf der Karte steht, kommt aus derselben Einordnung wie die Pille
+  (`application/ruecklagen/wartendeZuordnungen.ts`); ist nichts offen, steht sie nicht
+  da. Der Dialog der Rücklage sagt vorher, wenn an der gewählten Kategorie schon eine
+  hängt. **Hängt ein früheres aufbauendes Budget mit
   anderen an einer Kategorie**, gehört ihm vor DEREN `findet_ab` jede Buchung weiter
   allein; erst danach wartet sie (`fundfenster.test.ts`, „Paket 4").
 - **Ein monatliches Budget am selben Knoten gewinnt immer.** Eine NEUE Rücklage an dessen
   Kategorie weist die Anwendung ab (`ruecklage.kategorieHatBudget`, Hinweis auf eine
-  Unterkategorie); ein Altfall bleibt stehen, und die Rücklage findet dort nur
-  ausdrücklich Zugeordnetes. Bis Paket 4 ging auch ein aufbauendes Budget am selben
+  Unterkategorie), seit Paket 5 ebenso ein neues Budget an der Kategorie einer Rücklage
+  (`budget.kategorieHatRuecklage` in `budgetAnlegen`); ein Altfall bleibt stehen, und die
+  Rücklage findet dort nur ausdrücklich Zugeordnetes. Bis Paket 4 ging auch ein aufbauendes Budget am selben
   Knoten jeder Rücklage vor; mit Migration 81 ist es selbst eine.
 - **Ohne Kategorie rechnet eine Rücklage wie vorher** (oben).
 
@@ -226,17 +270,27 @@ dort nur, welche Konten etwas tragen und welche Rücklage auf keinem liegt.
 
 Drei Entscheidungen:
 
-- **Sie steht nach der Liste**, vor der Geschichte. In der Liste wird gearbeitet
-  (anlegen, ausbuchen); hier wird nachgesehen.
+- **Sie steht nach der Liste** (und nach „Wartet auf Zuordnung"), vor der Geschichte. In
+  der Liste wird gearbeitet (anlegen, abschliessen); hier wird nachgesehen.
 - **„Ohne Konto" ist ein eigener Abschnitt am Ende**: eine Rücklage ohne Konto oder mit
   einem gelöschten. Die Spalte „Sorte" sagt, ob sie weiterläuft; die Zeile öffnet den
   Dialog, in dem man das Konto einträgt.
 - **Ein stillgelegtes Konto steht da, solange etwas darauf beansprucht wird** — das Geld
   liegt dort, ob das Konto noch geführt wird oder nicht.
 
+## Der Verlauf im Monat eines Abschlusses
+
+`ruecklagenFortschreibung` rechnet im Abschlussmonat BEIDE Zyklen: der alte bringt seinen
+Übertrag und was er bis zum Abschlusstag trug, der neue, was er danach trug, und was der
+alte am Abschlusstag noch hatte, steht als `abgeschlossen` am Monat (positiv frei geworden,
+negativ das Minus). So geht der Monat auf: Übertrag + Zuführung − Verbrauch − abgeschlossen
+= Rest, und der Rest ist der Stand des neuen Zyklus. Bis Paket 5 fing die Reihe dort bei
+null an, und der Monat zeigte Buchungen, die in keiner Zahl darüber vorkamen. Die Zeile
+im Verlauf sagt dazu „abgeschlossen, frei geworden …" bzw. „im Minus abgeschlossen".
+
 ## Wie der Umbau hierher kam (ADR-0006)
 
-Fünf Pakete, die Migrationen 79 bis 81. Was davon noch wirkt:
+Fünf Pakete, die Migrationen 79 bis 81; Paket 5 kam ohne Migration aus. Was davon noch wirkt:
 
 - **Migration 79** legte das Schema an (Sorte, `findet_ab`, `ruecklage_rate`,
   `ruecklage_zuordnung`), **80** überführte die freie Rate in die Reihe und liess jede
@@ -258,4 +312,8 @@ Fünf Pakete, die Migrationen 79 bis 81. Was davon noch wirkt:
   Budget ohne `start` (nur in einer von Hand geänderten Datei) zählt seine Ausgaben jetzt
   ab dem ersten Betragsmonat; vorher kosteten sie nie etwas.
 
-Noch offen: Paket 5 (Abschliessen statt Ausbuchen, die Karte „Wartet auf Zuordnung").
+- **Paket 5** brachte das Abschliessen (oben) und die Karte „Wartet auf Zuordnung" — ohne
+  Migration: der Abschluss ist eine Zeile in `ruecklage_ausbuchung` ohne Buchung.
+
+Noch offen ist nur, was der Entwurf als Paket 6 führt: die Spalte `ruecklage.rate`
+abräumen, sobald sie nachweislich leer ist.

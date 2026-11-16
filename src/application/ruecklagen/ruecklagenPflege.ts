@@ -14,7 +14,8 @@
 //   • **Die Sorte steht mit dem Anlegen fest.** Sie entscheidet, ob `findet_ab` leer
 //     „ohne Anfang" oder „findet nichts" heisst, und wie der Stand eines Monats zählt; ein
 //     Wechsel änderte vergangene Monate. Eine Rücklage, die nicht mehr weiterlaufen soll,
-//     ist eine neue Frage — sie gehört ins Abschliessen (Paket 5), nicht in diesen Dialog.
+//     ist eine neue Frage — sie gehört ins Abschliessen (`ruecklageAbschliessen`), nicht
+//     in diesen Dialog.
 
 import { FachlicherFehler, freieRate, hatZiel, istCent, type Cent, type Ruecklage, type Ruecklagenart } from "../../core";
 import type { BudgetRepository, LedgerPort, RuecklagenAusbuchung, RuecklagenRepository } from "../ports";
@@ -222,7 +223,9 @@ export interface AusbuchenEingabe {
 }
 
 /**
- * Ausbuchen — die Rücklage ist gebraucht worden.
+ * Ausbuchen — die Rücklage ist gebraucht worden. Seit Paket 5 (ADR-0006) nur noch für eine
+ * Rücklage OHNE Kategorie, aus der Zeit vor der Umstellung; eine mit Kategorie wird
+ * abgeschlossen (`ruecklageAbschliessen.ts`).
  *
  * Was danach gilt, hängt an der Form der Rücklage, und das ist der Grund, warum es kein
  * eigenes Feld „wiederkehrend" gibt:
@@ -251,6 +254,11 @@ export async function ruecklageAusbuchen(
   // Kategorie und beginnt nie neu (bis Migration 81 war sie das aufbauende Budget, das
   // es auch nicht gab).
   if (ruecklage.art === "fortlaufend") throw new FachlicherFehler("ruecklage.laeuftWeiter");
+  // Eine Rücklage MIT Kategorie hat ihre Ausgaben schon gefunden; sie wird abgeschlossen
+  // (`ruecklageAbschliessen`), nicht mit einer Buchung ausgebucht. Verknüpfte man hier
+  // eine Buchung ihrer Kategorie, zählte dieselbe Ausgabe nach der alten Regel UND über
+  // die Kategorie — das Ausbuchen bleibt dem Altbestand ohne Kategorie (Paket 5, ADR-0006).
+  if (ruecklage.kategorieId) throw new FachlicherFehler("ruecklage.abschliessenStattAusbuchen");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(e.datum)) throw new FachlicherFehler("ruecklage.datumUngueltig");
   if (e.ziel != null && !(e.ziel > 0)) throw new FachlicherFehler("ziel.groesserNull");
 

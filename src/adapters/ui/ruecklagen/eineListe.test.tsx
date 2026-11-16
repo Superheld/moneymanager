@@ -85,13 +85,16 @@ describe("Rücklagen — die eine Liste", () => {
     expect(abschluss.textContent).toMatch(/300,00 \/ 1\.200,00/);
   });
 
-  it("bietet das Ausbuchen nur an einer an, die abgeschlossen wird", async () => {
+  it("bietet das Abschliessen nur an einer an, die abgeschlossen wird — ohne Ausbuchen daneben", async () => {
     await bestand();
     rendere(<RuecklagenScreen />);
     const weiter = await eintrag("Tellwick");
     const abschluss = await eintrag("Ombrast");
+    expect(within(weiter).queryByRole("button", { name: i18n.t("ruecklagen.abschliessen") })).toBeNull();
     expect(within(weiter).queryByRole("button", { name: i18n.t("ruecklagen.ausbuchen") })).toBeNull();
-    expect(within(abschluss).getByRole("button", { name: i18n.t("ruecklagen.ausbuchen") })).toBeInTheDocument();
+    expect(within(abschluss).getByRole("button", { name: i18n.t("ruecklagen.abschliessen") })).toBeInTheDocument();
+    // Mit Kategorie gibt es keine Buchungswahl mehr — das Ausbuchen bleibt dem Altbestand.
+    expect(within(abschluss).queryByRole("button", { name: i18n.t("ruecklagen.ausbuchen") })).toBeNull();
   });
 
   it("zeigt einen Stand im Minus, statt ihn auf null zu klemmen", async () => {

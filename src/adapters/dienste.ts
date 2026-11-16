@@ -199,6 +199,10 @@ import {
   type RuecklagenzuordnenEingabe,
 } from "../application/ruecklagen/ruecklageZuordnen";
 import {
+  ruecklageAbschliessen as ruecklageAbschliessenUseCase,
+  type AbschliessenEingabe,
+} from "../application/ruecklagen/ruecklageAbschliessen";
+import {
   kategorieAnlegen as kategorieAnlegenUseCase,
   kontoAnlegen as kontoAnlegenUseCase,
   personAnlegen as personAnlegenUseCase,
@@ -304,7 +308,7 @@ export function budgetBetragLoeschen(budgetId: string, abMonat: string): Promise
 }
 
 export function budgetAnlegen(eingabe: BudgetEingabe, id?: string) {
-  return budgetAnlegenUseCase(sqliteBudgetRepository, eingabe, id);
+  return budgetAnlegenUseCase(sqliteBudgetRepository, eingabe, id, sqliteRuecklagenRepository);
 }
 
 export function vorschlagIgnorieren(kategorieId: string): Promise<void> {
@@ -711,6 +715,14 @@ export function ruecklageZuordnen(eingabe: RuecklagenzuordnenEingabe) {
     },
     eingabe,
   );
+}
+
+/**
+ * Eine Rücklage mit Kategorie abschliessen — neu beginnen oder beenden. Der Rest wird auf
+ * dem Konto frei, kein Monat ändert sich (`ruecklageAbschliessen`).
+ */
+export function ruecklageAbschliessen(id: string, eingabe: AbschliessenEingabe, heute: string) {
+  return ruecklageAbschliessenUseCase(RUECKLAGEN_DEPS, id, eingabe, heute);
 }
 
 export function ruecklageAusbuchen(

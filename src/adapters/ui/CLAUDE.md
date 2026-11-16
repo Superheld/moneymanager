@@ -44,7 +44,7 @@ ein Baustein; was einer benutzt, gehört in dessen Ordner** — auch wenn es all
 | `uebersicht/` | „wie stehe ich gerade da": Monatskarten, Budgets, Was da ist, Depotstand (Regeln in `uebersicht/CLAUDE.md`) |
 | `analyse/` | „wie war es über einen Zeitraum": Register Verlauf, Kategorien, Ausblick, Befunde, Depot, Bericht |
 | `budgets/` | die monatlichen Budgets: Tabelle, Dialog, Verlauf, Vorschläge |
-| `ruecklagen/` | Rücklagen beider Sorten in EINER Liste und ihr Verlauf (`RuecklageVerlauf`), Fluss, Tacho, „Wo das Geld liegt" (je Konto, `GeldJeKontoKarte`) |
+| `ruecklagen/` | Rücklagen beider Sorten in EINER Liste und ihr Verlauf (`RuecklageVerlauf`), Abschliessen (`AbschlussDialog`), „Wartet auf Zuordnung" (`WartetKarte`), Fluss, Tacho, „Wo das Geld liegt" (je Konto, `GeldJeKontoKarte`) |
 | `vermoegen/` | Nettovermögen mit Verlauf, Vermögenswerte und Schulden als Werte zum Stichtag |
 | `vertraege/` | Verträge und ihre Erkennung |
 | `konten/` | der Kontoauszug („Buchungen", `ScreenId` `konten`), Kontenverwaltung, Bankzugänge, Abgleich, Depotauszug |
@@ -120,8 +120,10 @@ Was das für den Code hier heisst:
 - **EINE Liste, EIN Dialog für beide Sorten.** Der Bereich Rücklagen zeigt jede Rücklage
   in derselben Liste (`RuecklagenScreen`, Zeilen fertig aus `Ruecklagenzeile`): Name,
   Sorte als Pille, Kategorie, Rate, Stand (auch im Minus), mit Ziel der Fortschritt, das
-  Konto oder dass keines da ist. Der Name öffnet den Verlauf (`RuecklageVerlauf`), das
-  Ausbuchen steht nur an einer, die abgeschlossen wird. `RuecklageDialog` legt beide an:
+  Konto oder dass keines da ist. Der Name öffnet den Verlauf (`RuecklageVerlauf`). An
+  einer, die abgeschlossen wird, steht „abschließen" (`AbschlussDialog`, ohne
+  Buchungswahl, seit Paket 5) — nur beim Altbestand ohne Kategorie weiter „ausgebucht"
+  (`AusbuchungDialog`, mit Buchungswahl). Welcher Knopf, sagt die Sicht (`abschlussweg`). `RuecklageDialog` legt beide an:
   Kategorie Pflicht, Sorte beim Anlegen wählbar und danach nur angezeigt, Ziel mit Frist
   ODER Rate als Reihe mit „gilt ab". Ein Vorschlag „Rücklage" unter Budgets öffnet ihn
   vorbelegt; weil ihn damit zwei Bereiche öffnen, liegt er in `bausteine/`.

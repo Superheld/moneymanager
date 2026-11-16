@@ -65,8 +65,15 @@ export interface Budgetmonat {
   /** Verbrauch in diesem Monat, positiv (eine Erstattung ist entsprechend negativ). */
   readonly verbraucht: Cent;
   /**
-   * `verfuegbar − verbraucht`. Beim Budget das, was zum Ersten verfällt, bei einer
-   * Rücklage der Übertrag in den nächsten Monat. Negativ = überzogen.
+   * Nur bei einer Rücklage, und nur im Monat, in dem sie abgeschlossen wurde: was der
+   * abgeschlossene Zyklus am Abschlusstag noch hatte — positiv frei geworden, negativ das
+   * Minus, mit dem er abgeschlossen wurde. Beides verlässt die Rücklage an diesem Tag;
+   * ohne die Zahl ginge der Monat nicht auf (`ruecklagenFortschreibung`).
+   */
+  readonly abgeschlossen?: Cent;
+  /**
+   * `verfuegbar − verbraucht − abgeschlossen`. Beim Budget das, was zum Ersten verfällt,
+   * bei einer Rücklage der Übertrag in den nächsten Monat. Negativ = überzogen.
    */
   readonly rest: Cent;
 }

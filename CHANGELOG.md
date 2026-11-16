@@ -7,6 +7,11 @@ Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 
 ### Neu
 
+**Wartet auf Zuordnung**, als Karte im Bereich Rücklagen. Hängen mehrere Rücklagen an
+derselben Kategorie, stehen die Buchungen dort, bei denen noch offen ist, welche Rücklage
+sie trägt, gesammelt mit Datum, Empfänger, Kategorie und Betrag; gewählt wird direkt in der
+Zeile, auch „keine Rücklage". Ist nichts offen, steht die Karte nicht da.
+
 **Der Bereich Vermögen.** Vermögenswerte (etwa ein Fahrzeug oder eine Versicherung mit
 Rückkaufswert) und Schulden stehen als Wert bzw. Restschuld zum Stichtag da, wie man sie
 aus dem Auszug abliest. Daraus und aus Konten und Depots rechnet die App das
@@ -39,6 +44,21 @@ ein Klick öffnet sie, damit man das Konto eintragen kann. Bisher gab es das nur
 im Kontoauszug.
 
 ### Geändert
+
+**Eine Rücklage wird abgeschlossen, nicht ausgebucht.** Eine Rücklage mit Kategorie, die
+abgeschlossen wird, hat statt „ausgebucht" den Knopf „abschließen" — mit dem Kauf oder am
+Ende des Urlaubs, es ist derselbe Handgriff. Eine Buchung wählst du dabei nicht mehr: ihre
+Ausgaben hat die Rücklage über die Kategorie schon gefunden. Der Dialog zeigt, was am
+gewählten Tag angespart und getragen ist, und lässt wählen, ob sie neu beginnt oder endet.
+Was übrig ist, wird auf dem Konto frei; kein Monat ändert sich dadurch, die Raten bleiben
+Kosten ihrer Monate. Ein Minus hat seinen Monat schon gekostet. Die Geschichte heisst jetzt
+„Schon abgeschlossen" und zeigt, was frei geworden ist; der Verlauf zeigt den Monat des
+Abschlusses mit beiden Zyklen, sodass er aufgeht. Eine ältere Rücklage ohne Kategorie wird
+weiter mit ihrer Buchung ausgebucht wie bisher.
+
+**Ein neues Budget nicht an der Kategorie einer Rücklage.** Wer an einer Kategorie, an der
+schon eine Rücklage hängt, ein monatliches Budget anlegen will, bekommt den Hinweis auf eine
+Unterkategorie — wie umgekehrt schon bisher. Was schon so dasteht, bleibt.
 
 **Eine Rücklage, eine Liste, ein Dialog.** Was bisher „Rücklage über die Kategorie" hiess,
 ist jetzt eine Rücklage wie jede andere; der Bereich Rücklagen zeigt alle in einer Liste,
