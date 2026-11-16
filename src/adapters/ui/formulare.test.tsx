@@ -17,6 +17,7 @@ const halter = vi.hoisted(() => {
 vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 import { auswahlWaehlen, frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../testwerkzeug/harness";
+import i18n from "../../i18n/i18n";
 import { EinstellungenScreen } from "./einstellungen/EinstellungenScreen";
 import { KontenVerwaltungScreen } from "./konten/KontenVerwaltungScreen";
 import { RuecklagenScreen } from "./ruecklagen/RuecklagenScreen";
@@ -83,58 +84,43 @@ describe("Budgets — Formularpfade", () => {
     await waitFor(() => expect(screen.queryByText("Verworfen")).not.toBeInTheDocument());
   });
 
-  // Seit 2026-11-15 legt man ein aufbauendes Budget im Bereich Rücklagen an, als
-  // „Rücklage über die Kategorie" — eine Wahl der Art gibt es im Dialog nicht mehr.
-  it("legt ein aufbauendes Budget über die Maske an", async () => {
-    await sqliteZahlungskontoRepository.speichern({
-      id: "k1", bezeichnung: "Tagesgeldkonto", typ: "Tagesgeld", klasse: "liquide", inhaberIds: [], saldo: 100000,
-    });
-    await sqliteKategorieRepository.speichern({ id: "kat1", name: "Urlaub", defaultCharakter: "Aufwand" });
-
-    const nutzer = userEvent.setup();
-    rendere(<RuecklagenScreen />);
-    await nutzer.click((await screen.findAllByRole("button", { name: /über kategorie/i }))[0]);
-
-    // Der Kategorie-Picker ist ein Knopf, der einen eigenen Dialog öffnet.
-    await nutzer.click(screen.getByRole("button", { name: /Kategorie wählen|—|▾/ }));
-    await nutzer.click(await screen.findByRole("button", { name: /Urlaub/ }));
-
-    const betrag = screen.getAllByRole("textbox").find((f) => !(f as HTMLInputElement).value);
-    if (betrag) await nutzer.type(betrag, "50");
-    await klicke(nutzer, /^speichern$/i);
-
-    await waitFor(async () => {
-      const budgets = await sqliteBudgetRepository.alle();
-      expect(budgets).toHaveLength(1);
-      expect(budgets[0].art).toBe("aufbauend");
-      expect(budgets[0].kontoId).toBe("k1");
-      // Start immer auf dem Monatsersten — nie mitten im Monat.
-      expect(budgets[0].start.endsWith("-01")).toBe(true);
-    });
-  });
+  // Was sich ansammeln soll, ist seit Migration 81 eine Rücklage, die weiterläuft — der
+  // Dialog der Budgets kennt nur noch monatliche.
 });
 
+/** Die Kategorie im Dialog einer Rücklage wählen — seit Paket 4 Pflicht. */
+async function kategorieWaehlen(nutzer: ReturnType<typeof userEvent.setup>, name: RegExp) {
+  await nutzer.click(screen.getByRole("button", { name: /Kategorie wählen/ }));
+  await nutzer.click(await screen.findByRole("button", { name }));
+}
+
 describe("Rücklagen — Formularpfade", () => {
+  beforeEach(async () => {
+    await sqliteKategorieRepository.speichern({ id: "kat-quelvin", name: "Quelvin", defaultCharakter: "Aufwand" });
+  });
+
+
   // Die Felder werden ÜBER IHR LABEL gefüllt und nicht der Reihe nach: seit die Maske
   // zwei Formen kennt, hängt es von der Auswahl ab, welche Felder überhaupt dastehen —
   // ein Füller, der über alle Textfelder läuft, schriebe den Namen ins Zielfeld.
   it("legt eine Rücklage mit vollständigem Formular an", async () => {
     const nutzer = userEvent.setup();
     rendere(<RuecklagenScreen />);
-    // Erst warten, bis der Screen steht: `klicke` sucht synchron (siehe oben). Seit
-    // 2026-11-15 gibt es zwei Knöpfe zum Anlegen; gemeint ist die Rücklage von Hand,
-    // nicht die über die Kategorie.
+    // Erst warten, bis der Screen steht: `klicke` sucht synchron (siehe oben).
     await screen.findAllByRole("button", { name: /^\+?Rücklage$/i });
     await klicke(nutzer, /^\+?Rücklage$/i);
 
     await nutzer.type(await screen.findByLabelText(/^Wofür/), "Geschirrspüler");
     await nutzer.type(await screen.findByLabelText(/^Ziel/), "600");
     await nutzer.type(await screen.findByLabelText(/^Frist/), "120");
+    await kategorieWaehlen(nutzer, /Quelvin/);
     await klicke(nutzer, /speichern|anlegen/i);
 
     await waitFor(async () => {
       const [r] = await sqliteRuecklagenRepository.alle();
       expect(r?.bezeichnung).toBe("Geschirrspüler");
+      expect(r?.kategorieId).toBe("kat-quelvin");
+      expect(r?.art).toBe("abschliessend");
       expect(r?.ziel).toBe(60000);
       expect(r?.fristMonate).toBe(120);
     });
@@ -148,9 +134,7 @@ describe("Rücklagen — Formularpfade", () => {
   it("legt eine Rücklage ohne Ziel an, nur mit Rate", async () => {
     const nutzer = userEvent.setup();
     rendere(<RuecklagenScreen />);
-    // Erst warten, bis der Screen steht: `klicke` sucht synchron (siehe oben). Seit
-    // 2026-11-15 gibt es zwei Knöpfe zum Anlegen; gemeint ist die Rücklage von Hand,
-    // nicht die über die Kategorie.
+    // Erst warten, bis der Screen steht: `klicke` sucht synchron (siehe oben).
     await screen.findAllByRole("button", { name: /^\+?Rücklage$/i });
     await klicke(nutzer, /^\+?Rücklage$/i);
 
@@ -159,6 +143,7 @@ describe("Rücklagen — Formularpfade", () => {
     // Ziel und Frist sind jetzt weg — nicht nur leer.
     expect(screen.queryByLabelText(/^Ziel/)).toBeNull();
     await nutzer.type(await screen.findByLabelText(/^Rate im Monat/), "150");
+    await kategorieWaehlen(nutzer, /Quelvin/);
     await klicke(nutzer, /speichern|anlegen/i);
 
     await waitFor(async () => {
@@ -168,6 +153,41 @@ describe("Rücklagen — Formularpfade", () => {
       expect(r?.rate).toBeUndefined();
       expect(r?.ziel).toBeUndefined();
     });
+  });
+
+  it("legt eine Rücklage an, die weiterläuft", async () => {
+    const nutzer = userEvent.setup();
+    rendere(<RuecklagenScreen />);
+    await screen.findAllByRole("button", { name: /^\+?Rücklage$/i });
+    await klicke(nutzer, /^\+?Rücklage$/i);
+
+    await nutzer.type(await screen.findByLabelText(/^Wofür/), "Werkstatt");
+    await auswahlWaehlen(nutzer, /^Sorte/, /läuft weiter/);
+    await auswahlWaehlen(nutzer, /^Form/, /freie Rate/);
+    await nutzer.type(await screen.findByLabelText(/^Rate im Monat/), "40");
+    await kategorieWaehlen(nutzer, /Quelvin/);
+    await klicke(nutzer, /speichern|anlegen/i);
+
+    await waitFor(async () => {
+      const [r] = await sqliteRuecklagenRepository.alle();
+      expect(r).toMatchObject({ bezeichnung: "Werkstatt", art: "fortlaufend", kategorieId: "kat-quelvin" });
+      expect(r?.raten?.map((x) => x.betrag)).toEqual([4000]);
+      // Eine neue findet ab ihrem Beginn — „ohne Anfang" haben nur die früheren Budgets.
+      expect(r?.findetAb).toBe(r?.beginn);
+    });
+  });
+
+  it("verlangt die Kategorie, bevor sie speichert", async () => {
+    const nutzer = userEvent.setup();
+    rendere(<RuecklagenScreen />);
+    await screen.findAllByRole("button", { name: /^\+?Rücklage$/i });
+    await klicke(nutzer, /^\+?Rücklage$/i);
+    await nutzer.type(await screen.findByLabelText(/^Wofür/), "Ohne");
+    await nutzer.type(await screen.findByLabelText(/^Ziel/), "600");
+    await nutzer.type(await screen.findByLabelText(/^Frist/), "12");
+    await klicke(nutzer, /speichern|anlegen/i);
+    expect(await screen.findByText(i18n.t("fehler.ruecklage.kategorieFehlt"))).toBeInTheDocument();
+    expect(await sqliteRuecklagenRepository.alle()).toHaveLength(0);
   });
 
   it("zeigt Soll-Stand und Monatsrate einer Rücklage", async () => {

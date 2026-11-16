@@ -244,7 +244,7 @@ describe("Use-Cases — Integer-Cent-Invariante", () => {
   it("[BEHOBEN] budgetAnlegen lehnt Nachkommastellen ab", async () => {
     const repo = memBudgets();
     await expect(
-      budgetAnlegen(repo, { kategorieId: "k", kontoId: "k1", betragProMonat: 40000.5, art: "monatlich", start: "2026-06-01", abMonat: "2026-06" }),
+      budgetAnlegen(repo, { kategorieId: "k", kontoId: "k1", betragProMonat: 40000.5, start: "2026-06-01", abMonat: "2026-06" }),
     ).rejects.toThrow();
   });
 
@@ -318,7 +318,7 @@ describe("Rücklagen — Validierung vor Rundung", () => {
     };
     await expect(ruecklageAnlegen(repo, {
       bezeichnung: "Kaputt", ziel: 120000,
-      fristMonate: 0.4, beginn: "2026-06-01",
+      fristMonate: 0.4, beginn: "2026-06-01", kategorieId: "k",
     })).rejects.toThrow("frist.groesserNull");
     expect(gespeichert).toHaveLength(0);
   });

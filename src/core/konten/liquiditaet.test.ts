@@ -168,10 +168,10 @@ describe("liquiditaetsvorschau — die erwartete Linie", () => {
    * Seine Rate wird nicht ausgegeben, sie bleibt liegen. Sie mitzurechnen hiesse, Geld
    * abfliessen zu lassen, das auf dem Konto bleibt.
    */
-  it("lässt ein aufbauendes Budget aussen vor", () => {
+  it("lässt eine Rücklage, die weiterläuft, aussen vor (bis Migration 81 ein aufbauendes Budget)", () => {
     const [v] = liquiditaetsvorschau({
       konten: [konto()], buchungen: [], regeln: [],
-      budgetsicht: sicht([budget({ art: "aufbauend" })]),
+      budgetsicht: { ...sicht([]), ruecklagen: [{ id: "r", bezeichnung: "Ombrast", beginn: "2026-01-01", kategorieId: "k", kontoId: "giro", art: "fortlaufend", raten: [{ abMonat: "2026-01", betrag: 40000 }] }] },
       heute: HEUTE, tage: 29,
     });
     expect(v.erwartet.tiefstand).toBe(100000);

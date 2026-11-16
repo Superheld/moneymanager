@@ -82,11 +82,11 @@ describe("einrichtungsstand", () => {
     expect(stand.fertig).toBe(true);
   });
 
-  it("nimmt ein aufbauendes Budget als Rücklage", () => {
-    expect(status(eingabe({ budgets: [budget("aufbauend")] }), "ruecklagen").status).toBe("erledigt");
-    // … und nicht als Budget: der Bereich Budgets zeigt es nicht mehr.
-    expect(status(eingabe({ budgets: [budget("aufbauend")] }), "budgets").status).toBe("offen");
+  it("zählt eine Rücklage, die weiterläuft, als Rücklage — nicht als Budget", () => {
+    // Seit Migration 81 ist das frühere aufbauende Budget eine Rücklage und steht in
+    // `ruecklagenAnzahl`; der Schritt „Budgets" bleibt ohne monatliches offen.
     expect(status(eingabe({ ruecklagenAnzahl: 1 }), "ruecklagen").status).toBe("erledigt");
+    expect(status(eingabe({ ruecklagenAnzahl: 1 }), "budgets").status).toBe("offen");
   });
 
   it("nennt den ersten offenen Schritt als nächsten, solange die Einrichtung nicht fertig ist", () => {

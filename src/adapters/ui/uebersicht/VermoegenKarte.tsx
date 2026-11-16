@@ -57,7 +57,7 @@ export function VermoegenKarte({
             {k.posten.length > 0 && (
               <div className="muted" style={{ marginTop: 2 }}>
                 {k.posten.map((p) => (
-                  <div key={`${p.art}:${p.id}`} style={unterzeile}>
+                  <div key={p.id} style={unterzeile}>
                     {/* Ohne Pille: seit 2026-11-15 heisst beides „Rücklage", und eine
                         Pille, die an jeder Zeile dasselbe sagt, sagt nichts. */}
                     <span>{namen.get(p.id) ?? p.id}</span>

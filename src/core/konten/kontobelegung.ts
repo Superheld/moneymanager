@@ -3,8 +3,8 @@
 // Die EINE Rechnung für die Frage „wie viel von diesem Stand ist für etwas bestimmt, und
 // wie viel ist frei". Bis 2026-10-26 beantworteten sie mehrere Stellen je zur Hälfte, und
 // keine kannte die anderen: die Rücklagen-Deckung verteilte den GANZEN Kontostand auf die
-// Rücklagen, obwohl ein aufbauendes Budget auf demselben Konto denselben Euro für sich
-// beanspruchte. Die Deckung sah dann besser aus, als sie war, und nichts warnte.
+// Rücklagen, obwohl ein aufbauendes Budget (heute selbst eine Rücklage) auf demselben
+// Konto denselben Euro für sich beanspruchte. Die Deckung sah dann besser aus, als sie war, und nichts warnte.
 //
 // Deshalb kennt diese Datei keine Rücklage und kein Budget, nur ANSPRÜCHE: wer einen hat,
 // liefert ihn als `Anspruch` an, und jede Anzeige liest dieselbe Belegung. Eine zweite,
@@ -19,19 +19,22 @@
 //    darüber liegt, ist `frei`.
 //  • **Der Rest eines MONATLICHEN Budgets ist kein Anspruch.** Er verfällt zum Monatsende
 //    und bleibt dann einfach auf dem Konto liegen, ohne Kommentar. Gebunden ist nur, was
-//    über den Monat hinaus jemandem gehört: eine Rücklage und der Rest eines aufbauenden
-//    Budgets.
+//    über den Monat hinaus jemandem gehört: eine Rücklage.
 
 import type { Cent } from "../basis/geld";
 import type { Klassenstand } from "../buchung/istbuchung";
 import type { Kontoklasse } from "./konto";
 
-export type Anspruchsart = "ruecklage" | "budget";
-
-/** Ein Anspruch auf Geld, das auf einem bestimmten Konto liegen soll. */
+/**
+ * Ein Anspruch auf Geld, das auf einem bestimmten Konto liegen soll.
+ *
+ * Seit Migration 81 hat ihn nur noch eine Rücklage — der Rest eines aufbauenden Budgets
+ * war bis dahin die zweite Art (`Anspruchsart` `budget`); das Budget ist jetzt selbst
+ * eine Rücklage. Ein Feld für die Art gibt es deshalb nicht mehr. Wer einen Anspruch
+ * einer anderen Sache einführt, braucht es wieder.
+ */
 export interface Anspruch {
-  readonly art: Anspruchsart;
-  /** Id der Rücklage bzw. des Budgets. */
+  /** Id der Rücklage. */
   readonly id: string;
   readonly kontoId: string;
   /** Was beansprucht wird, POSITIV. Ein Anspruch von 0 oder darunter ist keiner. */

@@ -1,9 +1,9 @@
 // Use-Case „Budget anlegen". Eindeutigkeit „ein Budget je Kategorie" wird hier per
 // Repository geprüft (SPEC US-D1: bewusst nicht synchron erzwungen).
 //
-// Je Kategorie EINES — nicht mehr wie früher „eines je Kategorie + Periode". Mit zwei
-// Arten am selben Aggregat wäre ein zweites Budget auf derselben Kategorie keine
-// Verfeinerung, sondern eine Doppelzählung: beide zögen dieselben Buchungen. Wer
+// Je Kategorie EINES — nicht mehr wie früher „eines je Kategorie + Periode". Ein zweites
+// Budget auf derselben Kategorie wäre keine Verfeinerung, sondern eine Doppelzählung:
+// beide zögen dieselben Buchungen. Wer
 // unterschiedlich behandeln will, legt das zweite Budget auf eine UNTERkategorie —
 // dann rechnet der Kern es automatisch aus dem Dach heraus (core/budget).
 
@@ -11,7 +11,6 @@ import {
   FachlicherFehler,
   istCent,
   type Budget,
-  type Budgetart,
   type Budgetbetrag,
   type Cent,
 } from "../../core";
@@ -22,7 +21,6 @@ export interface BudgetEingabe {
   kontoId: string;
   /** Betrag pro Monat in Minor Units — die UI parst die Eingabe währungsgerecht (ADR-0004). */
   betragProMonat: Cent;
-  art: Budgetart;
   /** ISO-Datum; fehlt es, zählt der Erste des angegebenen Monats bzw. `heute`. */
   start: string;
   /**
@@ -69,9 +67,9 @@ export async function budgetAnlegen(
     kategorieId: eingabe.kategorieId,
     kontoId: eingabe.kontoId,
     betraege,
-    art: eingabe.art,
-    // Ein aufbauendes Budget sammelt ab dem Monatsersten — mitten im Monat anzufangen
-    // hiesse, den ersten Monat anteilig zu rechnen, und dafür gibt es keinen Grund.
+    // Seit Migration 81 die einzige Art. Was sich ansammeln soll, legt `ruecklageAnlegen`
+    // als Rücklage an, die weiterläuft — auch aus einem Budgetvorschlag heraus.
+    art: "monatlich",
     start: `${eingabe.start.slice(0, 7)}-01`,
   };
   // `speichern` schreibt das Aggregat ganz — die zusammengeführte Reihe kommt mit.

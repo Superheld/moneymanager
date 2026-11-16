@@ -226,11 +226,12 @@ describe("ErgebnisKarten", () => {
     expect(within(august).getByText("−588,00")).toBeInTheDocument();
   });
 
-  it("zeigt am aufbauenden Budget die Rate als Kosten und die Entnahme daneben", async () => {
+  it("zeigt an einer Rücklage, die weiterläuft, die Rate als Kosten und die Entnahme daneben", async () => {
     const nutzer = userEvent.setup();
-    const topf: Budget = { id: "b-urlaub", kategorieId: "urlaub", kontoId: "giro", betraege: [{ abMonat: "2026-01", betrag: 10000 }], art: "aufbauend", start: "2026-01-01" };
+    // Läuft weiter — bis Migration 81 ein aufbauendes Budget.
+    const topf: Ruecklage = { id: "b-urlaub", bezeichnung: "Urlaub", kategorieId: "urlaub", kontoId: "giro", raten: [{ abMonat: "2026-01", betrag: 10000 }], art: "fortlaufend", beginn: "2026-01-01" };
     const reise: IstBuchung = { id: "i9", datum: "2026-08-03", betrag: -60000, kontoId: "giro", kategorieId: "urlaub", charakter: "Aufwand", quelle: "import" };
-    rendere(<ErgebnisKarten {...props({ budgets: [...BUDGETS, topf], ist: [...IST, reise] })} />);
+    rendere(<ErgebnisKarten {...props({ ruecklagen: [topf], ist: [...IST, reise] })} />);
     const august = await karte("August 2026");
 
     // Seit 2026-11-15 steht es in der Zeile der Rücklagen — für den Nutzer dasselbe.
@@ -240,13 +241,14 @@ describe("ErgebnisKarten", () => {
     expect(within(august).getByText(new RegExp("600,00"))).toBeInTheDocument();
   });
 
-  it("führt Rücklage und aufbauendes Budget in EINER Zeile, als Summe beider", async () => {
-    const topf: Budget = { id: "b-urlaub", kategorieId: "urlaub", kontoId: "giro", betraege: [{ abMonat: "2026-01", betrag: 10000 }], art: "aufbauend", start: "2026-01-01" };
-    rendere(<ErgebnisKarten {...props({ ruecklagen: RUECKLAGEN, budgets: [...BUDGETS, topf] })} />);
+  it("führt Rücklagen beider Sorten in EINER Zeile, als Summe", async () => {
+    // Läuft weiter — bis Migration 81 ein aufbauendes Budget.
+    const topf: Ruecklage = { id: "b-urlaub", bezeichnung: "Urlaub", kategorieId: "urlaub", kontoId: "giro", raten: [{ abMonat: "2026-01", betrag: 10000 }], art: "fortlaufend", beginn: "2026-01-01" };
+    rendere(<ErgebnisKarten {...props({ ruecklagen: [...RUECKLAGEN, topf] })} />);
     const august = await karte("August 2026");
     // Eine Zeile „Rücklagen", keine zweite daneben.
     expect(within(august).getAllByText(text("ergebnis.zeile.abschreibungen"))).toHaveLength(1);
-    // Ihre Summe: die Rücklagen (120,00, siehe oben) plus die Rate des Budgets (100,00).
+    // Ihre Summe: die Rücklagen (120,00, siehe oben) plus die Rate der, die weiterläuft (100,00).
     const zeile = within(august).getByText(text("ergebnis.zeile.abschreibungen")).closest("[aria-expanded]") as HTMLElement;
     expect(zeile.textContent).toMatch(/−220,00/);
   });

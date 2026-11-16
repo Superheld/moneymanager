@@ -11,15 +11,14 @@
 
 import { describe, expect, it } from "vitest";
 import type { IstBuchung } from "../buchung/istbuchung";
-import { budgetRahmen, budgetStand, type Budget } from "../budgets/budget";
+import type { Budget } from "../budgets/budget";
 import { addMonate, parseIso, toIso } from "../basis/datum";
-import { einordnen, type Einordnung } from "../einordnung";
+import { einordnen } from "../einordnung";
 import { einordnungskontext, ergebnisbasis, monatsErgebnis, type ErgebnisEingabe } from "../ergebnis";
 import type { Kategorie } from "../kategorien/kategorie";
 import { sollRuecklage, type Ruecklage, type Ruecklagenzyklus } from "./ruecklage";
 import {
   abschliessen,
-  alsRuecklage as alsRuecklageKern,
   altabschlussKosten,
   rateIm,
   ratenBis,
@@ -29,7 +28,7 @@ import {
   zyklusKosten,
   type Ruecklagenentnahme,
 } from "./topf";
-import { zustaendigkeit, type Zustaendig } from "./zustaendigkeit";
+import { zustaendigkeit } from "./zustaendigkeit";
 
 /** `anzahl` Monate (`YYYY-MM`) ab `von`. */
 function monate(von: string, anzahl: number): string[] {
@@ -47,14 +46,14 @@ function buchung(datum: string, betrag: number, over: Partial<IstBuchung> = {}):
 
 const entnahme = (datum: string, betrag: number): Ruecklagenentnahme => ({ datum, betrag });
 
-/** Ein aufbauendes Budget so, wie es nach der Überführung als Rücklage dastünde. */
-function alsRuecklage(b: Budget): Ruecklage {
+/** Ein aufbauendes Budget so, wie Migration 81 es als Rücklage hinterlässt. */
+function alsRuecklage(b: { id: string; kategorieId: string; start: string; betraege: readonly { abMonat: string; betrag: number }[] }): Ruecklage {
   return {
     id: b.id,
     bezeichnung: "",
     beginn: b.start,
     kategorieId: b.kategorieId,
-    kontoId: b.kontoId,
+    kontoId: "tg",
     art: "fortlaufend",
     raten: b.betraege,
   };
@@ -193,23 +192,31 @@ describe("Zahlenbeispiele des Entwurfs", () => {
 });
 
 // ------------------------------------------------------------------ Äquivalenz (a)
+//
+// Seit Migration 81 gibt es das aufbauende Budget nicht mehr; es ist eine Rücklage, die
+// weiterläuft. Ihre Kosten müssen trotzdem nach der Regel von davor aufgehen — gegen die
+// Abschrift `topfKostenVorher`, die das aufbauende Budget aus seinen eigenen Feldern
+// rechnet (Start, Betragsreihe), so wie es bis Paket 3 in `ergebnis.ts` stand.
 
-describe("Äquivalenz: aufbauendes Budget gegen das heutige topfKosten", () => {
+describe("Äquivalenz: frühere aufbauende Budgets gegen das topfKosten von davor", () => {
   const kategorien: Kategorie[] = [
     { id: "reise", name: "Reise", defaultCharakter: "Aufwand" },
     { id: "flug", name: "Flug", elternId: "reise", defaultCharakter: "Aufwand" },
     { id: "werkstatt", name: "Werkstatt", defaultCharakter: "Aufwand" },
     { id: "markt", name: "Markt", defaultCharakter: "Aufwand" },
   ];
-  const budgets: Budget[] = [
+  /** So standen sie vor Migration 81 da. */
+  const vorher: AltesBudget[] = [
     // Ein Dach mit eingebettetem monatlichem Budget und einer Betragsänderung.
-    { id: "b-reise", kategorieId: "reise", kontoId: "tg", art: "aufbauend", start: "2025-03-01",
+    { id: "b-reise", kategorieId: "reise", start: "2025-03-01",
       betraege: [{ abMonat: "2025-03", betrag: 10000 }, { abMonat: "2025-09", betrag: 15000 }] },
-    { id: "b-flug", kategorieId: "flug", kontoId: "giro", art: "monatlich", start: "2025-01-01", betraege: [{ abMonat: "2025-01", betrag: 5000 }] },
     // Startet mitten im Monat und mit einer Betragsversion, die vor dem Start liegt.
-    { id: "b-werkstatt", kategorieId: "werkstatt", kontoId: "tg", art: "aufbauend", start: "2025-05-17",
-      betraege: [{ abMonat: "2025-02", betrag: 4000 }] },
+    { id: "b-werkstatt", kategorieId: "werkstatt", start: "2025-05-17", betraege: [{ abMonat: "2025-02", betrag: 4000 }] },
   ];
+  const budgets: Budget[] = [
+    { id: "b-flug", kategorieId: "flug", kontoId: "giro", art: "monatlich", start: "2025-01-01", betraege: [{ abMonat: "2025-01", betrag: 5000 }] },
+  ];
+  const ruecklagen = vorher.map(alsRuecklage);
   const ist: IstBuchung[] = [
     buchung("2025-02-20", -9000, { kategorieId: "reise" }), // vor dem Start: Entnahme, kostet nichts
     buchung("2025-05-03", -25000, { kategorieId: "reise" }),
@@ -223,105 +230,85 @@ describe("Äquivalenz: aufbauendes Budget gegen das heutige topfKosten", () => {
     buchung("2025-08-10", -5000, { kategorieId: "werkstatt", budgetrelevant: false }), // aus den Budgets genommen
     buchung("2025-09-01", -4000, { kategorieId: "markt" }),
   ];
-  const kontext = einordnungskontext({ kategorien, budgets, konten: [], vertragJeBuchung: new Map(), ausbuchungen: [], ruecklagen: [], ruecklagenzuordnungen: [] });
+  const kontext = einordnungskontext({ kategorien, budgets, konten: [], vertragJeBuchung: new Map(), ausbuchungen: [], ruecklagen, ruecklagenzuordnungen: [] });
   const einordnungen = einordnen(ist, kontext);
-  const topf = einordnungen.filter((x) => x.art === "ruecklage" && !!x.budgetId);
-  const entnahmenVon = (budgetId: string): Ruecklagenentnahme[] =>
-    topf.filter((x) => x.budgetId === budgetId).map((x) => ({ datum: x.buchung.datum, betrag: x.betrag }));
+  const entnahmenVon = (id: string): Ruecklagenentnahme[] =>
+    einordnungen.filter((x) => x.art === "ruecklage" && x.ruecklageId === id).map((x) => ({ datum: x.buchung.datum, betrag: x.betrag }));
 
-  for (const b of budgets.filter((x) => x.art === "aufbauend")) {
+  for (const b of vorher) {
     it(`kostet für ${b.id} jeden Monat dasselbe`, () => {
       const r = alsRuecklage(b);
       const [z] = zyklen(r, []);
       for (const m of monate("2025-01", 18)) {
-        const heute = topfKostenVorher(b, topf, m);
+        const heute = topfKostenVorher(b, entnahmenVon(b.id), m);
         expect(zyklusKosten(z, entnahmenVon(b.id), m), m).toBe(heute);
         expect(ruecklagenKostenIm(r, [], entnahmenVon(b.id), m).kosten, m).toBe(heute);
         // Und über die Ergebnisrechnung selbst, Posten für Posten.
-        expect(heutigeKosten(eingabe({ budgets, ist, kategorien }), m, (p) => p.budgetId === b.id), m).toBe(heute);
-      }
-    });
-
-    it(`steht für ${b.id} an jedem Tag wie heute der Rest des Budgets`, () => {
-      const r = alsRuecklage(b);
-      const sicht = { buchungen: ist, kategorien, budgets, vertragsBuchungen: new Set<string>() };
-      for (const m of monate("2025-03", 14)) {
-        for (const tag of ["01", "15", "28"]) {
-          const am = `${m}-${tag}`;
-          const heute = budgetStand(sicht, b, am);
-          const neu = ruecklagenstand(r, [], entnahmenVon(b.id), am);
-          expect(neu.raten, am).toBe(heute.rahmen);
-          expect(neu.stand, am).toBe(heute.rest);
-        }
+        expect(heutigeKosten(eingabe({ budgets, ruecklagen, ist, kategorien }), m, (p) => p.ruecklageId === b.id), m).toBe(heute);
       }
     });
   }
 
-  it("findet über die Zuständigkeit dieselben Träger wie die Einordnung", () => {
-    // Die Rücklage von Hand an `markt` hat kein Fundfenster und findet deshalb nichts —
-    // wie heute, wo eine Rücklage von Hand über ihre Kategorie gar nichts findet.
-    const vonHand: Ruecklage = { id: "r-hand", bezeichnung: "Dornbusch", rate: 3000, beginn: "2025-01-01", kategorieId: "markt" };
-    const traeger = zustaendigkeit(kategorien, budgets, [...budgets.filter((b) => b.art === "aufbauend").map(alsRuecklage), vonHand], [], []);
-    for (const x of einordnungen) {
-      const erwartet = alsZustaendig(x);
-      expect(traeger({ istbuchungId: x.buchung.id, kategorieId: x.kategorieId, datum: x.buchung.datum, budgetrelevant: x.buchung.budgetrelevant }), x.buchung.id).toEqual(erwartet);
-    }
+  it("ordnet wie vorher: das Unterbudget trägt seine Kategorie, nicht budgetrelevant ist ungeplant", () => {
+    const art = (id: string) => einordnungen.filter((x) => x.buchung.id === id).map((x) => x.art === "ruecklage" ? `ruecklage:${x.ruecklageId}` : x.art === "laufend" ? `laufend:${x.budgetId}` : x.art);
+    expect(art(ist[0].id)).toEqual(["ruecklage:b-reise"]);
+    expect(art(ist[4].id)).toEqual(["laufend:b-flug"]);
+    expect(art(ist[9].id)).toEqual(["ungeplant"]);
+    expect(art(ist[10].id)).toEqual(["ungeplant"]);
   });
 });
+
+/** Ein aufbauendes Budget, wie es vor Migration 81 aussah — nur, was seine Regel braucht. */
+interface AltesBudget {
+  readonly id: string;
+  readonly kategorieId: string;
+  readonly start: string;
+  readonly betraege: readonly { abMonat: string; betrag: number }[];
+}
 
 /**
  * Die Regel des aufbauenden Budgets, wie sie bis Paket 3 in `ergebnis.ts` stand — als
  * Abschrift festgehalten, damit die Äquivalenz oben gegen die Rechnung VON DAVOR prüft.
- * Nicht ändern: sie ist der Massstab, nicht die Rechnung.
+ * Der Rahmen wie damals `budgetRahmen`: aufsummiert ab dem späteren von Start und erster
+ * Betragsversion. Nicht ändern: sie ist der Massstab, nicht die Rechnung.
  */
-function topfKostenVorher(budget: Budget, entnahmen: readonly Einordnung[], monat: string): number {
-  const summe = (werte: readonly number[]) => werte.reduce((s, w) => s + w, 0);
-  const monatsende = toIso(addMonate(parseIso(`${monat}-01`), 1));
+function topfKostenVorher(budget: AltesBudget, entnahmen: readonly Ruecklagenentnahme[], monat: string): number {
+  const naechster = (m: string) => toIso(addMonate(parseIso(`${m}-01`), 1)).slice(0, 7);
+  const betragIm = (m: string) => {
+    let treffer = 0;
+    for (const v of budget.betraege) {
+      if (v.abMonat > m) break;
+      treffer = v.betrag;
+    }
+    return treffer;
+  };
+  const erster = budget.start.slice(0, 7) > budget.betraege[0].abMonat ? budget.start.slice(0, 7) : budget.betraege[0].abMonat;
+  const rahmen = (bis: string) => {
+    let s = 0;
+    for (let m = erster; m <= bis; m = naechster(m)) s += betragIm(m);
+    return s;
+  };
+  const monatsende = `${naechster(monat)}-01`;
   const monatsanfang = `${monat}-01`;
   const vormonat = toIso(addMonate(parseIso(monatsanfang), -1)).slice(0, 7);
   const ausgabenBis = (bis: string) =>
-    -summe(
-      entnahmen
-        .filter((x) => x.budgetId === budget.id && x.buchung.datum >= budget.start && x.buchung.datum < bis)
-        .map((x) => x.betrag),
-    );
-  const kostenBis = (m: string, bis: string) => Math.max(budgetRahmen(budget, `${m}-01`), ausgabenBis(bis));
+    -entnahmen.filter((x) => x.datum >= budget.start && x.datum < bis).reduce((s, x) => s + x.betrag, 0);
+  const kostenBis = (m: string, bis: string) => Math.max(rahmen(m), ausgabenBis(bis));
   return kostenBis(monat, monatsende) - kostenBis(vormonat, monatsanfang);
 }
 
-describe("alsRuecklage — ein aufbauendes Budget, übergangsweise als Rücklage gelesen", () => {
-  it("trägt Kategorie, Konto, Reihe und Start, und läuft weiter", () => {
-    const b: Budget = { id: "b-q", kategorieId: "k-q", kontoId: "tg", art: "aufbauend", start: "2025-04-09", betraege: [{ abMonat: "2025-04", betrag: 7000 }] };
-    expect(alsRuecklageKern(b)).toEqual({ id: "b-q", bezeichnung: "", beginn: "2025-04-09", kategorieId: "k-q", kontoId: "tg", art: "fortlaufend", raten: b.betraege });
-  });
-
-  it("beginnt ohne Start mit dem ersten Betragsmonat — die eine benannte Abweichung", () => {
-    // Ohne `start` (nur über eine von Hand geänderte Datei) kosteten die Ausgaben eines
-    // aufbauenden Budgets vor der Umstellung NIE etwas: `datum >= undefined` traf nie zu.
-    // Jetzt zählen sie ab dem ersten Betragsmonat (Teil B des Entwurfs, Abschnitt 5).
-    const b = { id: "b-ohne", kategorieId: "k-o", kontoId: "tg", art: "aufbauend", betraege: [{ abMonat: "2025-03", betrag: 5000 }] } as unknown as Budget;
-    const r = alsRuecklageKern(b);
-    expect(r.beginn).toBe("2025-03-01");
+describe("eine Rücklage, die weiterläuft, mit Beginn im ersten Betragsmonat", () => {
+  it("kostet ab dort die Rate und das Ungedeckte", () => {
+    // So überführt Migration 81 ein aufbauendes Budget ohne `start` (nur in einer von
+    // Hand geänderten Datei). Vor der Umstellung kosteten seine Ausgaben nie etwas
+    // (`datum >= undefined`); jetzt zählen sie ab dem ersten Betragsmonat — die eine
+    // benannte Abweichung (Teil B des Entwurfs, Abschnitt 5).
+    const r: Ruecklage = { id: "r-ohne", bezeichnung: "Tellwick", beginn: "2025-03-01", kategorieId: "k-o", art: "fortlaufend", raten: [{ abMonat: "2025-03", betrag: 5000 }] };
     const entnahmen = [{ datum: "2025-04-10", betrag: -20000 }];
-    // März: die Rate. April: Rate plus Ungedecktes — vorher wären es 5000 gewesen.
     expect(ruecklagenKostenIm(r, [], entnahmen, "2025-03").kosten).toBe(5000);
     expect(ruecklagenKostenIm(r, [], entnahmen, "2025-04").kosten).toBe(15000);
   });
 });
-
-/** Was die heutige Einordnung als Zuständigkeit hiesse. */
-function alsZustaendig(x: Einordnung): Zustaendig {
-  switch (x.art) {
-    case "laufend":
-      return { art: "laufend", budgetId: x.budgetId as string };
-    case "ruecklage":
-      return { art: "ruecklage", ruecklageId: x.budgetId as string };
-    case "ungeplant":
-      return { art: "ungeplant" };
-    default:
-      throw new Error(`nicht Teil der Zuständigkeit: ${x.art}`);
-  }
-}
 
 // ------------------------------------------------------------------ Äquivalenz (b)
 

@@ -38,11 +38,12 @@ import { spurenAus } from "../buchung/zahlungsspuren";
 import { belegZuBuchung } from "../buchung/belegZuBuchung";
 import { buchungsname } from "../buchung/buchungszeile";
 import type { Umsatz } from "../import/umsatz";
-import { budgetAnspruecheLaden, type BudgetanspruchDeps } from "../konten/kontobelegung";
+import { anspruchsbestandLaden, type BudgetanspruchDeps } from "../konten/kontobelegung";
 
 /**
- * Die Budget-Seite gehört dazu, weil ein aufbauendes Budget auf demselben Konto denselben
- * Euro beanspruchen kann. Ohne sie verteilte die Deckung Geld, das schon dem Budget gehört.
+ * Die Budget-Seite gehört dazu, weil der Anspruch einer Rücklage um das sinkt, was sie über
+ * ihre Kategorie gefunden hat — und das entscheidet dieselbe Zuständigkeit wie den
+ * Verbrauch eines Budgets.
  */
 export interface RuecklagenDeps extends BudgetanspruchDeps {
   readonly ruecklagenRepo: RuecklagenRepository;
@@ -74,11 +75,9 @@ export interface Buchungsvorschlag extends Buchungswahl {
  * Die Auswahl beim Ausbuchen EINER Rücklage: zuerst, was in ihrer Kategorie liegt, dann
  * die jüngsten Abflüsse.
  *
- * Die Kategorie einer Rücklage ist damit ein VORSCHLAG und keine Regel. Zugeordnet wird
- * weiterhin von Hand, eine Buchung je Ausbuchung: eine Rücklage ist ein Gegenstand mit
- * einem Kauf, und welcher Kauf es war, weiss nur, wer ihn getätigt hat. Wer viele
- * Ausgaben über eine Kategorie aus einem Topf bezahlen will, nimmt ein aufbauendes
- * Budget — dort zählt die Kategorie von selbst.
+ * Die Kategorie einer Rücklage ist hier ein VORSCHLAG: verknüpft wird beim Ausbuchen von
+ * Hand, eine Buchung je Ausbuchung. Seit Paket 3 findet eine Rücklage mit Kategorie ihre
+ * Ausgaben ausserdem von selbst; das Ausbuchen ohne Buchungswahl kommt mit Paket 5.
  *
  * Ohne Kategorie an der Rücklage ist die Liste dieselbe wie bisher.
  */
@@ -203,14 +202,11 @@ export interface Ruecklagensicht {
   /** Für die Kategoriewahl im Dialog und für `buchungswahlFuer`. */
   readonly kategorien: readonly Kategorie[];
   readonly kontoNamen: ReadonlyMap<string, string>;
-  /**
-   * Reicht das Ersparte für den bis heute aufgelaufenen Bedarf? Über beide Formen:
-   * `posten` sind die Rücklagen von Hand, `ueberKategorie` die über die Kategorie.
-   */
+  /** Reicht das Ersparte für den bis heute aufgelaufenen Bedarf? Je Rücklage ein Posten. */
   readonly deckung: RuecklagenDeckung;
-  /** Summe der monatlichen Raten beider Formen — derselbe Wert wie `fluss.bedarf`. */
+  /** Summe der monatlichen Raten beider Sorten — derselbe Wert wie `fluss.bedarf`. */
   readonly proMonat: Cent;
-  /** Summe der Ziele — freie Rücklagen und die über die Kategorie zählen nicht mit, sie haben keins. */
+  /** Summe der Ziele — freie Rücklagen zählen nicht mit, sie haben keins. */
   readonly zielwert: Cent;
   /** Faustformel: drei Monats-Vertragseinnahmen. Ein Massstab, keine Regel. */
   readonly mindest: Cent;
@@ -248,7 +244,7 @@ export interface Kategoriebelegung {
   readonly monatlich: ReadonlySet<string>;
 }
 
-function kategoriebelegung(ruecklagen: readonly Ruecklage[], budgets: readonly { art: string; kategorieId: string }[]): Kategoriebelegung {
+function kategoriebelegung(ruecklagen: readonly Ruecklage[], budgets: readonly { kategorieId: string }[]): Kategoriebelegung {
   const an = new Map<string, { id: string; bezeichnung: string }[]>();
   for (const r of ruecklagen) {
     if (!r.kategorieId) continue;
@@ -256,7 +252,7 @@ function kategoriebelegung(ruecklagen: readonly Ruecklage[], budgets: readonly {
     liste.push({ id: r.id, bezeichnung: r.bezeichnung });
     an.set(r.kategorieId, liste);
   }
-  return { ruecklagen: an, monatlich: new Set(budgets.filter((b) => b.art === "monatlich").map((b) => b.kategorieId)) };
+  return { ruecklagen: an, monatlich: new Set(budgets.map((b) => b.kategorieId)) };
 }
 
 /**
@@ -318,7 +314,7 @@ export async function ruecklagenLaden(
       deps.vertragRepo.alle(),
       deps.ruecklagenRepo.ausbuchungen(),
       deps.umsatzRepo.alle(),
-      budgetAnspruecheLaden(deps, heute),
+      anspruchsbestandLaden(deps),
       deps.kategorieRepo.alle(),
     ]);
   const kontostaende = new Map(konten.map((k) => [k.id, realerKontostand(k, buchungen)]));
@@ -338,7 +334,6 @@ export async function ruecklagenLaden(
     regeln,
     `${heute.slice(0, 7)}-01`,
     monatDanach(heute),
-    budget.budgets,
   );
 
   return {
@@ -346,11 +341,11 @@ export async function ruecklagenLaden(
     konten,
     kategorien,
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
-    deckung: ruecklagenDeckung(ruecklagen, heute, kontostaende, budget.ansprueche, budget.bestand),
+    deckung: ruecklagenDeckung(ruecklagen, heute, kontostaende, budget.bestand),
     proMonat: fluss.bedarf,
     zielwert: zielwertGesamt(ruecklagen),
     mindest: mindestRuecklage(einnahmen),
-    ruecklagenStand: [...ruecklagenKonten(konten, ruecklagen, budget.budgets)].reduce(
+    ruecklagenStand: [...ruecklagenKonten(konten, ruecklagen)].reduce(
       (s, id) => s + (kontostaende.get(id) ?? 0),
       0,
     ),

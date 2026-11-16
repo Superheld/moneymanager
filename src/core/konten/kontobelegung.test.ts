@@ -5,8 +5,7 @@ import { bilanzJeKlasse, kontobelegung, type Anspruch } from "./kontobelegung";
 import type { Klassenstand } from "../buchung/istbuchung";
 import type { Zahlungskonto } from "./konto";
 
-const anspruch = (id: string, kontoId: string, betrag: number, art: Anspruch["art"] = "ruecklage"): Anspruch => ({
-  art,
+const anspruch = (id: string, kontoId: string, betrag: number): Anspruch => ({
   id,
   kontoId,
   betrag,
@@ -16,7 +15,7 @@ describe("kontobelegung", () => {
   it("zieht alle Ansprüche vom Stand ab, gleich welcher Art", () => {
     const b = kontobelegung(new Map([["k1", 5000]]), [
       anspruch("r1", "k1", 1200),
-      anspruch("b1", "k1", 650, "budget"),
+      anspruch("b1", "k1", 650),
     ]).get("k1")!;
     expect(b.gebunden).toBe(1850);
     expect(b.frei).toBe(3150);
@@ -26,7 +25,7 @@ describe("kontobelegung", () => {
   it("verteilt eine Unterdeckung anteilig über alle Ansprüche", () => {
     const b = kontobelegung(new Map([["k1", 600]]), [
       anspruch("r1", "k1", 800),
-      anspruch("b1", "k1", 200, "budget"),
+      anspruch("b1", "k1", 200),
     ]).get("k1")!;
     expect(b.anteil).toBeCloseTo(0.6);
     expect(b.posten.map((p) => p.gedeckt)).toEqual([480, 120]);
@@ -46,7 +45,7 @@ describe("kontobelegung", () => {
   });
 
   it("lässt einen Anspruch von 0 oder darunter aus", () => {
-    const b = kontobelegung(new Map([["k1", 300]]), [anspruch("b1", "k1", -20, "budget")]).get("k1")!;
+    const b = kontobelegung(new Map([["k1", 300]]), [anspruch("b1", "k1", -20)]).get("k1")!;
     expect(b.posten).toEqual([]);
   });
 

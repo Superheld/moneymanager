@@ -1,8 +1,8 @@
 // Eine Rücklage als Folge von Zyklen — die Rechenbausteine für „eine Rücklage" (ADR-0006).
 //
 // Seit Paket 3 des Umbaus (Migration 80) rechnet die Ergebnisrechnung jede Rücklage über
-// diese Bausteine — die Rücklagen von Hand und, übergangsweise als Rücklage gelesen
-// (`alsRuecklage`), die aufbauenden Budgets. `topf.test.ts` hält fest, dass sie auf den
+// diese Bausteine — seit Migration 81 auch die früheren aufbauenden Budgets, die jetzt
+// Rücklagen der Sorte `fortlaufend` sind. `topf.test.ts` hält fest, dass sie auf den
 // Daten von davor DASSELBE ergeben wie die Rechnung von davor, und
 // `src/umstellungsprobe.test.ts` prüft es Zahl für Zahl an ganzen Beständen.
 //
@@ -21,7 +21,7 @@
 
 import { addMonate, addTage, parseIso, toIso } from "../basis/datum";
 import type { Cent } from "../basis/geld";
-import type { Budget } from "../budgets/budget";
+import type { Budgetmonat } from "../budgets/budgetverlauf";
 import { hatGeschichte, type Ruecklage, type Ruecklagenart, type Ruecklagenrate, type Ruecklagenzyklus } from "./ruecklage";
 
 /** Die Sorte einer Rücklage; ohne Angabe `abschliessend`, wie jede vor Migration 79. */
@@ -177,8 +177,11 @@ function letzterRatenmonat(z: Zyklus): string | undefined {
   return z.ende ? monatVerschoben(monatVon(z.ende), -1) : undefined;
 }
 
-/** Der Betrag der Reihe in `monat`: die jüngste Rate, die nicht später gilt; davor 0. */
-function rateDerReihe(raten: readonly Ruecklagenrate[], monat: string): Cent {
+/**
+ * Der Betrag der Reihe in `monat`: die jüngste Rate, die nicht später gilt; davor 0 —
+ * dieselbe Regel wie `betragImMonat` beim Budget.
+ */
+export function rateDerReihe(raten: readonly Ruecklagenrate[], monat: string): Cent {
   let treffer = 0;
   for (const v of raten) {
     if (v.abMonat > monat) break;
@@ -226,6 +229,18 @@ function monatsAbstand(von: string, bis: string): number {
  */
 export function rateIm(z: Zyklus, monat: string): Cent {
   return ratenBis(z, monat) - ratenBis(z, monatVerschoben(monat, -1));
+}
+
+/**
+ * Die Rate, mit der eine Rücklage einen Monat PLANT: bei einer freien Rate der Betrag der
+ * Reihe in diesem Monat — auch vor dem Beginn, wie `betragImMonat` beim aufbauenden Budget,
+ * dessen Planzeile im Monatsausblick sie übernommen hat —, mit Ziel die Rate des laufenden
+ * Zyklus.
+ */
+export function planrateIm(r: Ruecklage, monat: string): Cent {
+  const z = zyklen(r, []).find((x) => !x.ende);
+  if (!z) return 0;
+  return z.raten.length > 0 ? rateDerReihe(z.raten, monat) : rateIm(z, monat);
 }
 
 /** Liegt der Tag im Entnahmefenster des Zyklus (und vor `bisAusschliesslich`)? */
@@ -339,31 +354,6 @@ export function zyklenpostenIm(
 }
 
 /**
- * Ein aufbauendes Budget, gelesen als Rücklage, die weiterläuft — ÜBERGANGSWEISE, bis
- * Migration 81 die aufbauenden Budgets in die Tabelle `ruecklage` überführt (Paket 4).
- * Dieselbe ID: eine Entnahme, die die Zuständigkeit dem Budget gibt, findet so ihre
- * Rücklage.
- *
- * `findetAb` bleibt leer — bei einer fortlaufenden heisst das „ohne Anfang", wie die
- * Einordnung ein aufbauendes Budget schon immer behandelt hat. Ohne `start` (nur in einer
- * von Hand geänderten Datei) beginnt sie mit dem ersten Betragsmonat; vorher kosteten
- * ihre Ausgaben dann gar nichts, weil `datum >= undefined` nie zutraf. Das ist die eine
- * benannte Abweichung von Teil B des Entwurfs, festgehalten in `topf.test.ts`.
- */
-export function alsRuecklage(b: Budget): Ruecklage {
-  const beginn = b.start ?? (b.betraege[0] ? `${b.betraege[0].abMonat}-01` : "");
-  return {
-    id: b.id,
-    bezeichnung: "",
-    beginn,
-    kategorieId: b.kategorieId,
-    kontoId: b.kontoId,
-    art: "fortlaufend",
-    raten: b.betraege,
-  };
-}
-
-/**
  * Rate und Kosten einer Rücklage in `monat`, über alle ihre Zyklen.
  *
  * Je Zyklus EINE der beiden Regeln: hat ihn eine Ausbuchung mit verknüpfter Buchung
@@ -446,6 +436,70 @@ export function ruecklagenstand(
   const raten = ratenBis(z, fortlaufend ? monat : monatVerschoben(monat, -1));
   const weg = entnommen(z, entnahmen, fortlaufend ? ersterTag(monatVerschoben(monat, 1)) : tagDanach(am));
   return { raten, entnahmen: weg, stand: raten - weg };
+}
+
+/**
+ * Eine Rücklage Monat für Monat: Übertrag aus dem Vormonat, plus was in diesem Monat
+ * zurückgelegt wurde, minus was sie getragen hat, ergibt den Rest — die Fortschreibung,
+ * die bis Migration 81 das aufbauende Budget hatte (`budgetFortschreibung`), jetzt für
+ * JEDE Rücklage und in derselben Form (`Budgetmonat`).
+ *
+ * Der Rest am Ende eines Monats ist der Stand am letzten Tag (`ruecklagenstand`), je
+ * Sorte wie dort: bei einer abschliessenden kommt die Rate eines Monats erst im Folgemonat
+ * dazu. Was „in diesem Monat zurückgelegt" heisst, ist deshalb der Zuwachs dieses Stands
+ * und nicht stur die Rate des Monats — sonst ginge der Rest nicht auf den Stand auf, der
+ * daneben in der Liste steht.
+ *
+ * Beginnt in einem Monat ein neuer Zyklus (nach einem Ausbuchen), fängt die Reihe dort
+ * bei null an; was der alte in diesem Monat noch getragen hat, steht in seiner Ausbuchung.
+ * Vor dem ersten Beginn gibt es keine Monate — wie beim aufbauenden Budget vor seinem Start.
+ */
+export function ruecklagenFortschreibung(
+  r: Ruecklage,
+  abschluesse: readonly Ruecklagenzyklus[],
+  entnahmen: readonly Ruecklagenentnahme[],
+  vonMonat: string,
+  bisMonat: string,
+): Budgetmonat[] {
+  const zs = zyklen(r, abschluesse);
+  const erster = zs.find((z) => z.beginn)?.beginn;
+  if (!erster) return [];
+  const fortlaufend = ruecklagenart(r) === "fortlaufend";
+  const amEnde = (m: string) => {
+    const naechster = ersterTag(monatVerschoben(m, 1));
+    const z = zyklusAm(zs, toIso(addTage(parseIso(naechster), -1)));
+    if (!z) return { z, raten: 0, weg: 0 };
+    return { z, raten: ratenBis(z, fortlaufend ? m : monatVerschoben(m, -1)), weg: entnommen(z, entnahmen, naechster) };
+  };
+
+  const start = monatVon(erster) > vonMonat ? monatVon(erster) : vonMonat;
+  const raus: Budgetmonat[] = [];
+  let vorher = amEnde(monatVerschoben(start, -1));
+  let letzteZufuehrung: Cent | undefined;
+  for (let m = start; m <= bisMonat; m = monatVerschoben(m, 1)) {
+    const jetzt = amEnde(m);
+    const weiter = !!jetzt.z && vorher.z === jetzt.z;
+    const uebertrag = weiter ? vorher.raten - vorher.weg : 0;
+    const zufuehrung = weiter ? jetzt.raten - vorher.raten : jetzt.raten;
+    const verbraucht = weiter ? jetzt.weg - vorher.weg : jetzt.weg;
+    const verfuegbar = uebertrag + zufuehrung;
+    raus.push({
+      monat: m,
+      // Im Monat, in dem der Zyklus beginnt, zählt erst ab seinem Beginn — dasselbe
+      // Fenster, über das `verbraucht` hier zählt.
+      von: jetzt.z?.beginn && monatVon(jetzt.z.beginn) === m ? jetzt.z.beginn : ersterTag(m),
+      bis: ersterTag(monatVerschoben(m, 1)),
+      uebertrag,
+      zufuehrung,
+      verfuegbar,
+      verbraucht,
+      rest: verfuegbar - verbraucht,
+      ...(weiter && letzteZufuehrung != null && letzteZufuehrung !== zufuehrung ? { zufuehrungVorher: letzteZufuehrung } : {}),
+    });
+    letzteZufuehrung = zufuehrung;
+    vorher = jetzt;
+  }
+  return raus;
 }
 
 export interface Abschluss {

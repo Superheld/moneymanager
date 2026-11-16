@@ -2,30 +2,31 @@
 
 Gilt für Budgets in Kern, Anwendung und Oberfläche. Was überall gilt, steht in der Wurzel-`CLAUDE.md`.
 
-## In der Oberfläche ist ein Budget monatlich
+## Ein Budget ist monatlich (seit Migration 81)
 
-Seit 2026-11-15 zeigt der Bereich Budgets nur die monatlichen. Ein aufbauendes Budget
-heisst in der Oberfläche **Rücklage** („über die Kategorie") und steht im Bereich
-Rücklagen; für den Nutzer ist es dieselbe Sache wie eine Rücklage. Im Modell bleibt es ein
-Budget mit `art = aufbauend`, mit Betragsreihe und Übertrag; gerechnet wird es seit Paket 3
-als Rücklage (`alsRuecklage`, `zyklusKosten`) — warum die
-Trennung im Datenmodell stehen bleibt, steht in `../ruecklagen/CLAUDE.md`.
+Ein Budget ist ein Rahmen für EINEN Monat; was übrig bleibt, verfällt zum Ersten. Bis
+Migration 81 gab es eine zweite Art, `aufbauend`, deren Rest liegen blieb — für den Nutzer
+dieselbe Sache wie eine Rücklage, und seit 2026-11-15 stand sie in der Oberfläche schon
+dort. Mit Migration 81 ist sie auch im Modell eine Rücklage, die weiterläuft
+(`../ruecklagen/CLAUDE.md`), mit derselben Id, ihrer Betragsreihe als Ratenreihe und dem
+Namen ihrer Kategorie. Die Spalte `budget.art` bleibt im Schema; `BudgetRepository.alle()`
+liest nur `monatlich` und meldet ein stehengebliebenes aufbauendes laut, statt es still
+mitzurechnen.
 
 Drei Folgen, die man kennen muss:
 
-- **Der Dialog hat kein Feld „Art" mehr.** Die Art entscheidet der Bereich, aus dem man
-  anlegt (`ui/bausteine/BudgetDialog`); beim Bearbeiten bleibt die des Budgets. Ein Feld,
-  das ein Budget in den anderen Bereich schöbe, wäre ein Weg, es aus den Augen zu
-  verlieren. Ein Vorschlag der Art aufbauend legt deshalb unter Budgets eine Rücklage über
-  die Kategorie an; die Pille sagt „Rücklage", der Dialog sagt es im Titel.
-- **Die Verschachtelung gilt weiter** (unten, „Ein Dach gilt für alles ausser seinen
-  Unterbudgets") — auch über die Bereichsgrenze. Das Kind steht dann nicht in derselben
-  Liste wie das Dach, und der Verbrauch des Dachs wäre kleiner als die Ausgaben seiner
-  Kategorie, ohne dass man sähe warum. Das Dach nennt deshalb, was aus ihm herausgerechnet
-  ist (`abgezogen` an `GruppierterStand`, gesetzt in `nachArtGetrennt`): „ohne Rücklage
-  Urlaub" unter Budgets, „ohne Budget Tanken" unter Rücklagen.
-- **Der Einrichtungsschritt „Budgets" zählt nur die monatlichen** (`core/einrichtung.ts`);
-  ein aufbauendes erledigt den Schritt „Rücklagen".
+- **`budgetAnlegen` legt nur noch monatliche an**, der Dialog hat kein Feld „Art". Ein
+  Budgetvorschlag der Art `ruecklage` (der Fall, in dem selten etwas Grosses anfällt)
+  öffnet den Dialog einer Rücklage, die weiterläuft, vorbelegt mit Kategorie, Name und
+  Rate. An einer Kategorie, an der schon ein Budget oder eine Rücklage hängt, schlägt der
+  Vorschlag nichts vor.
+- **Die Verschachtelung gilt weiter** (unten) — auch gegen eine Rücklage: hängt eine
+  unter einem Budget, nimmt sie ihm ihre Buchungen ab (`zustaendigkeit`). Sie steht nicht
+  in derselben Liste wie das Budget, und dessen Verbrauch wäre kleiner als die Ausgaben
+  seiner Kategorie, ohne dass man sähe warum; die Zeile des Budgets nennt sie deshalb
+  („ohne Rücklage Urlaub", `abgezogen` am `Budgetstand`, aus `herausgerechnet`).
+- **Der Einrichtungsschritt „Budgets" zählt die Budgets**, der Schritt „Rücklagen" die
+  Rücklagen — die früheren aufbauenden eingeschlossen (`core/einrichtung.ts`).
 
 ## `budgetrelevant` — die eine Ausgabe, die kein Budget messen soll
 
@@ -67,12 +68,12 @@ zum Ersten.
 Wer den Betrag eines Monats braucht, fragt `betragImMonat` — **nie `betraege[0]` und nie den
 letzten Eintrag.** Vor der ersten Version ist er 0, nicht der erste Betrag: da war nichts
 geplant, und einen Rahmen rückwirkend anzunehmen hiesse, eine Planung zu erfinden, die es
-nie gab. Aus demselben Grund summiert `budgetRahmen` beim Aufbauenden über die Monate,
-statt zu multiplizieren.
+nie gab. Aus demselben Grund summiert die Ratenreihe einer Rücklage über die Monate,
+statt zu multiplizieren (`ratenBis` in `../ruecklagen/topf.ts`).
 
 **Wann die erste Version anfängt, sagt beim Anlegen der Nutzer.** Der Dialog zeigt seit
-2026-09-13 für BEIDE Arten ein Feld „Gilt ab", vorbelegt mit dem laufenden Monat. Vorher
-stand es nur beim Aufbauenden (dort als Sammelanker `start`), und ein monatliches Budget
+2026-09-13 ein Feld „Gilt ab", vorbelegt mit dem laufenden Monat. Vorher stand es nur
+beim Aufbauenden (dort als Sammelanker `start`), und ein monatliches Budget
 begann zwangsläufig im laufenden Monat — wer eines für etwas anlegte, das seit dem Frühjahr
 läuft, sah jeden Monat davor mit Rahmen 0 und in der Auswertung lauter Überziehungen, die
 nie welche waren.
@@ -81,20 +82,19 @@ Das widerspricht der 0 oben nicht, sondern schärft sie: **eine Angabe ist keine
 Rückwirkend von selbst zu füllen — etwa ab der ersten Buchung — bliebe verboten; der Monat
 kommt von jemandem, der ihn hinschreibt.
 
-**Ein Feld für beide Arten, nicht zwei.** Beim Aufbauenden setzt derselbe Monat zugleich
-`start`. Zwei Felder für einen Zeitpunkt wären zwei Wahrheiten, und ihre erste Abweichung
-fiele niemandem auf. Beim BEARBEITEN bleibt es der Anker und damit nur beim Aufbauenden
-sichtbar: ab wann ein GEÄNDERTER Betrag gilt, sagt dort die Betragsreihe darüber.
+Beim BEARBEITEN steht das Feld nicht da: ab wann ein GEÄNDERTER Betrag gilt, sagt die
+Betragsreihe darüber. Dieselbe Form hat seit Paket 4 die Ratenreihe einer Rücklage im
+Dialog der Rücklage.
 
 ## Ein Dach gilt für alles ausser seinen Unterbudgets
 
-Seit 2026-11-09, und das ist die Bedeutung, die gemeint war: „Mobilität" aufbauend mit
-50 €, darunter „Tanken" mit 100 € heisst 50 € für alles in Mobilität ausser Tanken, und
-100 € fürs Tanken. Zwei Töpfe, zusammen 150 € im Monat. Das Unterbudget nimmt dem Dach
+Seit 2026-11-09, und das ist die Bedeutung, die gemeint war: „Mobilität" mit 50 €,
+darunter „Tanken" mit 100 € heisst 50 € für alles in Mobilität ausser Tanken, und 100 €
+fürs Tanken. Zwei Rahmen, zusammen 150 € im Monat. Das Unterbudget nimmt dem Dach
 seine Kategorien weg (`budgetKategorien`, nur für den Verbrauch) und sonst nichts.
 
 Vorher zog es zusätzlich seinen BETRAG vom Dach ab (`effektiverMonatsbetrag`, gelöscht),
 als wäre das Dach ein Rahmen, der sich auf seine Teile verteilt. Bekam das Kind mehr als
-das Dach, lief dessen Rate ins Minus, und ein aufbauendes Dach sank Monat für Monat ohne
-eine einzige Ausgabe. Wer eine Aufteilung EINES Rahmens braucht, baut sie als eigene
+das Dach, lief dessen Rate ins Minus, und ein aufbauendes Dach (damals gab es das) sank
+Monat für Monat ohne eine einzige Ausgabe. Wer eine Aufteilung EINES Rahmens braucht, baut sie als eigene
 Funktion — nicht als stille Verrechnung in der Rate.

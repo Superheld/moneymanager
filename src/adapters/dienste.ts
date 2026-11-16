@@ -190,6 +190,7 @@ import {
   ruecklageAnlegen as ruecklageAnlegenUseCase,
   ruecklageAusbuchen as ruecklageAusbuchenUseCase,
   ruecklageLoeschen as ruecklageLoeschenUseCase,
+  ruecklageRateLoeschen as ruecklageRateLoeschenUseCase,
   type AusbuchenEingabe,
   type RuecklagenEingabe,
 } from "../application/ruecklagen/ruecklagenPflege";
@@ -673,7 +674,7 @@ export function ruecklagen(heute: string): Promise<Ruecklagensicht> {
   return ruecklagenLaden(RUECKLAGEN_DEPS, heute);
 }
 
-/** Wem das Geld auf jedem Konto gehört — Rücklagen und aufbauende Budgets, anteilig gedeckt. */
+/** Wem das Geld auf jedem Konto gehört — die Rücklagen beider Sorten, anteilig gedeckt. */
 export function kontobelegung(heute: string): Promise<Belegungssicht> {
   return kontobelegungLaden(RUECKLAGEN_DEPS, heute);
 }
@@ -689,6 +690,11 @@ export function ruecklageAnlegen(eingabe: RuecklagenEingabe) {
 
 export function ruecklageAktualisieren(id: string, eingabe: RuecklagenEingabe, heute: string) {
   return ruecklageAktualisierenUseCase(sqliteRuecklagenRepository, id, eingabe, heute, sqliteBudgetRepository);
+}
+
+/** Eine Version der Ratenreihe einer Rücklage entfernen — nie die letzte. */
+export function ruecklageRateLoeschen(id: string, abMonat: string): Promise<void> {
+  return ruecklageRateLoeschenUseCase(sqliteRuecklagenRepository, id, abMonat);
 }
 
 /**

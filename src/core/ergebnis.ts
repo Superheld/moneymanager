@@ -32,12 +32,10 @@
 //     − laufende Kosten − Ungeplantes             = was der Alltag übrig lässt
 //     − Rücklagen − Vorsorge − Tilgung            = Ergebnis
 //
-// „Rücklagen" ist EINE Zeile für zwei Dinge (seit 2026-11-15): die Rücklagen selbst und
-// die aufbauenden Budgets. Für den Nutzer sind beide dasselbe — Geld, das Monat für Monat
-// für etwas Späteres zurückgelegt wird —, und seit Paket 3 des Umbaus rechnen beide über
-// dieselben Bausteine (`ruecklagen/topf.ts`; das aufbauende Budget übergangsweise als
-// Rücklage gelesen, `alsRuecklage`). Die Posten bleiben dabei, was sie waren: einer je
-// aufbauendem Budget, einer je laufender Rücklage und einer je abgeschlossenem Zyklus —
+// „Rücklagen" ist EINE Zeile (seit 2026-11-15) für jede Rücklage — seit Migration 81 auch
+// die früheren aufbauenden Budgets, die jetzt Rücklagen der Sorte `fortlaufend` sind. Alle
+// rechnen über dieselben Bausteine (`ruecklagen/topf.ts`). Die Posten: einer je laufender
+// Rücklage und einer je abgeschlossenem Zyklus —
 // zusammengeführt HIER, damit Monatskarten, Kostensicht, Bericht, Reichweite und
 // Kennzahlen dieselbe Zeile lesen und keine Sicht selbst addiert. Die Zeilen-ID bleibt
 // `abschreibungen`.
@@ -59,8 +57,9 @@
 //     Ausbuchung ihren Zyklus kennt (seit Migration 76). Bei älteren ist der Stand
 //     von damals nicht mehr zu rechnen; ihr Kauf gilt als gedeckt.
 //   • Zwei bekannte Befunde werden bewusst NACHGEBILDET und nicht behoben (Teil B des
-//     Entwurfs zu ADR-0006): eine Kategoriebuchung VOR dem Start eines aufbauenden
-//     Budgets ist eine Entnahme und kostet nichts; ein Kauf, den zwei Ausbuchungen nennen,
+//     Entwurfs zu ADR-0006): eine Kategoriebuchung VOR dem Beginn einer fortlaufenden
+//     Rücklage (früher: dem Start eines aufbauenden Budgets) ist eine Entnahme und kostet
+//     nichts; ein Kauf, den zwei Ausbuchungen nennen,
 //     zählt in beiden als ungedeckt. Beides hält `ergebnis.test.ts` fest.
 
 import type { Cent } from "./basis/geld";
@@ -73,7 +72,7 @@ import { einordnen, type Einordnung, type Einordnungskontext } from "./einordnun
 import type { Kategorie } from "./kategorien/kategorie";
 import { istVorsorgekonto, type Zahlungskonto } from "./konten/konto";
 import type { Ruecklage, Ruecklagenzyklus } from "./ruecklagen/ruecklage";
-import { alsRuecklage, entnahmeIm, zyklenpostenIm, type Ruecklagenentnahme, type Zyklusposten } from "./ruecklagen/topf";
+import { entnahmeIm, ruecklagenart, zyklenpostenIm, type Ruecklagenentnahme, type Zyklusposten } from "./ruecklagen/topf";
 import type { Ruecklagenzuordnung } from "./ruecklagen/zustaendigkeit";
 import { tilgungIm } from "./vermoegen/tilgung";
 import { wirdGefuehrt, type VermoegensEingabe } from "./vermoegen/vermoegen";
@@ -305,7 +304,7 @@ export interface Ergebnisbasis {
   readonly eingabe: ErgebnisEingabe;
   readonly vorsorgeKonten: ReadonlySet<string>;
   readonly einordnungen: readonly Einordnung[];
-  /** Je Rücklage (und aufbauendem Budget) die Anteile, die sie trägt. */
+  /** Je Rücklage die Anteile, die sie trägt. */
   readonly entnahmen: ReadonlyMap<string, readonly Ruecklagenentnahme[]>;
   /**
    * Buchungs-ID → Kauf, für die Käufe, die eine alte Ausbuchung nennt und die die
@@ -365,15 +364,13 @@ export function ruecklagenEntnahmen(einordnungen: readonly Einordnung[]): Map<st
 
 /**
  * Die Posten der Zeile „Rücklagen" — in der Reihenfolge, in der sie vor der Umstellung
- * entstanden: die abgeschlossenen Zyklen (je Ausbuchung), die aufbauenden Budgets, die
- * laufenden Rücklagen. Dieselben Schlüssel wie damals, damit eine Sicht, die sich einen
- * Posten merkt, ihn wiederfindet.
+ * entstanden: die abgeschlossenen Zyklen (je Ausbuchung), die fortlaufenden Rücklagen
+ * (bis Migration 81 die aufbauenden Budgets), die abschliessenden.
  *
  *   • Ein abgeschlossener Zyklus mit Geschichte kostet je Monat, was seine Regel sagt —
  *     die alte, wenn eine Ausbuchung mit verknüpfter Buchung ihn abgeschlossen hat, sonst
  *     die max-Regel. Ohne Geschichte bildet er keinen Posten: ihr Kauf gilt wie zuvor
  *     als gedeckt. In einem künftigen Monat gibt es diese Posten nicht.
- *   • Ein aufbauendes Budget rechnet als fortlaufende Rücklage.
  *   • Eine laufende Rücklage kostet ihre Rate und, wenn sie ihre Ausgaben über die
  *     Kategorie findet und überzogen wird, das Ungedeckte dazu.
  */
@@ -426,18 +423,23 @@ function ruecklagenposten(basis: Ergebnisbasis, monat: string, von: string, bis:
         }];
       });
 
-  const budgetPosten = e.budgets
-    .filter((b) => b.art === "aufbauend")
-    .map((b): ErgebnisPosten => {
-      const p = zyklenpostenIm(alsRuecklage(b), [], entnahmenVon(b.id), monat)[0];
+  // Die fortlaufenden vor den abschliessenden — so standen sie vor Migration 81 (damals als
+  // aufbauende Budgets), und bei gleicher Rate entscheidet die Reihenfolge die Anzeige.
+  // Ihre Entnahme ist ALLES, was sie im Monat getragen hat, auch vor ihrem Beginn: so
+  // zeigte der Posten des aufbauenden Budgets den bekannten Befund (eine Kategoriebuchung
+  // vor dem Start ist eine Entnahme, die nichts kostet), und er wird nachgebildet.
+  const fortlaufendePosten = e.ruecklagen
+    .filter((r) => ruecklagenart(r) === "fortlaufend")
+    .map((r): ErgebnisPosten => {
+      const p = laufend.get(r.id);
       const entnahme = summe(
-        basis.einordnungen.filter((x) => x.art === "ruecklage" && x.budgetId === b.id && imMonat(x)).map((x) => x.betrag),
+        basis.einordnungen.filter((x) => x.art === "ruecklage" && x.ruecklageId === r.id && imMonat(x)).map((x) => x.betrag),
       );
       return {
-        schluessel: b.id,
-        bezeichnung: "",
-        kategorieId: b.kategorieId,
-        budgetId: b.id,
+        schluessel: `ruecklage:${r.id}`,
+        bezeichnung: r.bezeichnung,
+        ruecklageId: r.id,
+        kategorieId: r.kategorieId,
         plan: -(p?.rate ?? 0) || 0,
         ist: zukunft ? null : -(p?.kosten ?? 0) || 0,
         status: zukunft ? "offen" : "gebucht",
@@ -447,6 +449,7 @@ function ruecklagenposten(basis: Ergebnisbasis, monat: string, von: string, bis:
     .filter((p) => p.plan !== 0 || (p.ist ?? 0) !== 0 || (p.entnahme ?? 0) !== 0);
 
   const laufendePosten = e.ruecklagen
+    .filter((r) => ruecklagenart(r) !== "fortlaufend")
     .map((r): ErgebnisPosten => {
       const p = laufend.get(r.id);
       // Die Rate und nicht die blosse Monatsrate: vor dem Beginn steht nichts, und eine
@@ -466,7 +469,7 @@ function ruecklagenposten(basis: Ergebnisbasis, monat: string, von: string, bis:
     })
     .filter((p) => p.plan !== 0 || (p.ist ?? 0) !== 0 || (p.entnahme ?? 0) !== 0);
 
-  return [...zyklusPosten, ...budgetPosten, ...laufendePosten].sort((a, b) => a.plan - b.plan);
+  return [...zyklusPosten, ...fortlaufendePosten, ...laufendePosten].sort((a, b) => a.plan - b.plan);
 }
 
 const summe = (werte: readonly Cent[]): Cent => werte.reduce((s, w) => s + w, 0);
@@ -908,7 +911,7 @@ export interface ErgebnisKennzahlen {
    * einem Kredit zählen nur seine Zinsen — die Tilgung baut Vermögen auf.
    */
   readonly fixkostenquote: number | null;
-  /** (Rücklagen + Vorsorge + Tilgung) ÷ Einnahmen. `null` ohne Einnahmen. Rücklagen samt aufbauender Budgets. */
+  /** (Rücklagen + Vorsorge + Tilgung) ÷ Einnahmen. `null` ohne Einnahmen. */
   readonly sparquote: number | null;
 }
 

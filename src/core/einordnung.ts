@@ -27,7 +27,7 @@
 //        b. nicht budgetrelevant → Entnahme, WENN für die Buchung vor der Umstellung
 //           eine Rücklage ausgebucht wurde; sonst ungeplant;
 //        c. der nächste Vorfahr der Kategorie mit einem Träger: ein monatliches Budget
-//           (laufende Kosten), ein aufbauendes oder EINE Rücklage, deren Fundfenster den
+//           (laufende Kosten) oder EINE Rücklage, deren Fundfenster den
 //           Tag enthält (Entnahme), MEHRERE solche Rücklagen (ungeplant, bis jemand
 //           zuordnet — `wartetAuf`);
 //        d. sonst ungeplant.
@@ -35,8 +35,8 @@
 // **Eine Art `ruecklage` für beide Formen** (seit Paket 3). Bis dahin hiess die Entnahme
 // aus einem aufbauenden Budget `topf` und die aus einer Rücklage von Hand `ruecklage`;
 // für den Nutzer ist es dieselbe Sache, und die Ergebnisrechnung rechnet sie inzwischen
-// nach denselben Bausteinen. Woher sie kommt, sagen `ruecklageId` und — solange das
-// aufbauende Budget noch ein Budget ist — `budgetId`.
+// nach denselben Bausteinen. Woher sie kommt, sagt `ruecklageId` — seit Migration 81 auch
+// für das frühere aufbauende Budget, das jetzt selbst eine Rücklage ist.
 //
 // **Schritt b fragt nach der AUSBUCHUNG, nicht nach `budgetrelevant` allein.** Das Feld
 // sagt „zählt in kein Budget" und wird beim Ausbuchen gesetzt — aber auch von Hand.
@@ -77,10 +77,7 @@ export interface Einordnung {
   /** Vorzeichenbehaftet wie die Buchung (Abfluss negativ). */
   readonly betrag: Cent;
   readonly art: Einordnungsart;
-  /**
-   * Bei `laufend`: das monatliche Budget. Bei `ruecklage` aus einem aufbauenden Budget:
-   * dieses Budget (dann ist `ruecklageId` dieselbe ID) — bis Paket 4 ist es noch eines.
-   */
+  /** Bei `laufend`: das monatliche Budget. */
   readonly budgetId?: string;
   /**
    * Bei `ruecklage`: die Rücklage, die den Anteil trägt. Fehlt bei einer Entnahme über
@@ -107,7 +104,7 @@ export interface Einordnung {
 
 export interface Einordnungskontext {
   readonly kategorien: readonly Kategorie[];
-  /** ALLE Budgets, monatliche wie aufbauende. */
+  /** Die Budgets — seit Migration 81 nur noch monatliche. */
   readonly budgets: readonly Budget[];
   /**
    * Buchungs-ID → Vertrags-ID, nur für zugeordnete Buchungen. Pflichtfeld aus demselben
@@ -146,7 +143,6 @@ export function einordner(kontext: Einordnungskontext): (b: IstBuchung) => Einor
     kontext.ruecklagenzuordnungen,
     kontext.ausbuchungen,
   );
-  const aufbauend = new Set(kontext.budgets.filter((b) => b.art === "aufbauend").map((b) => b.id));
 
   return (b) => {
     const vertragId = kontext.vertragJeBuchung.get(b.id);
@@ -180,7 +176,7 @@ export function einordner(kontext: Einordnungskontext): (b: IstBuchung) => Einor
         case "laufend":
           return { ...basis, art: "laufend", budgetId: z.budgetId };
         case "ruecklage":
-          return { ...basis, art: "ruecklage", ruecklageId: z.ruecklageId, budgetId: aufbauend.has(z.ruecklageId) ? z.ruecklageId : undefined };
+          return { ...basis, art: "ruecklage", ruecklageId: z.ruecklageId };
         case "ausgebucht":
           return { ...basis, art: "ruecklage", ausgebucht: z.ruecklageIds };
         case "wartet":

@@ -261,16 +261,10 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
       art: "monatlich",
       betraege: [{ ab: monat(-MONATE), betrag: 18000 }],
     },
-    {
-      // Das Aufbauende liegt auf der Ruecklage und nicht auf dem Giro: was sich ansammelt,
-      // soll auch dort liegen, wo es hingehoert.
-      id: "budget-anschaffung",
-      kategorie: "kat-anschaffungen",
-      konto: "konto-tagesgeld",
-      art: "aufbauend",
-      betraege: [{ ab: monat(-MONATE), betrag: 15000 }],
-    },
   ];
+  // Bis Migration 81 stand hier ein drittes, AUFBAUENDES Budget an `kat-anschaffungen`. Es
+  // ist jetzt eine Ruecklage, die weiterlaeuft (unten, `budget-anschaffung`) — mit derselben
+  // Id und denselben Werten, die Migration 81 aus ihm macht.
   for (const b of budgets) {
     setzen("INSERT INTO budget (id, kategorie_id, konto_id, art, start) VALUES (?, ?, ?, ?, ?)", [
       b.id,
@@ -362,6 +356,36 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
       "INSERT INTO ruecklage (id, bezeichnung, ziel, frist_monate, rate, beginn, kategorie_id, konto_id, art, findet_ab) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [r.id, r.bezeichnung, r.ziel, r.frist, r.rate, tagIn(-MONATE - 12, 10), "kat-anschaffungen", "konto-tagesgeld", "abschliessend", null],
     );
+  }
+
+  // Die Ruecklagen, die WEITERLAUFEN, und die beiden Faelle, die man mit ihnen sehen soll:
+  //
+  //  • `budget-anschaffung` ist das fruehere aufbauende Budget, so wie Migration 81 es
+  //    hinterlaesst: fortlaufend, `findet_ab` leer („ohne Anfang"), Bezeichnung = Name der
+  //    Kategorie, die Betragsreihe als Ratenreihe. Es liegt auf dem Tagesgeld und nicht auf
+  //    dem Giro: was sich ansammelt, soll auch dort liegen, wo es hingehoert.
+  //  • `rue-5` haengt ALLEIN an ihrer Kategorie und findet dort jede Ausgabe von selbst,
+  //    angelegt wie ueber die App (findet ab ihrem Beginn).
+  //  • `rue-6` haengt zusammen mit `budget-anschaffung` an `kat-anschaffungen` und findet
+  //    ab ihrem Beginn vor zwei Monaten: seither WARTET dort jede Buchung auf eine
+  //    Zuordnung, davor gehoert sie dem frueheren Budget allein.
+  //
+  // `rue-5` und `rue-6` sind mit Paket 4 dazugekommen. Die Umstellungsprobe
+  // (`src/umstellungsprobe.test.ts`) nimmt sie heraus: ihre Erwartung stammt vom
+  // Spielstand davor.
+  const weiterlaufend = [
+    { id: "budget-anschaffung", bezeichnung: "Anschaffungen", kategorie: "kat-anschaffungen", art: "fortlaufend", ziel: null, frist: null, beginn: tagIn(-MONATE, 1), findetAb: null, rate: 15000, rateAb: monat(-MONATE) },
+    { id: "rue-5", bezeichnung: "Fahrzeug", kategorie: "kat-mobilitaet", art: "fortlaufend", ziel: null, frist: null, beginn: tagIn(-6, 1), findetAb: tagIn(-6, 1), rate: 6000, rateAb: monat(-6) },
+    { id: "rue-6", bezeichnung: "Sofa", kategorie: "kat-anschaffungen", art: "abschliessend", ziel: 90000, frist: 12, beginn: tagIn(-2, 1), findetAb: tagIn(-2, 1), rate: null, rateAb: null },
+  ];
+  for (const r of weiterlaufend) {
+    setzen(
+      "INSERT INTO ruecklage (id, bezeichnung, ziel, frist_monate, rate, beginn, kategorie_id, konto_id, art, findet_ab) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [r.id, r.bezeichnung, r.ziel, r.frist, null, r.beginn, r.kategorie, "konto-tagesgeld", r.art, r.findetAb],
+    );
+    if (r.rate && r.rateAb) {
+      setzen("INSERT INTO ruecklage_rate (ruecklage_id, ab_monat, betrag) VALUES (?, ?, ?)", [r.id, r.rateAb, r.rate]);
+    }
   }
 
   // ------------------------------------------------------------ Depot

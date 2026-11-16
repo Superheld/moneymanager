@@ -9,6 +9,7 @@ import type {
   Budget,
   IstBuchung,
   Kategorie,
+  Ruecklage,
   Vertrag,
   Vertragszuordnung,
   Zahlungskonto,
@@ -36,10 +37,12 @@ function budget(id: string, kategorieId: string, art: Budget["art"]): Budget {
   };
 }
 
-const BUDGETS: Budget[] = [
-  budget("bu-m", "kat-m", "monatlich"),
-  budget("bu-t", "kat-t", "aufbauend"),
-  budget("bu-t2", "kat-t2", "aufbauend"),
+const BUDGETS: Budget[] = [budget("bu-m", "kat-m", "monatlich")];
+
+/** Die früheren aufbauenden Budgets, wie Migration 81 sie hinterlässt: Name = Kategorie. */
+const WEITERLAUFEND: Ruecklage[] = [
+  { id: "bu-t", bezeichnung: "Vorhaben Nordseite", kategorieId: "kat-t", kontoId: "giro", art: "fortlaufend", beginn: "2026-01-01", raten: [{ abMonat: "2026-01", betrag: 10000 }] },
+  { id: "bu-t2", bezeichnung: "Vorhaben Südseite", kategorieId: "kat-t2", kontoId: "giro", art: "fortlaufend", beginn: "2026-01-01", raten: [{ abMonat: "2026-01", betrag: 10000 }] },
 ];
 
 const VERTRAG = { id: "v1", anbieter: "Ohlert", beginn: "2026-01-01", verlaengerung: "keine", status: "aktiv" } as unknown as Vertrag;
@@ -53,13 +56,13 @@ function buchung(over: Partial<IstBuchung> = {}): IstBuchung {
 
 function sicht(buchungen: IstBuchung[], over: Partial<EinordnungssichtEingabe> = {}) {
   return einordnungJeBuchung({
-    buchungen, kategorien: KATEGORIEN, budgets: BUDGETS, konten: KONTEN, ausbuchungen: [], ruecklagen: [], beendete: [], ruecklagenzuordnungen: [],
+    buchungen, kategorien: KATEGORIEN, budgets: BUDGETS, konten: KONTEN, ausbuchungen: [], ruecklagen: WEITERLAUFEND, beendete: [], ruecklagenzuordnungen: [],
     zuordnungen: [], vertraege: [VERTRAG], ...over,
   });
 }
 
 describe("einordnungJeBuchung", () => {
-  it("nennt bei einer Entnahme aus dem aufbauenden Budget dessen Kategorie als Namen", () => {
+  it("nennt bei einer Entnahme aus einer Rücklage, die weiterläuft, ihren Namen", () => {
     const e = sicht([buchung({ kategorieId: "kat-t" })]);
     expect(e.get("b1")).toEqual([
       { art: "ruecklage", budgetName: "Vorhaben Nordseite", vertragsname: undefined, intern: false, ruecklageId: "bu-t" },

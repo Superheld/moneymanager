@@ -1,52 +1,57 @@
-// Die Trennung nach Art — je Zeile, seit 2026-11-09 (vorher nach dem Dach eines Baums).
+// Was aus einem Budget herausgerechnet ist — seit Migration 81 über die Zuständigkeit
+// (`herausgerechnet`), nicht mehr über die zweite Art eines Budgets. Bis dahin trennte
+// `nachArtGetrennt` die Stände in monatliche und aufbauende und las daraus, was ein Dach
+// verliert; das aufbauende ist inzwischen eine Rücklage und steht in keinem Budgetbaum.
 
 import { describe, expect, it } from "vitest";
-import type { Budgetart } from "../../core";
-import { nachArtGetrennt, type Budgetstand } from "./budgetsichten";
+import type { Budget, BudgetSicht, Kategorie, Ruecklage } from "../../core";
+import { budgetstaende } from "./budgetsichten";
 
-const stand = (id: string, art: Budgetart, tiefe: number): Budgetstand =>
-  ({ budget: { id, art }, kategorieName: id, tiefe }) as unknown as Budgetstand;
+const kategorien: Kategorie[] = [
+  { id: "freizeit", name: "Freizeit", defaultCharakter: "Aufwand" },
+  { id: "urlaub", name: "Urlaub", elternId: "freizeit", defaultCharakter: "Aufwand" },
+  { id: "kino", name: "Kino", elternId: "freizeit", defaultCharakter: "Aufwand" },
+  { id: "essen", name: "Essen", defaultCharakter: "Aufwand" },
+];
 
-describe("nachArtGetrennt", () => {
-  const g = nachArtGetrennt([
-    stand("freizeit", "monatlich", 0),
-    stand("urlaub", "aufbauend", 1), // aufbauend, aber unter einem monatlichen Dach
-    stand("kino", "monatlich", 1),
-    stand("werkstatt", "aufbauend", 0),
-    stand("reifen", "monatlich", 1),
-    stand("winter", "aufbauend", 2), // aufbauend unter monatlich unter aufbauend
-    stand("essen", "monatlich", 0),
-  ]);
+const budget = (id: string, kategorieId: string): Budget => ({
+  id, kategorieId, kontoId: "giro", art: "monatlich", start: "2026-01-01", betraege: [{ abMonat: "2026-01", betrag: 10000 }],
+});
 
-  it("trennt nach der Art jedes Budgets, nicht nach seinem Dach", () => {
-    expect(g.monatlich.map((z) => z.budget.id)).toEqual(["freizeit", "kino", "reifen", "essen"]);
-    expect(g.aufbauend.map((z) => z.budget.id)).toEqual(["urlaub", "werkstatt", "winter"]);
+const ruecklage = (over: Partial<Ruecklage> & { id: string; kategorieId: string }): Ruecklage => ({
+  bezeichnung: over.id, beginn: "2026-01-01", art: "fortlaufend", raten: [{ abMonat: "2026-01", betrag: 5000 }], ...over,
+});
+
+const sicht = (budgets: Budget[], ruecklagen: Ruecklage[]): BudgetSicht => ({
+  buchungen: [], kategorien, budgets, vertragsBuchungen: new Set(), ruecklagen,
+});
+
+describe("budgetstaende — was eine Rücklage darunter dem Budget abnimmt", () => {
+  it("nennt am Dach die Rücklage, die unter ihm hängt", () => {
+    const s = budgetstaende(sicht([budget("b-freizeit", "freizeit"), budget("b-essen", "essen")], [ruecklage({ id: "Tellwick", kategorieId: "urlaub" })]), "2026-03-15");
+    expect(s.find((z) => z.budget.id === "b-freizeit")?.abgezogen).toEqual(["Tellwick"]);
+    expect(s.find((z) => z.budget.id === "b-essen")?.abgezogen).toBeUndefined();
   });
 
-  it("nennt das Budget der anderen Art, unter dem eines hängt", () => {
-    const unter = (l: typeof g.monatlich, id: string) => l.find((z) => z.budget.id === id)!.unter;
-    expect(unter(g.aufbauend, "urlaub")).toBe("freizeit");
-    expect(unter(g.monatlich, "reifen")).toBe("werkstatt");
-    expect(unter(g.aufbauend, "winter")).toBe("reifen");
-    expect(unter(g.monatlich, "kino")).toBeUndefined();
+  it("nennt eine Rücklage erst, wenn ihr Fundfenster den Tag enthält", () => {
+    const spaeter = ruecklage({ id: "Ombrast", kategorieId: "urlaub", art: "abschliessend", findetAb: "2026-06-01" });
+    const ohne = ruecklage({ id: "Quelvin", kategorieId: "kino", art: "abschliessend" });
+    const b = [budget("b-freizeit", "freizeit")];
+    expect(budgetstaende(sicht(b, [spaeter, ohne]), "2026-03-15")[0].abgezogen).toBeUndefined();
+    expect(budgetstaende(sicht(b, [spaeter, ohne]), "2026-07-15")[0].abgezogen).toEqual(["Ombrast"]);
   });
 
-  it("nennt am Dach, was aus ihm herausgerechnet ist und in der anderen Liste steht", () => {
-    // Der Bereich Budgets zeigt nur die monatlichen: dass „urlaub" aus „freizeit"
-    // herausgerechnet ist, muss deshalb an „freizeit" selbst stehen.
-    const abgezogen = (l: typeof g.monatlich, id: string) => l.find((z) => z.budget.id === id)!.abgezogen;
-    expect(abgezogen(g.monatlich, "freizeit")).toEqual(["urlaub"]);
-    expect(abgezogen(g.monatlich, "reifen")).toEqual(["winter"]);
-    expect(abgezogen(g.aufbauend, "werkstatt")).toEqual(["reifen"]);
-    // Ein Kind derselben Art steht eingerückt darunter und braucht keinen Hinweis.
-    expect(abgezogen(g.monatlich, "essen")).toBeUndefined();
-    expect(abgezogen(g.monatlich, "kino")).toBeUndefined();
+  it("nennt nichts, wenn das Budget am selben Knoten hängt — dort gewinnt es", () => {
+    const s = budgetstaende(sicht([budget("b-urlaub", "urlaub")], [ruecklage({ id: "Tellwick", kategorieId: "urlaub" })]), "2026-03-15");
+    expect(s[0].abgezogen).toBeUndefined();
   });
 
-  it("zählt die Tiefe nur über Vorfahren derselben Art", () => {
-    const tiefe = (l: typeof g.monatlich) => l.map((z) => z.tiefe);
-    expect(tiefe(g.monatlich)).toEqual([0, 1, 0, 0]);
-    // „winter" hängt unter „werkstatt" (aufbauend) — eine Stufe, nicht zwei.
-    expect(tiefe(g.aufbauend)).toEqual([0, 0, 1]);
+  it("bindet die Rücklage an das NÄCHSTE Budget darüber", () => {
+    const s = budgetstaende(
+      sicht([budget("b-freizeit", "freizeit"), budget("b-kino", "kino")], [ruecklage({ id: "Tellwick", kategorieId: "urlaub" })]),
+      "2026-03-15",
+    );
+    expect(s.find((z) => z.budget.id === "b-freizeit")?.abgezogen).toEqual(["Tellwick"]);
+    expect(s.find((z) => z.budget.id === "b-kino")?.abgezogen).toBeUndefined();
   });
 });

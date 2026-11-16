@@ -28,7 +28,7 @@ function memRepo(): BudgetRepository & { daten: Budget[] } {
 function eingabe(over: Partial<BudgetEingabe> = {}): BudgetEingabe {
   return {
     kategorieId: "kat1", kontoId: "giro", betragProMonat: 35000,
-    art: "monatlich", start: "2026-08-19", abMonat: "2026-08", ...over,
+    start: "2026-08-19", abMonat: "2026-08", ...over,
   };
 }
 
@@ -46,7 +46,7 @@ describe("budgetAnlegen", () => {
     // Mitten im Monat anzufangen hiesse, den ersten Monat anteilig zu rechnen — dafür
     // gibt es keinen Grund, und es wäre die einzige Stelle mit Bruchteilen einer Rate.
     const repo = memRepo();
-    const b = await budgetAnlegen(repo, eingabe({ art: "aufbauend", start: "2026-08-19" }));
+    const b = await budgetAnlegen(repo, eingabe({ start: "2026-08-19" }));
     expect(b.start).toBe("2026-08-01");
   });
 
@@ -58,20 +58,20 @@ describe("budgetAnlegen", () => {
     await expect(budgetAnlegen(repo, eingabe({ start: "August" }))).rejects.toThrow("startdatum.ungueltig");
   });
 
-  it("verbietet ein zweites Budget für dieselbe Kategorie — auch mit anderer Art", async () => {
+  it("verbietet ein zweites Budget für dieselbe Kategorie", async () => {
     // Zwei Budgets auf derselben Kategorie zögen dieselben Buchungen: eine
     // Doppelzählung, keine Verfeinerung. Feiner geht über eine Unterkategorie.
     const repo = memRepo();
     await budgetAnlegen(repo, eingabe());
     await expect(budgetAnlegen(repo, eingabe({ betragProMonat: 20000 }))).rejects.toThrow("budget.existiert");
-    await expect(budgetAnlegen(repo, eingabe({ art: "aufbauend" }))).rejects.toThrow("budget.existiert");
   });
 
-  it("erlaubt das Bearbeiten desselben Budgets (gleiche id) samt Artwechsel", async () => {
+  it("erlaubt das Bearbeiten desselben Budgets (gleiche id) — es bleibt monatlich", async () => {
+    // Seit Migration 81 gibt es keine andere Art; was sich ansammeln soll, ist eine Rücklage.
     const repo = memRepo();
     const b = await budgetAnlegen(repo, eingabe());
-    const geaendert = await budgetAnlegen(repo, eingabe({ betragProMonat: 15000, art: "aufbauend" }), b.id);
-    expect(geaendert.art).toBe("aufbauend");
+    const geaendert = await budgetAnlegen(repo, eingabe({ betragProMonat: 15000 }), b.id);
+    expect(geaendert.art).toBe("monatlich");
     expect(repo.daten).toHaveLength(1);
   });
 });

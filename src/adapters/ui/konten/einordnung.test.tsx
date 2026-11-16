@@ -3,7 +3,7 @@
 //
 // Bis 2026-11-15 sah man im Kontoauszug die Kategorie einer Buchung, aber nicht, wie sie
 // deshalb ZÄHLT: ob die Ergebnisrechnung der Übersicht sie als Fixkosten führt, als
-// laufende Kosten, oder gar nicht, weil ein aufbauendes Budget sie trägt. Wer wissen
+// laufende Kosten, oder gar nicht, weil eine Rücklage sie trägt. Wer wissen
 // wollte, warum eine grosse Ausgabe den Monat nicht belastet, hatte keine Stelle zum
 // Nachsehen.
 //
@@ -27,6 +27,7 @@ import i18n from "../../../i18n/i18n";
 import { KontenScreen } from "./KontenScreen";
 import { sqliteLedgerRepository as ledgerRepo } from "../../persistence/sqliteLedgerRepository";
 import { sqliteBudgetRepository as budgetRepo } from "../../persistence/sqliteBudgetRepository";
+import { sqliteRuecklagenRepository as ruecklagenRepo } from "../../persistence/sqliteRuecklagenRepository";
 import {
   sqliteKategorieRepository as kategorieRepo,
   sqliteZahlungskontoRepository as kontoRepo,
@@ -56,10 +57,11 @@ async function bestand() {
     id: "bu-m", kategorieId: "kat-m", kontoId: "kt", art: "monatlich", start: "2026-01-01",
     betraege: [{ abMonat: "2026-01", betrag: 20000 }],
   });
-  await budgetRepo.speichern({
-    id: "bu-t", kategorieId: "kat-t", kontoId: "kt", art: "aufbauend", start: "2026-01-01",
-    betraege: [{ abMonat: "2026-01", betrag: 5000 }],
+  // Läuft weiter — bis Migration 81 ein aufbauendes Budget; sein Name ist der der Kategorie.
+  await ruecklagenRepo.speichern({
+    id: "bu-t", bezeichnung: "Vorhaben Nordseite", kategorieId: "kat-t", kontoId: "kt", art: "fortlaufend", beginn: "2026-01-01",
   });
+  await ruecklagenRepo.rateSpeichern("bu-t", { abMonat: "2026-01", betrag: 5000 });
   await vertragRepo.speichern({
     id: "v1", anbieter: "Halvern", beginn: "2026-01-01", status: "aktiv",
     verlaengerung: "automatisch", verlaengerungMonate: 1,
@@ -97,7 +99,7 @@ describe("Einordnung im Kontoauszug", () => {
     expect((await zeileVon("Eingang Vibora")).getByText(pille("einnahme"))).toBeInTheDocument();
     expect((await zeileVon("Besorgung Kesselmann")).getByText(pille("laufend"))).toBeInTheDocument();
     expect((await zeileVon("Einzelposten Dremmel")).getByText(pille("ungeplant"))).toBeInTheDocument();
-    // Das aufbauende Budget steht mit NAMEN da — „aus Budget" allein liesse offen, aus
+    // Die Rücklage steht mit NAMEN da — „aus Budget" allein liesse offen, aus
     // welchem, und genau das will man an der Zeile wissen.
     expect(
       (await zeileVon("Anzahlung Ohlert")).getByText(pille("ruecklageBenannt", { budget: "Vorhaben Nordseite" })),
@@ -170,7 +172,7 @@ describe("Einordnung im Buchungsdialog", () => {
     expect(abschnitt.getByText(i18n.t("einordnung.grund.fixkosten", { vertrag: "Halvern" }))).toBeInTheDocument();
   });
 
-  it("erklärt bei der Entnahme aus dem aufbauenden Budget, dass sie den Monat nicht noch einmal kostet", async () => {
+  it("erklärt bei der Entnahme aus einer Rücklage, die weiterläuft, dass sie den Monat nicht noch einmal kostet", async () => {
     await bestand();
     const nutzer = userEvent.setup();
     rendere(<KontenScreen onNavigate={() => {}} />);

@@ -29,10 +29,7 @@ import { Trans, useTranslation } from "react-i18next";
 import {
   hatZiel,
   monatsRuecklage,
-  nachArtGetrennt,
-  type Budgetbereich,
   type GeldJeKonto,
-  type GruppierterStand,
   type IstBuchung,
   type Ruecklage,
   type RuecklagenDeckung,
@@ -41,15 +38,10 @@ import {
   buchungswahlFuer,
 } from "../../../application";
 import {
-  budgetbereich,
-  budgetLoeschen,
   geldJeKonto,
   ruecklageLoeschen,
   ruecklagen as ruecklagenLaden,
 } from "../../dienste";
-import { BudgetDialog } from "../bausteine/BudgetDialog";
-import { BudgetTabelle } from "../bausteine/BudgetTabelle";
-import { BudgetVerlauf } from "../bausteine/BudgetVerlauf";
 import { BuchungDetail } from "../buchung/BuchungDetail";
 import { Button, Card, CoverageTrack, KPIStat, Pill } from "../bausteine";
 import { FaustformelTacho } from "./FaustformelTacho";
@@ -68,7 +60,7 @@ import { LeererZustand } from "../bausteine/LeererZustand";
 /** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
 const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
 const LEERE_DECKUNG: RuecklagenDeckung = {
-  posten: [], ueberKategorie: [], soll: 0, sollMitKonto: 0, tatsaechlich: 0, grad: 100, nurRechnung: false,
+  posten: [], soll: 0, sollMitKonto: 0, tatsaechlich: 0, grad: 100, nurRechnung: false,
 };
 const LEERE_LISTE: readonly never[] = [];
 const LEERER_FLUSS: Ruecklagenfluss = { bedarf: 0, plan: 0, ist: 0, posten: [] };
@@ -86,8 +78,6 @@ export function RuecklagenScreen() {
   const datum = useDatum();
   const heute = useMemo(heuteIso, []);
   const [sicht, setSicht] = useState<Ruecklagensicht | null>(null);
-  /** Die Budgets — gebraucht werden hier nur die aufbauenden („über die Kategorie"). */
-  const [budgets, setBudgets] = useState<Budgetbereich | null>(null);
   /** Je Konto, welche Rücklagen dort Geld haben — für die Karte „Wo das Geld liegt". */
   const [jeKonto, setJeKonto] = useState<GeldJeKonto | null>(null);
 
@@ -95,19 +85,14 @@ export function RuecklagenScreen() {
   // `AusbuchungDialog`), der Screen merkt sich nur, für welche Rücklage.
   const [bearbeitet, setBearbeitet] = useState<Ruecklage | "neu" | null>(null);
   const [ausbuchen, setAusbuchen] = useState<Ruecklage | null>(null);
-  /** Der Dialog für eine Rücklage über die Kategorie: `"neu"`, die ID des Budgets, oder zu. */
-  const [budgetDialog, setBudgetDialog] = useState<string | null>(null);
-  /** Welche Rücklage über die Kategorie ihren Verlauf zeigt — höchstens eine. */
-  const [offenesBudget, setOffenesBudget] = useState<string | null>(null);
   /** Eine Buchung aus dem Verlauf, die gerade im Dialog steht. */
   const [detail, setDetail] = useState<IstBuchung | null>(null);
 
   // Verwandte Repos in EINEM Zug laden und zusammen setzen: gestaffelte setState lassen
   // die Deckung kurz gegen eine leere Kontenliste rechnen (jeder Stand wäre dann 0).
   async function laden() {
-    const [r, b, k] = await Promise.all([ruecklagenLaden(heute), budgetbereich(heute), geldJeKonto(heute)]);
+    const [r, k] = await Promise.all([ruecklagenLaden(heute), geldJeKonto(heute)]);
     setSicht(r);
-    setBudgets(b);
     setJeKonto(k);
   }
   useEffect(() => {
@@ -121,35 +106,14 @@ export function RuecklagenScreen() {
   const zielwert = sicht?.zielwert ?? 0;
   const mindest = sicht?.mindest ?? 0;
   const fluss = sicht?.fluss ?? LEERER_FLUSS;
-  // Die aufbauenden Budgets in ihrer Baumordnung — getrennt in der Anwendungsschicht,
-  // dieselbe Trennung, nach der der Bereich Budgets nur die monatlichen zeigt.
-  const ueberKategorie = useMemo(
-    () => (budgets ? nachArtGetrennt(budgets.staende).aufbauend : LEERE_LISTE),
-    [budgets],
-  );
-  const offeneKategorie = ueberKategorie.find((z) => z.budget.id === offenesBudget);
-  const bearbeitetesBudget =
-    budgetDialog && budgetDialog !== "neu" ? budgets?.staende.find((z) => z.budget.id === budgetDialog) ?? null : null;
-  /** Was vom Rest auf seinem Konto NICHT liegt — 0, wenn alles da ist. */
-  const fehlt = (budgetId: string) => {
-    const d = budgets?.deckung.get(budgetId);
-    return d ? d.anspruch - d.gedeckt : 0;
-  };
-  const nichtsDa = items.length === 0 && ueberKategorie.length === 0;
+  const nichtsDa = items.length === 0;
 
   const neu = () => setBearbeitet("neu");
   const bearbeiten = (r: Ruecklage) => setBearbeitet(r);
   const ausbuchenOeffnen = (r: Ruecklage) => setAusbuchen(r);
-  const neuUeberKategorie = () => setBudgetDialog("neu");
-  const budgetLoeschfrage = (z: GruppierterStand) => loeschfrage.stellen({
-    name: z.kategorieName,
-    folgen: t("ruecklagen.kategorie.loeschenFolgen"),
-    ausfuehren: async () => { await budgetLoeschen(z.budget.id); await laden(); },
-  });
   const anlegenKnoepfe = (hauptknopf: boolean) => (
     <>
       <Button variant={hauptknopf ? "primary" : undefined} plus onClick={neu}>{t("ruecklagen.ruecklage")}</Button>
-      <Button plus onClick={neuUeberKategorie}>{t("ruecklagen.kategorie.knopf")}</Button>
     </>
   );
 
@@ -177,7 +141,7 @@ export function RuecklagenScreen() {
         {/* Seit 2026-11-16 über BEIDE Formen (`ruecklagenDeckung`): Soll, „tatsächlich da"
             und Deckung zählen die Rücklagen über die Kategorie mit (ihr Rest ist ihr Soll).
             „Ziele gesamt" bleibt bei denen von Hand mit Ziel — die anderen haben keins. */}
-        {(items.length > 0 || ueberKategorie.length > 0) && (
+        {items.length > 0 && (
           <Card title={t("ruecklagen.standTitel")} subtitle={t("ruecklagen.standUntertitel")}>
             {/* Zwei mal zwei statt `kpis`: vier Kacheln brechen dort drei zu eins um, und
                 die Paare gehören zusammen — Ziele und Soll ist die Rechnung, Stand und
@@ -321,7 +285,7 @@ export function RuecklagenScreen() {
                     <span className="muted" style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-2)" }}>
                       {t("ruecklagen.rate")} {geld.format(monatsRuecklage(r))} {geld.symbol}{t("ruecklagen.proMonatSuffix")}
                       <IconLeiste>
-                        <IconButton icon="uebernehmen" label={t("ruecklagen.ausbuchen")} onClick={() => ausbuchenOeffnen(r)} />
+                        {r.art !== "fortlaufend" && <IconButton icon="uebernehmen" label={t("ruecklagen.ausbuchen")} onClick={() => ausbuchenOeffnen(r)} />}
                         <IconButton icon="bearbeiten" label={t("ruecklagen.bearbeiten")} onClick={() => bearbeiten(r)} />
                         <IconButton icon="loeschen" ton="gefahr" label={t("ruecklagen.loeschen")} onClick={() => loeschfrage.stellen({
                             name: r.bezeichnung,
@@ -390,33 +354,6 @@ export function RuecklagenScreen() {
       </Card>
       )}
 
-      {/* Die zweite Form: findet ihre Ausgaben von selbst über die Kategorie. Dieselbe
-          Tabelle und derselbe Verlauf wie unter Budgets — nur die Wörter sind die einer
-          Rücklage (`bausteine/budgetTexte`). */}
-      {budgets && ueberKategorie.length > 0 && (
-        <Card title={t("ruecklagen.abschnittKategorie")} subtitle={t("ruecklagen.abschnittKategorieHinweis")}>
-          <BudgetTabelle
-            zeilen={ueberKategorie}
-            kontoNamen={budgets.kontoNamen}
-            fehlt={fehlt}
-            offen={offenesBudget}
-            onZeile={(z) => setOffenesBudget((cur) => (cur === z.budget.id ? null : z.budget.id))}
-            onBearbeiten={(z) => setBudgetDialog(z.budget.id)}
-            onLoeschen={budgetLoeschfrage}
-          />
-        </Card>
-      )}
-      {budgets && offeneKategorie && (
-        <BudgetVerlauf
-          key={offeneKategorie.budget.id}
-          sicht={budgets.sicht}
-          stand={offeneKategorie}
-          heute={heute}
-          zeilenkontext={budgets.zeilenkontext}
-          onSchliessen={() => setOffenesBudget(null)}
-          onBuchung={setDetail}
-        />
-      )}
 
       {/* Nach den beiden Listen und nicht davor: dort wird gearbeitet (anlegen, ausbuchen),
           hier wird nachgesehen, auf welchem Konto das alles liegt. Vor den Listen schöbe
@@ -425,11 +362,8 @@ export function RuecklagenScreen() {
         <GeldJeKontoKarte
           sicht={jeKonto}
           onBearbeiten={(r) => {
-            if (r.form === "kategorie") setBudgetDialog(r.id);
-            else {
-              const ruecklage = items.find((x) => x.id === r.id);
-              if (ruecklage) setBearbeitet(ruecklage);
-            }
+            const ruecklage = items.find((x) => x.id === r.id);
+            if (ruecklage) setBearbeitet(ruecklage);
           }}
         />
       )}
@@ -455,18 +389,6 @@ export function RuecklagenScreen() {
           buchungswahl={sicht ? buchungswahlFuer(sicht, ausbuchen) : []}
           onClose={() => setAusbuchen(null)}
           onGespeichert={async () => { setAusbuchen(null); await laden(); }}
-        />
-      )}
-      {budgets && budgetDialog && (budgetDialog === "neu" || bearbeitetesBudget) && (
-        <BudgetDialog
-          art="aufbauend"
-          stand={bearbeitetesBudget}
-          heute={heute}
-          kategorien={budgets.kategorien}
-          konten={budgets.konten}
-          onClose={() => setBudgetDialog(null)}
-          onGespeichert={async () => { setBudgetDialog(null); await laden(); }}
-          onGeaendert={laden}
         />
       )}
       {detail && <BuchungDetail buchung={detail} onClose={() => setDetail(null)} onGeaendert={laden} />}

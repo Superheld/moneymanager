@@ -185,6 +185,7 @@ describe("Vertrag anlegen", () => {
 
 describe("Rücklage anlegen", () => {
   it("legt eine Rücklage an", async () => {
+    await sqliteKategorieRepository.speichern({ id: "kat-ombrast", name: "Ombrast", defaultCharakter: "Aufwand" });
     const nutzer = userEvent.setup();
     rendere(<RuecklagenScreen />);
 
@@ -195,6 +196,9 @@ describe("Rücklage anlegen", () => {
     await nutzer.type(await screen.findByLabelText(/^Wofür/), "Testgerät");
     await nutzer.type(await screen.findByLabelText(/^Ziel/), "120");
     await nutzer.type(await screen.findByLabelText(/^Frist/), "12");
+    // Die Kategorie ist seit Paket 4 Pflicht.
+    await nutzer.click(screen.getByRole("button", { name: /Kategorie wählen/ }));
+    await nutzer.click(await screen.findByRole("button", { name: /Ombrast/ }));
 
     const alleSpeichern = screen.queryAllByRole("button", { name: /speichern|anlegen/i });
     const speichern = alleSpeichern[alleSpeichern.length - 1];

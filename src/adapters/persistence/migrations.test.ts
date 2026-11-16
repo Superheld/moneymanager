@@ -1989,3 +1989,137 @@ describe("Migration 80 — eine Rücklage: freie Rate in die Reihe, Fundfenster 
     db.close();
   });
 });
+
+describe("Migration 81 — eine Rücklage: die aufbauenden Budgets werden Rücklagen", () => {
+  /**
+   * Ein Bestand nach v80: aufbauende Budgets in jeder Lage — mit Konto, mit verschwundenem
+   * Konto, mit verwaister Kategorie, ohne `start`, eines mit einer Id, die schon eine
+   * Rücklage trägt —, dazu ein monatliches, das bleiben muss, wie es ist.
+   */
+  function vor81(fremdschluessel = false): Database {
+    const db = new SQL.Database();
+    if (fremdschluessel) db.run("PRAGMA foreign_keys = ON");
+    apply(db, 0, 80);
+    db.run("INSERT INTO kategorie (id, name, default_charakter) VALUES ('kat-reise','Tellwick','Aufwand'), ('kat-markt','Ombrast','Aufwand')");
+    db.run("INSERT INTO zahlungskonto (id, bezeichnung, typ, inhaber_ids) VALUES ('k-tg','Tagesgeld','Tagesgeld','[]'), ('k-giro','Girokonto','Giro','[]')");
+    db.run(
+      `INSERT INTO budget (id, kategorie_id, konto_id, art, start) VALUES
+         ('b-reise','kat-reise','k-tg','aufbauend','2025-03-01'),
+         ('b-markt','kat-markt','k-giro','monatlich','2025-01-01')`,
+    );
+    db.run(
+      `INSERT INTO budget_betrag (budget_id, ab_monat, betrag) VALUES
+         ('b-reise','2025-03',8000), ('b-reise','2025-09',9500),
+         ('b-markt','2025-01',30000)`,
+    );
+    // Eine Rücklage von Hand, deren Id ein aufbauendes Budget unten auch trägt.
+    db.run("INSERT INTO ruecklage (id, bezeichnung, ziel, frist_monate, beginn, kategorie_id, art) VALUES ('b-kollision','Quelvin',60000,12,'2025-01-01','kat-reise','abschliessend')");
+    if (!fremdschluessel) {
+      // Was nur mit abgeschalteten Fremdschlüsseln entsteht: verschwundenes Konto,
+      // verwaiste Kategorie, kein Start.
+      db.run(
+        `INSERT INTO budget (id, kategorie_id, konto_id, art, start) VALUES
+           ('b-weg','kat-reise','k-geloescht','aufbauend','2025-05-01'),
+           ('b-waise','kat-geloescht','k-tg','aufbauend','2025-02-01'),
+           ('b-ohne','kat-markt','k-tg','aufbauend',NULL),
+           ('b-kollision','kat-reise','k-tg','aufbauend','2025-04-01')`,
+      );
+      db.run(
+        `INSERT INTO budget_betrag (budget_id, ab_monat, betrag) VALUES
+           ('b-weg','2025-05',2000), ('b-waise','2025-02',1000), ('b-ohne','2025-07',3000),
+           ('b-kollision','2025-04',4000)`,
+      );
+    }
+    return db;
+  }
+  const zeilen = (db: Database, sql: string) => db.exec(sql)[0]?.values ?? [];
+
+  it("überführt ein aufbauendes Budget mit derselben Id als Rücklage, die weiterläuft", () => {
+    const db = vor81();
+    apply(db, 80, 81);
+    expect(zeilen(db, "SELECT id, bezeichnung, ziel, frist_monate, rate, beginn, kategorie_id, konto_id, beendet_am, art, findet_ab FROM ruecklage WHERE id = 'b-reise'")).toEqual([
+      ["b-reise", "Tellwick", null, null, null, "2025-03-01", "kat-reise", "k-tg", null, "fortlaufend", null],
+    ]);
+    expect(zeilen(db, "SELECT ab_monat, betrag FROM ruecklage_rate WHERE ruecklage_id = 'b-reise' ORDER BY ab_monat")).toEqual([
+      ["2025-03", 8000],
+      ["2025-09", 9500],
+    ]);
+    // Abgeräumt: das Budget und seine Beträge.
+    expect(zeilen(db, "SELECT COUNT(*) FROM budget WHERE id = 'b-reise'")).toEqual([[0]]);
+    expect(zeilen(db, "SELECT COUNT(*) FROM budget_betrag WHERE budget_id = 'b-reise'")).toEqual([[0]]);
+    db.close();
+  });
+
+  it("lässt das monatliche Budget unberührt", () => {
+    const db = vor81();
+    apply(db, 80, 81);
+    expect(zeilen(db, "SELECT id, art FROM budget WHERE art = 'monatlich'")).toEqual([["b-markt", "monatlich"]]);
+    expect(zeilen(db, "SELECT budget_id, ab_monat, betrag FROM budget_betrag WHERE budget_id = 'b-markt'")).toEqual([["b-markt", "2025-01", 30000]]);
+    expect(zeilen(db, "SELECT COUNT(*) FROM ruecklage WHERE id = 'b-markt'")).toEqual([[0]]);
+    db.close();
+  });
+
+  it("nimmt ein verschwundenes Konto nicht mit — die Rücklage ist dann reine Rechnung", () => {
+    const db = vor81();
+    apply(db, 80, 81);
+    expect(zeilen(db, "SELECT konto_id, kategorie_id, bezeichnung FROM ruecklage WHERE id = 'b-weg'")).toEqual([[null, "kat-reise", "Tellwick"]]);
+    db.close();
+  });
+
+  it("lässt bei verwaister Kategorie die Kategorie leer und nennt sie schlicht Rücklage", () => {
+    const db = vor81();
+    apply(db, 80, 81);
+    expect(zeilen(db, "SELECT kategorie_id, bezeichnung, konto_id FROM ruecklage WHERE id = 'b-waise'")).toEqual([[null, "Rücklage", "k-tg"]]);
+    db.close();
+  });
+
+  it("beginnt ohne `start` mit dem ersten Betragsmonat", () => {
+    const db = vor81();
+    apply(db, 80, 81);
+    expect(zeilen(db, "SELECT beginn, findet_ab FROM ruecklage WHERE id = 'b-ohne'")).toEqual([["2025-07-01", null]]);
+    db.close();
+  });
+
+  it("lässt ein Budget stehen, dessen Id schon eine Rücklage trägt — nichts geht verloren", () => {
+    const db = vor81();
+    apply(db, 80, 81);
+    // Die Rücklage von Hand ist dieselbe wie vorher, ohne fremde Raten.
+    expect(zeilen(db, "SELECT bezeichnung, art, ziel FROM ruecklage WHERE id = 'b-kollision'")).toEqual([["Quelvin", "abschliessend", 60000]]);
+    expect(zeilen(db, "SELECT COUNT(*) FROM ruecklage_rate WHERE ruecklage_id = 'b-kollision'")).toEqual([[0]]);
+    // Das Budget samt Betrag steht weiter da.
+    expect(zeilen(db, "SELECT art, start FROM budget WHERE id = 'b-kollision'")).toEqual([["aufbauend", "2025-04-01"]]);
+    expect(zeilen(db, "SELECT ab_monat, betrag FROM budget_betrag WHERE budget_id = 'b-kollision'")).toEqual([["2025-04", 4000]]);
+    db.close();
+  });
+
+  it("läuft ein zweites Mal folgenlos durch", () => {
+    const db = vor81();
+    apply(db, 80, 81);
+    const stand = (t: string) => zeilen(db, `SELECT * FROM ${t} ORDER BY 1, 2`);
+    const vorher = ["ruecklage", "ruecklage_rate", "budget", "budget_betrag"].map(stand);
+    apply(db, 80, 81);
+    expect(["ruecklage", "ruecklage_rate", "budget", "budget_betrag"].map(stand)).toEqual(vorher);
+    db.close();
+  });
+
+  it("hinterlässt mit eingeschalteten Fremdschlüsseln keinen Widerspruch", () => {
+    // Mit den Fremdschlüsseln an lassen sich die Altfälle mit verwaisten Verweisen nicht
+    // anlegen; geprüft wird der Normalfall samt Kollision und monatlichem Budget.
+    const db = vor81(true);
+    apply(db, 80, 81);
+    expect(db.exec("PRAGMA foreign_key_check")).toEqual([]);
+    expect(zeilen(db, "SELECT id, art FROM ruecklage ORDER BY id")).toEqual([["b-kollision", "abschliessend"], ["b-reise", "fortlaufend"]]);
+    db.close();
+  });
+
+  it("hinterlässt auch nach den Altfällen, nach der Kette geprüft, keinen neuen Widerspruch", () => {
+    // Die verwaisten Verweise lagen VOR der Migration im Bestand (Budget auf ein
+    // verschwundenes Konto bzw. eine verschwundene Kategorie). Was 81 hinzufügt, verweist
+    // auf nichts, was es nicht gibt — die Prüfung nach der Kette meldet nur noch das
+    // stehengebliebene Budget der Kollision nicht, und das hat gültige Verweise.
+    const db = vor81();
+    apply(db, 80, 81);
+    expect(db.exec("PRAGMA foreign_key_check")).toEqual([]);
+    db.close();
+  });
+});

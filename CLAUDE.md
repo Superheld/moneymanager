@@ -32,14 +32,13 @@ Nettovermögen. Sein Verlauf steht im Bereich selbst und nicht in der Analyse: e
 Geschichte einer einzigen Zahl, und die Einträge, aus denen er entsteht, pflegt man
 daneben. Regeln in `src/core/vermoegen/CLAUDE.md`.
 
-**Rücklagen und Budgets** trennen seit 2026-11-15 nach dem, was der Nutzer meint, nicht
-nach dem Datenmodell: Geld, das Monat für Monat für etwas Späteres zurückgelegt wird, ist
-eine **Rücklage** — gleich, ob sie ihre Ausgabe beim Ausbuchen von Hand bekommt (Tabelle
-`ruecklage`) oder über ihre Kategorie von selbst (Tabelle `budget` mit Art aufbauend).
-Beides steht im Bereich Rücklagen und in EINER Zeile der Ergebnisrechnung; der Bereich
-Budgets zeigt nur noch die monatlichen. Das ist eine Stufe der Oberfläche: die zwei
-Tabellen und ihre Rechenregeln bleiben bewusst, warum, steht in
-`src/core/ruecklagen/CLAUDE.md`.
+**Rücklagen und Budgets** trennen nach dem, was der Nutzer meint: Geld, das Monat für
+Monat für etwas Späteres zurückgelegt wird, ist eine **Rücklage** — eine, die weiterläuft
+(Reparaturen), oder eine, die abgeschlossen wird (Urlaub, ein Gerät); sie findet ihre
+Ausgaben über ihre Kategorie. Ein **Budget** ist ein Rahmen für einen Monat. Seit
+Migration 81 (ADR-0006) gilt das auch im Datenmodell: das frühere aufbauende Budget ist
+eine Rücklage in der Tabelle `ruecklage`, und `budget` heisst nur noch „monatlich". Die
+Regeln stehen in `src/core/ruecklagen/CLAUDE.md` und `src/core/budgets/CLAUDE.md`.
 
 ### Die Schichten
 
@@ -110,11 +109,12 @@ prüft die Menge auf GLEICHHEIT, eine Tabelle zu viel oder zu wenig macht den Te
   Klasse UND `aktiv`, siehe `src/core/konten/CLAUDE.md`) ·
   `kontostand_anker` · `vormerkung` (was die Bank kennt und noch nicht gebucht hat,
   siehe `src/application/fints/CLAUDE.md`) · `import_lauf` · `dubletten_freigabe`
-- **Ordnen:** `kategorie` · `budget` + `budget_betrag` (die
-  Reihe seiner Beträge, siehe `src/core/budgets/CLAUDE.md`) · `vertrag` ·
-  `vertrag_erkennung` · `zahlungsregel` · `ruecklage` + `ruecklage_ausbuchung` +
-  `ruecklage_rate` (die Reihe der freien Raten) + `ruecklage_zuordnung` (welche Rücklage
-  einen Anteil trägt) — die letzten beiden seit Migration 79 angelegt und im Umbau, siehe
+- **Ordnen:** `kategorie` · `budget` + `budget_betrag` (das monatliche Budget und die
+  Reihe seiner Beträge — seit Migration 81 nur noch monatlich, siehe
+  `src/core/budgets/CLAUDE.md`) · `vertrag` · `vertrag_erkennung` · `zahlungsregel` ·
+  `ruecklage` (beide Sorten, seit Migration 81 auch die früheren aufbauenden Budgets) +
+  `ruecklage_ausbuchung` + `ruecklage_rate` (die Reihe der freien Raten) +
+  `ruecklage_zuordnung` (welche Rücklage einen Anteil trägt), siehe
   `src/core/ruecklagen/CLAUDE.md`
 - **Erkennen:** `klassifikator_modell` · `merkmal_ausschluss` · `trainingslauf` (jedes
   Training mit Konfiguration, Kennzahlen und Vorhersagen, siehe

@@ -17,7 +17,7 @@
 // `betragSpeichern`/`betragLoeschen` gibt es zusätzlich für die Arbeit an EINER Version,
 // ohne den Rest des Budgets anzufassen.
 
-import type { Budget, Budgetart, Budgetbetrag, Cent } from "../../core";
+import type { Budget, Budgetbetrag, Cent } from "../../core";
 import type { BudgetRepository } from "../../application/ports";
 import { getDb } from "./db";
 
@@ -53,14 +53,28 @@ export const sqliteBudgetRepository: BudgetRepository = {
       if (liste) liste.push(eintrag);
       else jeBudget.set(b.budget_id, [eintrag]);
     }
-    return zeilen.map((z) => ({
-      id: z.id,
-      kategorieId: z.kategorie_id,
-      kontoId: z.konto_id,
-      betraege: jeBudget.get(z.id) ?? [],
-      art: z.art as Budgetart,
-      start: z.start,
-    }));
+    // Seit Migration 81 gibt es nur noch monatliche Budgets: die aufbauenden sind Rücklagen
+    // geworden. Steht trotzdem eines da, hat die Migration es nicht überführen können (eine
+    // Id-Kollision mit einer bestehenden Rücklage) und es bewusst stehen lassen — nichts
+    // davon ist verloren. Es wird hier nicht still mitgerechnet (der Kern kennt die Art
+    // nicht mehr), sondern laut gemeldet, damit es jemand sieht.
+    const stehengeblieben = zeilen.filter((z) => z.art !== "monatlich");
+    if (stehengeblieben.length > 0) {
+      console.warn(
+        "Budgets, die keine monatlichen sind, werden nicht gelesen (Migration 81 hat sie nicht überführt):",
+        stehengeblieben.map((z) => z.id),
+      );
+    }
+    return zeilen
+      .filter((z) => z.art === "monatlich")
+      .map((z) => ({
+        id: z.id,
+        kategorieId: z.kategorie_id,
+        kontoId: z.konto_id,
+        betraege: jeBudget.get(z.id) ?? [],
+        art: "monatlich" as const,
+        start: z.start,
+      }));
   },
 
   async speichern(b: Budget) {

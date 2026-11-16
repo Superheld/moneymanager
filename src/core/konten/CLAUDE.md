@@ -11,19 +11,24 @@ die Karte „Gebunden auf …" im Kontoauszug. Wer etwas Neues einführt, das Ge
 Konto beansprucht, liefert es dort als `Anspruch` an und rechnet nirgends selbst.
 
 Bis 2026-10-26 gab es das nicht, und das hatte eine konkrete Folge: die Rücklagen-Deckung
-verteilte den GANZEN Kontostand auf die Rücklagen, obwohl ein aufbauendes Budget auf
-demselben Konto denselben Euro beanspruchte. Die Deckung sah besser aus, als sie war.
+verteilte den GANZEN Kontostand auf die Rücklagen, obwohl ein aufbauendes Budget (heute
+selbst eine Rücklage) auf demselben Konto denselben Euro beanspruchte. Die Deckung sah besser aus, als sie war.
 
 | Anspruch | in Höhe von | warum |
 |---|---|---|
-| Rücklage mit Konto | ihr Stand, wenn positiv: das Soll bis heute minus dem, was sie seit ihrem Fundfenster über die Kategorie gefunden hat | das soll beisammen sein — was sie schon getragen hat, ist vom Konto weg |
-| aufbauendes Budget | sein Rest, wenn positiv | er gehört weiter dem Budget |
+| Rücklage mit Konto, beide Sorten | ihr Stand, wenn positiv: die Raten bis heute minus dem, was sie seit ihrem Fundfenster über die Kategorie gefunden hat (je Sorte gezählt wie in `../ruecklagen/CLAUDE.md`) | das soll beisammen sein — was sie schon getragen hat, ist vom Konto weg |
 | monatliches Budget | **keiner** | sein Rest verfällt und bleibt einfach auf dem Konto, ohne Kommentar |
 
-Dieselbe Belegung steht an drei weiteren Stellen, jede liest sie und rechnet nicht selbst:
-in der Übersicht unter „Was da ist" je Kontoklasse (`bilanzJeKlasse`), im Bereich Budgets
-am aufbauenden Budget („auf dem Konto fehlen …", nur wenn etwas fehlt) und in der
-Rücklagen-Deckung.
+**Seit Migration 81 ist die Rücklage der einzige Anspruch.** Bis dahin war der Rest eines
+aufbauenden Budgets der zweite (`Anspruchsart` `budget`); das Budget ist jetzt selbst eine
+Rücklage, die weiterläuft, und `Anspruch` trägt keine Art mehr. Wer einen Anspruch einer
+anderen Sache einführt, braucht sie wieder.
+
+Dieselbe Belegung steht an weiteren Stellen, jede liest sie und rechnet nicht selbst:
+in der Übersicht unter „Was da ist" je Kontoklasse (`bilanzJeKlasse`) und in der
+Rücklagen-Deckung. Den Satz „auf dem Konto fehlen …" am aufbauenden Budget im Bereich
+Budgets gibt es mit Migration 81 nicht mehr; was einer Rücklage fehlt, zeigt die Liste
+der Rücklagen.
 
 Seit 2026-11-15 liest sie eine vierte: die Reichweite im Ausblick der Analyse
 (`core/reichweite.ts`, „Wie lange reicht es ohne Einnahmen?"). Ihr Zähler ist Stand
@@ -37,8 +42,8 @@ Seit 2026-11-16 liest sie eine fünfte: die Karte „Wo das Geld liegt" im Berei
 (`application/ruecklagen/geldJeKonto.ts`) — jedes Konto mit einem Anspruch auf einem
 Blatt, mit derselben Tabelle wie „Gebunden auf …" (`ui/bausteine/BelegungTabelle`). Und
 die Kennzahlen des Bereichs (Soll, Tatsächlich da, Deckung) zählen über
-`ruecklagenDeckung` jetzt auch die Ansprüche der aufbauenden Budgets in ihre Summen, nicht
-nur in die Verteilung.
+`ruecklagenDeckung` alle Rücklagen in EINER Liste — seit Migration 81 auch die früheren
+aufbauenden Budgets.
 
 **Seit Paket 3 des Umbaus (ADR-0006) sinkt der Anspruch einer Rücklage um ihre gefundenen
 Entnahmen** (`anspruchAm`, `ruecklagenEntnahmenAus`). Vorher fand eine Rücklage von Hand
@@ -194,7 +199,8 @@ Drei Dinge, die dabei Entscheidungen sind und keine Rechenschritte:
   gehen 400 ab". Gleichmässig zu verteilen ist die neutrale Annahme — nicht die
   schlimmste (alles am Monatsanfang), nicht die beste (alles am Ende). Im laufenden Monat
   zählt nur der noch offene REST: was schon ausgegeben wurde, steht bereits im Kontostand.
-- **Ein aufbauendes Budget zählt nicht mit.** Seine Rate wird nicht ausgegeben, sie bleibt
+- **Eine Rücklage, die weiterläuft, zählt nicht mit** (bis Migration 81 das aufbauende
+  Budget). Ihre Rate wird nicht ausgegeben, sie bleibt
   liegen — sie mitzurechnen hiesse, Geld abfliessen zu lassen, das auf dem Konto bleibt.
 - **Eine geplante Umbuchung wirkt auf BEIDEN Konten**, als Abfluss und als Zufluss. Nur
   die eine Seite zu rechnen liesse ausgerechnet das Rücklagenkonto nach Handlungsbedarf

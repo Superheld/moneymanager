@@ -2400,4 +2400,71 @@ export const MIGRATIONS: Migration[] = [
           AND beendet_am IS NULL AND kategorie_id IS NOT NULL`,
     ],
   },
+  {
+    version: 81, // Eine Ruecklage, Stufe 3: die aufbauenden Budgets werden Ruecklagen
+    sql: [
+      // Dritte von drei Stufen (ADR-0006). Ein aufbauendes Budget ist eine Ruecklage, die
+      // weiterlaeuft (`art = 'fortlaufend'`), und zieht mit DERSELBEN Id in die Tabelle
+      // `ruecklage` um — so findet jede Einordnung, die auf die Id zeigt, ihr Ziel wieder.
+      //
+      //   • `findet_ab` bleibt NULL. Bei einer fortlaufenden heisst das „ohne Anfang": die
+      //     Kategorie gehoert ihr zu jedem Datum, so wie die Einordnung das Budget immer
+      //     behandelt hat. Die Kosten zaehlen weiter erst ab `beginn` (Teil B des Entwurfs,
+      //     Abschnitt 4).
+      //   • `beginn` ist der Start des Budgets. Fehlt er (nur in einer von Hand geaenderten
+      //     Datei), der erste Betragsmonat, sonst der laufende Monat — NOT NULL verlangt
+      //     einen Tag, erfunden wird darueber hinaus nichts.
+      //   • Die Bezeichnung ist der Name der Kategorie; das Budget hatte keinen eigenen.
+      //     Ist die Kategorie verwaist (nur mit abgeschalteten Fremdschluesseln moeglich),
+      //     bleibt die Kategorie leer und der Name „Rücklage".
+      //   • Das Konto wird uebernommen, wenn es das Konto noch gibt; sonst leer — dann ist
+      //     die Ruecklage reine Rechnung, und es gibt keinen Anspruch auf einem Konto, das
+      //     es nicht mehr gibt.
+      //
+      // `OR IGNORE`: steht schon eine Ruecklage mit dieser Id da (theoretisch, eine Id ist
+      // eine UUID), wird nichts ueberschrieben. Das Budget bleibt dann unten stehen.
+      `INSERT OR IGNORE INTO ruecklage
+         (id, bezeichnung, ziel, frist_monate, rate, beginn, kategorie_id, konto_id, beendet_am, art, findet_ab)
+         SELECT b.id,
+                COALESCE(k.name, 'Rücklage'),
+                NULL, NULL, NULL,
+                COALESCE(b.start,
+                         (SELECT MIN(x.ab_monat) FROM budget_betrag x WHERE x.budget_id = b.id) || '-01',
+                         strftime('%Y-%m-01', 'now', 'localtime')),
+                k.id, z.id, NULL, 'fortlaufend', NULL
+           FROM budget b
+           LEFT JOIN kategorie k ON k.id = b.kategorie_id
+           LEFT JOIN zahlungskonto z ON z.id = b.konto_id
+          WHERE b.art = 'aufbauend'`,
+      // Die Betragsreihe wird die Ratenreihe — Zeile fuer Zeile, mit ihrem Monat. Nur fuer
+      // eine Ruecklage, die das Budget wirklich ist: fortlaufend, ohne Fundanfang und mit
+      // dem Beginn, den die Zeile oben schreibt. Eine fremde Ruecklage mit derselben Id
+      // bekommt so keine Raten untergeschoben.
+      `INSERT OR IGNORE INTO ruecklage_rate (ruecklage_id, ab_monat, betrag)
+         SELECT x.budget_id, x.ab_monat, x.betrag
+           FROM budget_betrag x
+           JOIN budget b ON b.id = x.budget_id AND b.art = 'aufbauend'
+           JOIN ruecklage r ON r.id = b.id AND r.art = 'fortlaufend' AND r.findet_ab IS NULL
+                           AND r.ziel IS NULL AND r.beendet_am IS NULL`,
+      // Abgeraeumt wird nur, was je Zeile geprueft ueberfuehrt ist. Die Betraege
+      // AUSDRUECKLICH zuerst: in der Schemasitzung sind die Fremdschluessel aus, ein
+      // CASCADE nimmt sie also nicht mit — und eine Zeile, deren Gegenstueck in der Reihe
+      // fehlt, bleibt stehen.
+      `DELETE FROM budget_betrag
+        WHERE budget_id IN (SELECT b.id FROM budget b
+                              JOIN ruecklage r ON r.id = b.id AND r.art = 'fortlaufend'
+                             WHERE b.art = 'aufbauend')
+          AND EXISTS (SELECT 1 FROM ruecklage_rate y
+                       WHERE y.ruecklage_id = budget_betrag.budget_id
+                         AND y.ab_monat = budget_betrag.ab_monat
+                         AND y.betrag = budget_betrag.betrag)`,
+      // Das Budget nur, wenn seine Ruecklage dasteht und keine seiner Betragszeilen
+      // uebrig ist. Bleibt eines stehen, geht nichts verloren; `BudgetRepository.alle()`
+      // liest es nicht mehr und meldet es.
+      `DELETE FROM budget
+        WHERE art = 'aufbauend'
+          AND EXISTS (SELECT 1 FROM ruecklage r WHERE r.id = budget.id AND r.art = 'fortlaufend')
+          AND NOT EXISTS (SELECT 1 FROM budget_betrag x WHERE x.budget_id = budget.id)`,
+    ],
+  },
 ];

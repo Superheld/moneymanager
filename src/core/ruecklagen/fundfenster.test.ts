@@ -149,19 +149,19 @@ describe("Wirkung 3: der Anspruch auf dem Konto sinkt um die gefundenen Entnahme
 
   it("zieht am Stichtag nach dem Fundfenster ab, was die Rücklage gefunden hat", () => {
     // Am 20.05.: Soll (Januar bis April) 40000, gefunden 15000 → Anspruch 25000.
-    const d = ruecklagenDeckung([geraet], "2026-05-20", konto, [], bestand);
+    const d = ruecklagenDeckung([geraet], "2026-05-20", konto, bestand);
     expect(d.posten[0]).toMatchObject({ soll: 25000, tatsaechlich: 25000 });
   });
 
   it("lässt den Anspruch vor dem Fundfenster beim Soll — die Buchung davor gehört ihr nicht", () => {
-    const d = ruecklagenDeckung([geraet], "2026-03-20", konto, [], bestand);
+    const d = ruecklagenDeckung([geraet], "2026-03-20", konto, bestand);
     expect(d.posten[0].soll).toBe(20000);
   });
 
   it("beansprucht im Minus nichts", () => {
     const gross = buchung("2026-04-20", -90000, { kategorieId: "k-geraet" });
     const s2: BudgetSicht = { ...sicht, buchungen: [vorher, danach, gross] };
-    const d = ruecklagenDeckung([geraet], "2026-05-20", konto, [], { entnahmen: ruecklagenEntnahmenAus(s2) });
+    const d = ruecklagenDeckung([geraet], "2026-05-20", konto, { entnahmen: ruecklagenEntnahmenAus(s2) });
     expect(d.posten[0].soll).toBe(0);
   });
 });
@@ -169,16 +169,18 @@ describe("Wirkung 3: der Anspruch auf dem Konto sinkt um die gefundenen Entnahme
 // ------------------------------------------------------------------ Befunde
 
 describe("Befunde, die bewusst nachgebildet sind", () => {
-  it("eine Kategoriebuchung VOR dem Start eines aufbauenden Budgets ist eine Entnahme und kostet nichts", () => {
-    // Bekannter Befund (Teil B, Abschnitt 4): die Einordnung kennt kein Datum, die Kosten
-    // zählen ab dem Start. Behoben wird das mit eigener Entscheidung, nicht hier.
+  it("eine Kategoriebuchung VOR dem Beginn einer früheren aufbauenden ist eine Entnahme und kostet nichts", () => {
+    // Bekannter Befund (Teil B, Abschnitt 4): eine fortlaufende ohne `findet_ab` trägt
+    // ihre Kategorie ohne Anfang, die Kosten zählen ab dem Beginn. So rechnete das
+    // aufbauende Budget, aus dem sie mit Migration 81 wurde. Behoben wird das mit eigener
+    // Entscheidung, nicht hier.
     const kategorien: Kategorie[] = [{ id: "k-werk", name: "Werk", defaultCharakter: "Aufwand" }];
-    const werk: Budget = { id: "b-werk", kategorieId: "k-werk", kontoId: "tg", art: "aufbauend", start: "2026-03-01", betraege: [{ abMonat: "2026-03", betrag: 5000 }] };
+    const werk: Ruecklage = { id: "b-werk", bezeichnung: "Werk", kategorieId: "k-werk", kontoId: "tg", art: "fortlaufend", beginn: "2026-03-01", raten: [{ abMonat: "2026-03", betrag: 5000 }] };
     const frueh = buchung("2026-02-11", -40000, { kategorieId: "k-werk" });
-    const e = eingabe({ kategorien, budgets: [werk], ist: [frueh] });
+    const e = eingabe({ kategorien, ruecklagen: [werk], ist: [frueh] });
     const [x] = einordnen(e.ist, einordnungskontext(e));
-    expect(x).toMatchObject({ art: "ruecklage", ruecklageId: "b-werk", budgetId: "b-werk" });
-    const posten = zeile(e, "2026-02", "abschreibungen")!.posten.find((p) => p.budgetId === "b-werk")!;
+    expect(x).toMatchObject({ art: "ruecklage", ruecklageId: "b-werk" });
+    const posten = zeile(e, "2026-02", "abschreibungen")!.posten.find((p) => p.ruecklageId === "b-werk")!;
     expect(posten).toMatchObject({ ist: 0, entnahme: -40000 });
     gehtAuf(e, "2026-02");
   });
@@ -197,5 +199,63 @@ describe("Befunde, die bewusst nachgebildet sind", () => {
     expect(posten.find((p) => p.schluessel === "zyklus:a-eins")).toMatchObject({ plan: 0, ist: -6000 });
     // Zwei: angespart am Abschluss (Februar und März) 8000, Rate März 4000 → 4000 + 18000.
     expect(posten.find((p) => p.schluessel === "zyklus:a-zwei")).toMatchObject({ plan: -4000, ist: -22000 });
+  });
+});
+
+// ------------------------------------------------------------------ Paket 4
+
+describe("Paket 4: was sich mit Migration 81 ändern darf — und nur ab `findetAb`", () => {
+  const kategorien: Kategorie[] = [
+    { id: "k-wohnung", name: "Wohnung", defaultCharakter: "Aufwand" },
+    { id: "k-moebel", name: "Moebel", elternId: "k-wohnung", defaultCharakter: "Aufwand" },
+  ];
+  /** Das frühere aufbauende Budget, wie Migration 81 es hinterlässt: ohne Fundanfang. */
+  const frueher: Ruecklage = {
+    id: "b-moebel", bezeichnung: "Moebel", kategorieId: "k-moebel", kontoId: "tg", art: "fortlaufend",
+    beginn: "2025-06-01", raten: [{ abMonat: "2025-06", betrag: 8000 }],
+  };
+  /** Eine zweite an derselben Kategorie, von Hand, mit Fundfenster ab März. */
+  const zweite: Ruecklage = {
+    id: "r-ombrast", bezeichnung: "Ombrast", ziel: 60000, fristMonate: 12, beginn: "2026-01-01",
+    kategorieId: "k-moebel", kontoId: "tg", art: "abschliessend", findetAb: "2026-03-01",
+  };
+  const vorDemFenster = buchung("2026-02-14", -12000, { kategorieId: "k-moebel" });
+  const imFenster = buchung("2026-03-09", -9000, { kategorieId: "k-moebel" });
+  const traeger = (ruecklagen: readonly Ruecklage[], b: IstBuchung) =>
+    einordnen([b], einordnungskontext(eingabe({ kategorien, ruecklagen })))[0];
+
+  it("allein an ihrer Kategorie trägt die frühere jede Buchung, auch vor ihrem Beginn — wie das Budget", () => {
+    for (const b of [buchung("2025-04-02", -3000, { kategorieId: "k-moebel" }), vorDemFenster, imFenster]) {
+      expect(traeger([frueher], b), b.datum).toMatchObject({ art: "ruecklage", ruecklageId: "b-moebel" });
+    }
+  });
+
+  it("zusammen mit einer zweiten gehört ihr VOR deren findetAb weiter alles allein", () => {
+    expect(traeger([frueher, zweite], vorDemFenster)).toMatchObject({ art: "ruecklage", ruecklageId: "b-moebel" });
+  });
+
+  it("ab dem findetAb der zweiten wartet die Buchung auf eine Zuordnung", () => {
+    expect(traeger([frueher, zweite], imFenster)).toMatchObject({ art: "ungeplant", wartetAuf: ["b-moebel", "r-ombrast"] });
+  });
+
+  it("die abschliessende ohne findetAb (eine von Hand vor Migration 80) lässt die frühere allein", () => {
+    const ohneFenster: Ruecklage = { ...zweite, findetAb: undefined };
+    expect(traeger([frueher, ohneFenster], imFenster)).toMatchObject({ art: "ruecklage", ruecklageId: "b-moebel" });
+  });
+
+  it("ein monatliches Budget am selben Knoten gewinnt gegen beide", () => {
+    const budget: Budget = { id: "b-quelvin", kategorieId: "k-moebel", kontoId: "giro", art: "monatlich", start: "2025-01-01", betraege: [{ abMonat: "2025-01", betrag: 20000 }] };
+    const x = einordnen([imFenster], einordnungskontext(eingabe({ kategorien, budgets: [budget], ruecklagen: [frueher, zweite] })))[0];
+    expect(x).toMatchObject({ art: "laufend", budgetId: "b-quelvin" });
+  });
+
+  it("kostet bis zum findetAb der zweiten Monat für Monat dasselbe wie allein", () => {
+    const ist = [vorDemFenster, buchung("2025-11-20", -30000, { kategorieId: "k-moebel" })];
+    const allein = eingabe({ kategorien, ruecklagen: [frueher], ist });
+    const zu_zweit = eingabe({ kategorien, ruecklagen: [frueher, zweite], ist });
+    for (const m of ["2025-06", "2025-10", "2025-11", "2025-12", "2026-01", "2026-02"]) {
+      const kosten = (e: ErgebnisEingabe) => zeile(e, m, "abschreibungen")?.posten.find((p) => p.ruecklageId === "b-moebel")?.ist ?? 0;
+      expect(kosten(zu_zweit), m).toBe(kosten(allein));
+    }
   });
 });

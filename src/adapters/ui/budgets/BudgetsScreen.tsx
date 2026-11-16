@@ -3,29 +3,24 @@
 // Bis 2026-11-15 standen hier zwei Arten nebeneinander: monatlich (der Rest verfällt) und
 // aufbauend (der Rest bleibt). Ein aufbauendes Budget ist für den Nutzer aber dasselbe wie
 // eine Rücklage — Geld, das Monat für Monat für etwas Späteres zurückgelegt wird —, und es
-// steht seitdem dort, im Bereich Rücklagen, als „Rücklage über die Kategorie". Im
-// Datenmodell ist es weiter ein Budget (`budget.art = aufbauend`); die Rechnung ist
-// dieselbe geblieben.
+// stand seitdem im Bereich Rücklagen. Seit Migration 81 ist es auch im Datenmodell eine
+// Rücklage (Sorte `fortlaufend`); ein Budget ist nur noch monatlich.
 //
 // Die Verschachtelung gilt weiter: ein Budget auf einer Unterkategorie nimmt dem Dach
-// seinen Verbrauch weg (core/budget). Liegt dort eine Rücklage, sieht man sie hier nicht
-// mehr — die Zeile des Dachs sagt deshalb, was abgezogen ist (`abgezogen` an
-// `GruppierterStand`).
+// seinen Verbrauch weg (core/budget), eine Rücklage darunter ebenso. Die sieht man hier
+// nicht — die Zeile des Dachs sagt deshalb, was abgezogen ist (`abgezogen` am
+// `Budgetstand`, aus der Zuständigkeit).
 //
 // Die Kennzahlen stehen als eigene Reihe ÜBER den Karten, nicht darin — wie auf der
 // Übersicht. In der Karte konkurrierten sie mit der Tabelle um dieselbe Fläche.
-//
-// Tabelle, Dialog und Verlauf liegen in `bausteine/` (`BudgetTabelle`, `BudgetDialog`,
-// `BudgetVerlauf`): der Bereich Rücklagen benutzt dieselben für die aufbauenden.
 //
 // PILOT für ADR-0004: alle sichtbaren Strings über t()/<Trans>, alles Geld über useGeld().
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
-  nachArtGetrennt,
   type Budgetbereich,
-  type GruppierterStand,
+  type Budgetstand,
   type Budgetvorschlag,
   type IstBuchung,
 } from "../../../application";
@@ -35,6 +30,7 @@ import { BuchungDetail } from "../buchung/BuchungDetail";
 import { BudgetVerlauf } from "../bausteine/BudgetVerlauf";
 import { BudgetDialog, type BudgetVorbelegung } from "../bausteine/BudgetDialog";
 import { BudgetTabelle } from "../bausteine/BudgetTabelle";
+import { RuecklageDialog, type RuecklageVorbelegung } from "../ruecklagen/RuecklageDialog";
 import { IconButton, IconLeiste } from "../bausteine/IconButton";
 import { betont } from "../bausteine/betonung";
 import { PageHead } from "../bausteine/PageHead";
@@ -101,8 +97,10 @@ export function BudgetsScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => v
    * er nach dem Entfernen einer Version die neue Reihe zeigt.
    */
   const [dialog, setDialog] = useState<
-    { neu: true; art: Budgetvorschlag["art"]; vorbelegung?: BudgetVorbelegung } | { neu: false; id: string } | null
+    { neu: true; vorbelegung?: BudgetVorbelegung } | { neu: false; id: string } | null
   >(null);
+  /** Ein übernommener Vorschlag „Rücklage" — er öffnet den Dialog einer Rücklage. */
+  const [ruecklageVorschlag, setRuecklageVorschlag] = useState<RuecklageVorbelegung | null>(null);
 
   // EIN Ladevorgang, EIN setState: gestaffelte await/setState-Paare lassen abgeleitete
   // Werte kurz gegen leere Listen rechnen (ein Kategorie-Lookup meldet dann für einen
@@ -121,18 +119,11 @@ export function BudgetsScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => v
    * `budgetstaende` (Anwendungsschicht), nicht hier.
    */
   const alle = bereich?.staende ?? [];
-  // Nur die monatlichen — die aufbauenden stehen unter Rücklagen. Getrennt wird in der
-  // Anwendungsschicht, dieselbe Trennung liest der Bereich Rücklagen.
-  const zeilen = useMemo(() => nachArtGetrennt(alle).monatlich, [alle]);
+  const zeilen = alle;
   const kategorien = bereich?.kategorien ?? [];
   const konten = bereich?.konten ?? [];
   const vorschlaege = bereich?.vorschlaege ?? [];
   const kontoName = bereich?.kontoNamen ?? LEERE_NAMEN;
-  /** Was vom Rest eines aufbauenden Budgets auf seinem Konto NICHT liegt — 0, wenn alles da ist. */
-  const fehlt = (budgetId: string) => {
-    const d = bereich?.deckung.get(budgetId);
-    return d ? d.anspruch - d.gedeckt : 0;
-  };
   /** Die Zeile, deren Verlauf offen ist — sie kann nach einem Löschen weg sein. */
   const offenesZeile = zeilen.find((z) => z.budget.id === offenesBudget);
   /** Das Budget, das der Dialog gerade bearbeitet, im aktuellen Stand. */
@@ -157,21 +148,23 @@ export function BudgetsScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => v
     };
   }, [zeilen]);
 
-  // Neue Budgets sind monatlich: die Wahl der Art ist mit dem Umzug der aufbauenden in
-  // den Bereich Rücklagen entfallen.
-  const neu = () => setDialog({ neu: true, art: "monatlich" });
-  const bearbeiten = (z: GruppierterStand) => setDialog({ neu: false, id: z.budget.id });
+  const neu = () => setDialog({ neu: true });
+  const bearbeiten = (z: Budgetstand) => setDialog({ neu: false, id: z.budget.id });
 
   /**
    * Übernimmt einen Vorschlag in die Anlege-Maske — bestätigt wird dort.
    *
-   * Die Art gehört zum Vorschlag: bei einer Kategorie, in der zweimal im Jahr etwas
-   * passiert, wäre ein monatlicher Rahmen die falsche Zusage. Ein aufbauender Vorschlag
-   * legt deshalb eine Rücklage über die Kategorie an; der Dialog sagt das im Titel, und
-   * die Pille in der Tabelle sagt es vorher.
+   * Was vorgeschlagen wird, gehört zum Vorschlag: bei einer Kategorie, in der zweimal im
+   * Jahr etwas passiert, wäre ein monatlicher Rahmen die falsche Zusage. Ein Vorschlag
+   * „Rücklage" öffnet deshalb den Dialog einer Rücklage, die weiterläuft, vorbelegt mit
+   * Kategorie, Name und Rate; die Pille in der Tabelle sagt es vorher.
    */
   function vorschlagUebernehmen(v: Budgetvorschlag) {
-    setDialog({ neu: true, art: v.art, vorbelegung: { kategorieId: v.kategorieId, betrag: v.vorschlag } });
+    if (v.art === "ruecklage") {
+      setRuecklageVorschlag({ kategorieId: v.kategorieId, bezeichnung: v.name, rate: v.vorschlag, art: "fortlaufend" });
+      return;
+    }
+    setDialog({ neu: true, vorbelegung: { kategorieId: v.kategorieId, betrag: v.vorschlag } });
   }
 
   async function vorschlagVerwerfen(v: Budgetvorschlag) {
@@ -209,11 +202,6 @@ export function BudgetsScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => v
         </div>
       )}
 
-      {/* Beide Arten in EINER Karte, nebeneinander (seit 2026-11-09). Vorher standen zwei
-          Karten mit je einer breiten Tabelle untereinander, und wer ein Budget anklickte,
-          scrollte an beiden vorbei, bevor der Verlauf kam. Getrennt wird je Zeile nach
-          der Art des Budgets (`nachArtGetrennt`); woraus ein Kind herausgerechnet ist,
-          sagt `unter`. Gibt es nur eine Art, nimmt sie die volle Breite — `auto-fit`. */}
       {zeilen.length === 0 ? (
         <Card title={t("budgets.abschnittListe")}>
           {/* Vor dem Laden nur der alte Satz: ob es Buchungen gibt, weiss erst die Sicht,
@@ -251,7 +239,6 @@ export function BudgetsScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => v
           <BudgetTabelle
             zeilen={zeilen}
             kontoNamen={kontoName}
-            fehlt={fehlt}
             offen={offenesBudget}
             onZeile={(z) => verlaufUmschalten(z.budget.id)}
             onBearbeiten={bearbeiten}
@@ -319,7 +306,7 @@ export function BudgetsScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => v
                 label: t("budgets.spalteArt"),
                 sortValue: (v: Budgetvorschlag) => v.art,
                 render: (v: Budgetvorschlag) => (
-                  <Pill variant={v.art === "aufbauend" ? "um" : "neutral"}>
+                  <Pill variant={v.art === "ruecklage" ? "um" : "neutral"}>
                     {t(`budgets.art.${v.art}`)}
                   </Pill>
                 ),
@@ -355,10 +342,10 @@ export function BudgetsScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => v
                 align: "right",
                 sortValue: (v: Budgetvorschlag) => v.schwankung,
                 render: (v: Budgetvorschlag) =>
-                  // Beim aufbauenden Budget sagt die Schwankung nichts: dort ist der
-                  // eine teure Monat der Zweck und nicht der Ausreißer. Eine
-                  // Warnpille stünde da als Warnung vor dem Erwarteten.
-                  v.art === "aufbauend" ? (
+                  // Bei einer Rücklage sagt die Schwankung nichts: dort ist der eine
+                  // teure Monat der Zweck und nicht der Ausreißer. Eine Warnpille
+                  // stünde da als Warnung vor dem Erwarteten.
+                  v.art === "ruecklage" ? (
                     <span className="muted">—</span>
                   ) : v.schwankung <= 2 ? (
                     <Pill variant="ok">{t("budgets.stabil")}</Pill>
@@ -387,7 +374,6 @@ export function BudgetsScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => v
 
       {dialog && (dialog.neu || bearbeitet) && (
         <BudgetDialog
-          art={dialog.neu ? dialog.art : "monatlich"}
           stand={bearbeitet}
           vorbelegung={dialog.neu ? dialog.vorbelegung : undefined}
           heute={heute}
@@ -396,6 +382,18 @@ export function BudgetsScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => v
           onClose={() => setDialog(null)}
           onGespeichert={async () => { setDialog(null); await laden(); }}
           onGeaendert={laden}
+        />
+      )}
+
+      {ruecklageVorschlag && bereich && (
+        <RuecklageDialog
+          ruecklage={null}
+          vorbelegung={ruecklageVorschlag}
+          heute={heute}
+          konten={konten}
+          kategorien={kategorien}
+          onClose={() => setRuecklageVorschlag(null)}
+          onGespeichert={async () => { setRuecklageVorschlag(null); await laden(); }}
         />
       )}
 

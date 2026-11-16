@@ -5,13 +5,15 @@
 
 import { describe, it, expect } from "vitest";
 import { euroZuCent } from "../basis/geld";
-import { budgetStand, type Budget, type BudgetSicht } from "./budget";
+import { budgetStand as standDesBudgets, ruecklagenEntnahmenAus, type Budget, type BudgetSicht } from "./budget";
 import {
-  budgetFortschreibung,
-  budgetMonatsstand,
-  fruehesterVerlaufsmonat,
+  budgetFortschreibung as fortschreibungDesBudgets,
+  budgetMonatsstand as monatsstandDesBudgets,
   verlaufsfenster,
+  type Budgetmonat,
 } from "./budgetverlauf";
+import type { Ruecklage } from "../ruecklagen/ruecklage";
+import { ruecklagenFortschreibung, ruecklagenstand } from "../ruecklagen/topf";
 import type { IstBuchung } from "../buchung/istbuchung";
 import type { Kategorie } from "../kategorien/kategorie";
 
@@ -21,8 +23,38 @@ const BAUM: Kategorie[] = [
   { id: "fremd", name: "Mobilität", defaultCharakter: "Aufwand" },
 ];
 
+/**
+ * Ein Budget, wie es VOR Migration 81 aussah — mit der zweiten Art. Seit der Migration ist
+ * ein aufbauendes eine Rücklage, die weiterläuft, und ihre Fortschreibung rechnet
+ * `ruecklagenFortschreibung`. Die Fälle unten bleiben dieselben; die drei Helfer darunter
+ * fragen je Art die Rechnung, die heute dafür gilt. So prüft diese Datei, dass die
+ * Fortschreibung der Rücklage dasselbe sagt wie die des aufbauenden Budgets davor.
+ */
+type TestBudget = Omit<Budget, "art"> & { readonly art: "monatlich" | "aufbauend" };
+
+/** So überführt Migration 81 ein aufbauendes Budget. */
+const alsRuecklage = (b: TestBudget): Ruecklage => ({
+  id: b.id, bezeichnung: "", beginn: b.start, kategorieId: b.kategorieId, kontoId: b.kontoId, art: "fortlaufend", raten: b.betraege,
+});
+
+function budgetFortschreibung(s: BudgetSicht, b: TestBudget, von: string, bis: string): Budgetmonat[] {
+  if (b.art === "monatlich") return fortschreibungDesBudgets(s, b as Budget, von, bis);
+  return ruecklagenFortschreibung(alsRuecklage(b), [], ruecklagenEntnahmenAus(s).get(b.id) ?? [], von, bis);
+}
+
+function budgetMonatsstand(s: BudgetSicht, b: TestBudget, am: string): Budgetmonat {
+  if (b.art === "monatlich") return monatsstandDesBudgets(s, b as Budget, am);
+  const m = am.slice(0, 7);
+  return budgetFortschreibung(s, b, m, m)[0] ?? { monat: m, von: "", bis: "", uebertrag: 0, zufuehrung: 0, verfuegbar: 0, verbraucht: 0, rest: 0 };
+}
+
+function budgetStand(s: BudgetSicht, b: TestBudget, am: string): { rest: number } {
+  if (b.art === "monatlich") return standDesBudgets(s, b as Budget, am);
+  return { rest: ruecklagenstand(alsRuecklage(b), [], ruecklagenEntnahmenAus(s).get(b.id) ?? [], am).stand };
+}
+
 /** Wie in `budget.test.ts`: `betragProMonat` wird zur Reihe mit einer Version. */
-function budget(over: Partial<Budget> & { betragProMonat?: number } = {}): Budget {
+function budget(over: Partial<TestBudget> & { betragProMonat?: number } = {}): TestBudget {
   const { betragProMonat = euroZuCent(50), ...rest } = over;
   const basis = {
     id: "b", kategorieId: "urlaub", kontoId: "giro",
@@ -41,8 +73,14 @@ function buchung(over: Partial<IstBuchung>): IstBuchung {
   };
 }
 
-function sicht(buchungen: readonly IstBuchung[], budgets: readonly Budget[]): BudgetSicht {
-  return { buchungen, kategorien: BAUM, budgets, vertragsBuchungen: new Set() };
+function sicht(buchungen: readonly IstBuchung[], budgets: readonly TestBudget[]): BudgetSicht {
+  return {
+    buchungen,
+    kategorien: BAUM,
+    budgets: budgets.filter((b) => b.art === "monatlich") as Budget[],
+    vertragsBuchungen: new Set(),
+    ruecklagen: budgets.filter((b) => b.art === "aufbauend").map(alsRuecklage),
+  };
 }
 
 describe("verlaufsfenster", () => {
@@ -51,19 +89,6 @@ describe("verlaufsfenster", () => {
   });
   it("trägt den Jahreswechsel", () => {
     expect(verlaufsfenster("2026-02-01", 3)).toEqual({ vonMonat: "2025-12", bisMonat: "2026-02" });
-  });
-});
-
-describe("fruehesterVerlaufsmonat", () => {
-  it("begrenzt das Aufbauende auf seinen Startmonat", () => {
-    expect(fruehesterVerlaufsmonat(budget({ start: "2026-04-15" }))).toBe("2026-04");
-  });
-  it("lässt das Monatliche unbegrenzt — dort steht jeder Monat für sich", () => {
-    // Es bekommt keinen erfundenen Rahmen für die Zeit davor, sondern `ohnePlan` (siehe
-    // unten). Eine Untergrenze liesse vom Verlauf oft einen einzigen Balken übrig: ein
-    // monatliches Budget trägt als `start` den Tag, an dem es angelegt wurde.
-    const b = budget({ art: "monatlich", betraege: [{ abMonat: "2026-03", betrag: euroZuCent(200) }] });
-    expect(fruehesterVerlaufsmonat(b)).toBeNull();
   });
 });
 
@@ -98,7 +123,7 @@ describe("budgetFortschreibung, monatlich", () => {
   });
 });
 
-describe("budgetFortschreibung, aufbauend", () => {
+describe("ruecklagenFortschreibung — wie das aufbauende Budget davor", () => {
   const b = budget({ betragProMonat: euroZuCent(50), start: "2026-01-01" });
 
   it("nimmt den Rest in den Folgemonat mit", () => {

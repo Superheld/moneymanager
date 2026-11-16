@@ -217,12 +217,12 @@ describe("budgetvorschlaege", () => {
  * Der Fall, der vorher ganz herausfiel: zweimal im Jahr etwas Großes. Ein monatlicher
  * Rahmen wäre hier sinnlos — elf Monate bliebe er unberührt, im zwölften risse er.
  */
-describe("budgetvorschlaege — aufbauend", () => {
-  it("schlägt für seltene große Ausgaben ein aufbauendes Budget vor", () => {
+describe("budgetvorschlaege — Rücklage", () => {
+  it("schlägt für seltene große Ausgaben eine Rücklage vor", () => {
     const selten = anStellen({ praefix: "s", kategorieId: "miete", betrag: 60000, stellen: [1, 7] });
     const v = budgetvorschlaege([...HINTERGRUND, ...selten], KATEGORIEN, "2026-08");
     const wohnen = v.find((x) => x.name === "Wohnen");
-    expect(wohnen?.art).toBe("aufbauend");
+    expect(wohnen?.art).toBe("ruecklage");
     // 2 × 600 € über zwölf beobachtete Monate → 100 € im Monat.
     expect(wohnen?.proMonat).toBe(10000);
     expect(wohnen?.vorschlag).toBe(10000);
@@ -255,7 +255,7 @@ describe("budgetvorschlaege — aufbauend", () => {
     expect(v.map((x) => x.name)).toEqual(["Lebenshaltung"]);
   });
 
-  it("zieht auch beim aufbauenden Vorschlag den vertraglich gebundenen Teil ab", () => {
+  it("zieht auch beim Vorschlag einer Rücklage den vertraglich gebundenen Teil ab", () => {
     const selten = anStellen({ praefix: "s", kategorieId: "miete", betrag: 60000, stellen: [1, 7] });
     const v = budgetvorschlaege(
       [...HINTERGRUND, ...selten],

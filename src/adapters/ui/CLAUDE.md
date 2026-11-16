@@ -96,7 +96,7 @@ Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlic
 | Ein Bereich, in dem noch nichts steht | `LeererZustand` — Satz, Erklärung, Knöpfe; keine Karte (unten, „Leere Zustände") |
 | Ein Schritt der Einrichtung samt Knopf in seinen Bereich | `Einrichtungsschritt` (`EinrichtungsschrittZeile`, `EINRICHTUNG_ZIEL`) |
 | Was auf einem Konto gebunden ist: Ansprüche, gedeckt, Stand, gebunden, frei | `BelegungTabelle` (ohne Karte; im Kontoauszug und in „Wo das Geld liegt") |
-| Budgets einer Art: Liste, Anlegen/Bearbeiten, Verlauf | `BudgetTabelle`, `BudgetDialog`, `BudgetVerlauf` — die Wörter je Art aus `budgetTexte` (unten, „Rücklagen und Budgets") |
+| Budgets: Liste, Anlegen/Bearbeiten, Verlauf | `BudgetTabelle`, `BudgetDialog`, `BudgetVerlauf` (unten, „Rücklagen und Budgets") |
 
 Was nicht in der Tabelle steht und an zwei Stellen gebraucht wird, ist ein Kandidat für
 einen neuen Eintrag — und gehört dann auch hier hinein.
@@ -110,19 +110,13 @@ Modell bleibt es ein Budget (Gründe in `src/core/ruecklagen/CLAUDE.md`).
 
 Was das für den Code hier heisst:
 
-- **Tabelle, Dialog und Verlauf liegen in `bausteine/`**, weil beide Bereiche sie
-  benutzen (`BudgetTabelle`, `BudgetDialog`, `BudgetVerlauf`, `BudgetVerlaufChart`).
-  Nachgebaut wird nichts; der Bereich Rücklagen lädt dafür `budgetbereich` mit.
-- **Die Art entscheidet der Bereich, nicht ein Feld.** `BudgetDialog` bekommt sie vom
-  Aufrufer; beim Bearbeiten gilt die des Budgets.
-- **Sätze mit dem Wort „Budget" kommen beim aufbauenden aus `ruecklagen.kategorie.*`**
-  (`budgetTexte.ts`, ausdrücklich aufgezählt). Wer in Tabelle, Dialog oder Verlauf einen
-  Satz ergänzt, in dem „Budget" steht, trägt ihn dort ein — `budgetTexte.test.ts` prüft
-  nur, was in der Liste steht.
-- **Gerechnet und getrennt wird nicht hier.** Die Zeile „Rücklagen" der
-  Ergebnisrechnung ist schon im Kern die Summe beider; welche Budgets in welchen Bereich
-  gehören, sagt `nachArtGetrennt`, und was aus einem Dach herausgerechnet ist, sagt
-  `abgezogen` daran.
+- **Seit Migration 81 ist ein Budget nur noch monatlich**; Tabelle, Dialog und Verlauf
+  der Budgets kennen keine zweite Art mehr, und die Umleitung der Wörter
+  (`budgetTexte`) ist weg. Eine Rücklage hat ihren eigenen Dialog
+  (`ruecklagen/RuecklageDialog`, beide Sorten).
+- **Gerechnet wird nicht hier.** Die Zeile „Rücklagen" der Ergebnisrechnung ist schon im
+  Kern die Summe aller Rücklagen, und was aus einem Budget herausgerechnet ist, sagt
+  `abgezogen` am Budgetstand (über die Zuständigkeit).
 
 ## Leere Zustände
 

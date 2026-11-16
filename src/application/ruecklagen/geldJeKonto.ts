@@ -11,11 +11,12 @@
 
 import {
   anspruchAm,
+  ruecklagenart,
   type Anspruchsbestand,
-  type Budget,
   type Cent,
   type Kontobelegung,
   type Ruecklage,
+  type Ruecklagenart,
   type Zahlungskonto,
 } from "../../core";
 import { vertragsBuchungenLaden } from "../budgets/budgetsichten";
@@ -31,30 +32,30 @@ export interface GeldAufKonto {
   readonly belegung: Kontobelegung;
 }
 
+
 /**
- * Eine Rücklage, deren Geld auf keinem Konto steht — sie ist reine Rechnung.
- *
- * Von Hand: kein Konto eingetragen, oder das eingetragene gibt es nicht mehr. Über die
- * Kategorie: ihr Konto gibt es nicht mehr (eintragen muss man eines immer).
+ * Eine Rücklage, deren Geld auf keinem Konto steht — sie ist reine Rechnung: kein Konto
+ * eingetragen, oder das eingetragene gibt es nicht mehr.
  */
 export interface RuecklageOhneKonto {
   readonly id: string;
-  /** `hand` ist eine Rücklage, `kategorie` ein aufbauendes Budget. */
-  readonly form: "hand" | "kategorie";
-  readonly name: string;
   /**
-   * Was sie heute beansprucht: das Soll (von Hand) bzw. der Rest (über die Kategorie),
-   * nie unter null. Dieselben Beträge wie in der Kontobelegung.
+   * Die Sorte. Bis Migration 81 stand hier die Form (`hand` für eine Rücklage, `kategorie`
+   * für ein aufbauendes Budget); seither sind beide Rücklagen, und was sie unterscheidet,
+   * ist, ob sie weiterläuft oder abgeschlossen wird.
    */
+  readonly art: Ruecklagenart;
+  readonly name: string;
+  /** Was sie heute beansprucht, nie unter null — derselbe Betrag wie in der Kontobelegung. */
   readonly anspruch: Cent;
 }
 
 export interface GeldJeKonto {
   /** In der Reihenfolge der Kontenliste; nur Konten mit mindestens einem Anspruch. */
   readonly konten: readonly GeldAufKonto[];
-  /** Wie ein Anspruch heisst: Bezeichnung der Rücklage bzw. Kategorie des Budgets. */
+  /** Wie ein Anspruch heisst: die Bezeichnung der Rücklage. */
   readonly namen: ReadonlyMap<string, string>;
-  /** Rücklagen beider Formen, die auf keinem Konto liegen, grösster Anspruch zuerst. */
+  /** Rücklagen, die auf keinem Konto liegen, grösster Anspruch zuerst. */
   readonly ohneKonto: readonly RuecklageOhneKonto[];
 }
 
@@ -69,7 +70,6 @@ export function geldJeKonto(
   belegung: Belegungssicht,
   konten: readonly Zahlungskonto[],
   ruecklagen: readonly Ruecklage[],
-  budgets: readonly Budget[],
   heute: string,
   /** Was die Rücklagen über ihre Kategorie gefunden haben (`anspruchsbestand`). */
   bestand: Anspruchsbestand = {},
@@ -87,31 +87,17 @@ export function geldJeKonto(
     });
   }
 
-  // Den Rest eines Budgets auf einem verschwundenen Konto liest die Belegung: sie führt
-  // es mit Stand 0, „ungedeckt, nicht verschwunden" (`kontobelegung`).
-  const restAufVerschwundenem = (b: Budget): Cent =>
-    belegung.jeKonto.get(b.kontoId)?.posten.find((p) => p.art === "budget" && p.id === b.id)?.betrag ?? 0;
-
-  const ohneKonto: RuecklageOhneKonto[] = [
-    ...ruecklagen
-      .filter((r) => !r.kontoId || !bekannt.has(r.kontoId))
-      .map((r): RuecklageOhneKonto => ({
-        id: r.id,
-        form: "hand",
-        name: r.bezeichnung,
-        // Derselbe Anspruch wie auf einem Konto: das Soll, abzüglich dessen, was sie über
-        // ihre Kategorie gefunden hat.
-        anspruch: anspruchAm(r, heute, bestand),
-      })),
-    ...budgets
-      .filter((b) => b.art === "aufbauend" && !bekannt.has(b.kontoId))
-      .map((b): RuecklageOhneKonto => ({
-        id: b.id,
-        form: "kategorie",
-        name: belegung.namen.get(b.id) ?? "?",
-        anspruch: restAufVerschwundenem(b),
-      })),
-  ].sort((a, b) => b.anspruch - a.anspruch);
+  const ohneKonto = ruecklagen
+    .filter((r) => !r.kontoId || !bekannt.has(r.kontoId))
+    .map((r): RuecklageOhneKonto => ({
+      id: r.id,
+      art: ruecklagenart(r),
+      name: r.bezeichnung,
+      // Derselbe Anspruch wie auf einem Konto: der Stand, abzüglich dessen, was sie über
+      // ihre Kategorie gefunden hat.
+      anspruch: anspruchAm(r, heute, bestand),
+    }))
+    .sort((a, b) => b.anspruch - a.anspruch);
 
   return { konten: aufKonten, namen: belegung.namen, ohneKonto };
 }
@@ -128,5 +114,5 @@ export async function geldJeKontoLaden(deps: KontobelegungDeps, heute: string): 
   const ruecklagen = rb.ruecklagen;
   const sicht = budgetsichtMit({ buchungen, kategorien, budgets, vertragsBuchungen }, rb);
   const belegung = belegungssicht({ konten, buchungen, ruecklagen, sicht }, heute);
-  return geldJeKonto(belegung, konten, ruecklagen, budgets, heute, anspruchsbestand(sicht));
+  return geldJeKonto(belegung, konten, ruecklagen, heute, anspruchsbestand(sicht));
 }

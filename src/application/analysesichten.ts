@@ -27,6 +27,7 @@ import {
   KOSTENZEILEN,
   monatsErgebnis,
   monatsKosten,
+  ruecklagenart,
   ruecklagenrateFehlt,
   zeilenIst,
   type ErgebnisKennzahlen,
@@ -519,8 +520,8 @@ export interface Verlaufspunkt {
  * Sprung, den niemand erklären kann.
  *
  * Was ein Planmonat zum Saldo beiträgt, entscheidet `planWirkung` — Rücklagen und
- * Umschichtungen bleiben draussen (siehe dort). Die Rücklagen werden
- * hier deshalb gar nicht erst geladen.
+ * Umschichtungen bleiben draussen (siehe dort). Die fortlaufenden Rücklagen gehen mit
+ * ihrer Zeile `budgetsAufbauend` ein, wie bis Migration 81 die aufbauenden Budgets.
  */
 export function analyseAusblick(
   basis: Analysebasis,
@@ -547,6 +548,9 @@ export function analyseAusblick(
     {
       regeln: basis.regeln,
       budgets: basis.budgets,
+      // Nur die fortlaufenden zählen dort (Zeile `budgetsAufbauend`) — bis Migration 81
+      // waren sie aufbauende Budgets und kamen über `budgets` herein.
+      ruecklagen: basis.ruecklagen,
       ist: basis.buchungen,
       kategorien: basis.kategorien,
       vertragsBuchungen,
@@ -758,6 +762,10 @@ export function analyseLiquiditaet(basis: Analysebasis, heute: string, tage = LI
       kategorien: basis.kategorien,
       budgets: basis.budgets,
       vertragsBuchungen: new Set(basis.vertragJeBuchung.keys()),
+      // Die fortlaufenden Rücklagen nehmen einem monatlichen Budget darüber seine Buchungen
+      // ab, wie bis Migration 81 die aufbauenden Budgets, die sie waren. Die
+      // abschliessenden blieben hier schon vorher draussen; daran ändert sich nichts.
+      ruecklagen: basis.ruecklagen.filter((r) => ruecklagenart(r) === "fortlaufend"),
     },
     vormerkungen: basis.vormerkungen,
     heute,

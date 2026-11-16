@@ -36,7 +36,6 @@ import { istLiquide } from "../konten/konto";
 import type { Zahlungsregel } from "../basis/zahlungsregel";
 import { RHYTHMUS_MONATE } from "../basis/zahlungsregel";
 import { istUmbuchungsregel } from "../vertraege/umbuchungErkennung";
-import type { Budget } from "../budgets/budget";
 import { ruecklagenBedarf, ruecklagenKonten, type Ruecklage } from "./ruecklage";
 
 export interface Flussposten {
@@ -85,9 +84,9 @@ function monatsanteil(r: Zahlungsregel): Cent {
  * Rücklage über die Kategorie je Monat verschieden sein kann (Betragsreihe), gilt für
  * `bedarf` der Monat, in dem das Fenster BEGINNT.
  *
- * `budgets` sind seit 2026-11-16 dabei: die aufbauenden zählen zum Bedarf, und ihre nicht
- * liquiden Konten zu den Rücklagenkonten (`ruecklagenKonten`). Ohne sie stand der Bedarf
- * nur für die Rücklagen von Hand da.
+ * `ruecklagen` sind alle laufenden, beide Sorten: seit 2026-11-16 zählen die früheren
+ * aufbauenden Budgets (heute die fortlaufenden) zum Bedarf, und ihre nicht liquiden
+ * Konten zu den Rücklagenkonten (`ruecklagenKonten`).
  */
 export function ruecklagenfluss(
   buchungen: readonly IstBuchung[],
@@ -96,10 +95,9 @@ export function ruecklagenfluss(
   regeln: readonly Zahlungsregel[],
   von: string,
   bis: string,
-  budgets: readonly Budget[] = [],
 ): Ruecklagenfluss {
   const klasse = new Map(konten.map((k) => [k.id, k]));
-  const ziele = ruecklagenKonten(konten, ruecklagen, budgets);
+  const ziele = ruecklagenKonten(konten, ruecklagen);
   const istZiel = (id: string | undefined): boolean => !!id && ziele.has(id);
   const istQuelle = (id: string | undefined): boolean => {
     const k = id ? klasse.get(id) : undefined;
@@ -130,7 +128,7 @@ export function ruecklagenfluss(
     .reduce((s, r) => s + monatsanteil(r), 0);
 
   return {
-    bedarf: ruecklagenBedarf(ruecklagen, budgets, von.slice(0, 7)),
+    bedarf: ruecklagenBedarf(ruecklagen, von.slice(0, 7)),
     plan,
     ist: posten.reduce((s, p) => s + p.betrag, 0),
     posten: posten.sort((a, b) => a.datum.localeCompare(b.datum)),

@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 // Die Linie hinter den Balken hat je nach Art eine andere Form — und genau das ist ihre
-// Aussage. Monatlich eine Grenze (Stufe über die ganze Breite eines Monats), aufbauend
+// Aussage. Monatlich eine Grenze (Stufe über die ganze Breite eines Monats), bei einer Rücklage
 // ein Stand (Linie durch die Monatsmitten, mit Punkten). Monate ohne Rahmen unterbrechen
 // sie: dort gab es keinen Rahmen, und eine durchgezogene Linie behauptete einen.
 
@@ -55,8 +55,8 @@ describe("BudgetVerlaufChart — die Linie hinter den Balken", () => {
     expect(container.textContent).toMatch(/Rahmen/);
   });
 
-  it("zeichnet beim aufbauenden Budget den Stand als Linie mit Punkten", async () => {
-    const { container } = rendere(<BudgetVerlaufChart monate={monate} art="aufbauend" />);
+  it("zeichnet bei einer Rücklage den Stand als Linie mit Punkten", async () => {
+    const { container } = rendere(<BudgetVerlaufChart monate={monate} art="ruecklage" />);
     const d = await linie(container);
     expect(d.match(/M/g)).toHaveLength(1);
     expect(d.match(/L/g)).toHaveLength(2);
@@ -67,7 +67,7 @@ describe("BudgetVerlaufChart — die Linie hinter den Balken", () => {
 
   it("unterbricht die Linie an einem Monat ohne Rahmen", async () => {
     const mitLuecke = [monat(0, 10000, 1000), monat(1, 0, 2000, true), monat(2, 10000, 3000)];
-    const { container } = rendere(<BudgetVerlaufChart monate={mitLuecke} art="aufbauend" />);
+    const { container } = rendere(<BudgetVerlaufChart monate={mitLuecke} art="ruecklage" />);
     const d = await linie(container);
     expect(d.match(/M/g)).toHaveLength(2);
   });
