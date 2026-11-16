@@ -17,6 +17,17 @@ import {
   zyklusSoll,
   zyklusUngedeckt,
   hatGeschichte,
+  getrageneBuchungen,
+  ruecklagenEntnahmenAus,
+  monatsRuecklage,
+  planrateIm,
+  ruecklagenart,
+  ruecklagenFortschreibung,
+  ruecklagenstand,
+  verlaufsfenster,
+  type Budgetmonat,
+  type BudgetSicht,
+  type Ruecklagenart,
   type Cent,
   type IstBuchung,
   type Kategorie,
@@ -38,6 +49,8 @@ import { spurenAus } from "../buchung/zahlungsspuren";
 import { belegZuBuchung } from "../buchung/belegZuBuchung";
 import { buchungsname } from "../buchung/buchungszeile";
 import type { Umsatz } from "../import/umsatz";
+import { buchungszeile, zeilenkontext, type Buchungszeile, type Zeilenkontext } from "../buchung/buchungszeile";
+import { vertragsnamenLaden } from "../vertraege/vertragszuordnung";
 import { anspruchsbestandLaden, type BudgetanspruchDeps } from "../konten/kontobelegung";
 
 /**
@@ -196,8 +209,42 @@ export function ruecklagenGeschichte(
   return [...zeilen, ...ohneAusbuchung].sort((a, b) => b.datum.localeCompare(a.datum));
 }
 
+/**
+ * Eine Rücklage, wie die EINE Liste des Bereichs sie zeigt (seit Paket 4, ADR-0006) — beide
+ * Sorten, jede Zahl schon gerechnet. Bis dahin standen zwei Karten da: die Rücklagen von
+ * Hand mit Balken und die aufbauenden Budgets als Tabelle der Budgets.
+ */
+export interface Ruecklagenzeile {
+  readonly ruecklage: Ruecklage;
+  readonly art: Ruecklagenart;
+  /** Der Name der Kategorie; fehlt bei einem Altfall ohne Kategorie. */
+  readonly kategorieName?: string;
+  /**
+   * Was sie in diesem Monat zurücklegt: bei einer, die abgeschlossen wird, Ziel ÷ Frist
+   * bzw. die Rate (wie bisher in der Liste), bei einer, die weiterläuft, die Rate der
+   * Reihe in diesem Monat (wie bisher die Monatsrate des aufbauenden Budgets).
+   */
+  readonly rate: Cent;
+  /** Der Stand heute, je Sorte gezählt (`ruecklagenstand`) — darf negativ sein. */
+  readonly stand: Cent;
+  /** Was auf dem Konto liegen sollte: der Stand über null (dieselbe Zahl wie in der Deckung). */
+  readonly soll: Cent;
+  /** Was davon auf dem Konto liegt; `null` ohne Konto. */
+  readonly tatsaechlich: Cent | null;
+  /** Der Name des Kontos; fehlt ohne Konto oder wenn es das Konto nicht mehr gibt. */
+  readonly kontoName?: string;
+  /** Nur eine, die abgeschlossen wird, lässt sich ausbuchen. */
+  readonly ausbuchbar: boolean;
+}
+
 export interface Ruecklagensicht {
   readonly ruecklagen: readonly Ruecklage[];
+  /** Die eine Liste des Bereichs, in der Reihenfolge der Rücklagen (nach Name). */
+  readonly zeilen: readonly Ruecklagenzeile[];
+  /** Die Sicht hinter Stand und Entnahmen — für den Verlauf einer Rücklage. */
+  readonly verlaufsicht: BudgetSicht;
+  /** Was die Buchungszeilen eines Monats im Verlauf brauchen. */
+  readonly zeilenkontext: Zeilenkontext;
   readonly konten: readonly Zahlungskonto[];
   /** Für die Kategoriewahl im Dialog und für `buchungswahlFuer`. */
   readonly kategorien: readonly Kategorie[];
@@ -304,7 +351,7 @@ export async function ruecklagenLaden(
   deps: RuecklagenDeps,
   heute: string,
 ): Promise<Ruecklagensicht> {
-  const [ruecklagen, beendete, buchungen, konten, regeln, vertraege, ausbuchungen, umsaetze, budget, kategorien] =
+  const [ruecklagen, beendete, buchungen, konten, regeln, vertraege, ausbuchungen, umsaetze, budget, kategorien, vertragsnamen] =
     await Promise.all([
       deps.ruecklagenRepo.alle(),
       deps.ruecklagenRepo.beendete(),
@@ -316,6 +363,7 @@ export async function ruecklagenLaden(
       deps.umsatzRepo.alle(),
       anspruchsbestandLaden(deps),
       deps.kategorieRepo.alle(),
+      vertragsnamenLaden(deps.zuordnungRepo, deps.vertragRepo),
     ]);
   const kontostaende = new Map(konten.map((k) => [k.id, realerKontostand(k, buchungen)]));
   // Nur laufende Verträge: ein gekündigter zahlt nicht mehr ein, und eine Mindestrücklage
@@ -336,12 +384,34 @@ export async function ruecklagenLaden(
     monatDanach(heute),
   );
 
+  const deckung = ruecklagenDeckung(ruecklagen, heute, kontostaende, budget.bestand);
+  const kontoNamen = new Map(konten.map((k) => [k.id, k.bezeichnung]));
+  const kategorieNamen = new Map(kategorien.map((k) => [k.id, k.name]));
+  const zeilen = deckung.posten.map((p): Ruecklagenzeile => {
+    const r = p.ruecklage;
+    const art = ruecklagenart(r);
+    return {
+      ruecklage: r,
+      art,
+      kategorieName: r.kategorieId ? kategorieNamen.get(r.kategorieId) : undefined,
+      rate: art === "fortlaufend" ? planrateIm(r, heute.slice(0, 7)) : monatsRuecklage(r),
+      stand: ruecklagenstand(r, ausbuchungen, budget.bestand.entnahmen?.get(r.id) ?? [], heute).stand,
+      soll: p.soll,
+      tatsaechlich: p.tatsaechlich,
+      kontoName: r.kontoId ? kontoNamen.get(r.kontoId) : undefined,
+      ausbuchbar: art !== "fortlaufend",
+    };
+  });
+
   return {
     ruecklagen,
+    zeilen,
+    verlaufsicht: budget.sicht,
+    zeilenkontext: zeilenkontext(umsaetze, konten, kategorien, vertragsnamen),
     konten,
     kategorien,
-    kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
-    deckung: ruecklagenDeckung(ruecklagen, heute, kontostaende, budget.bestand),
+    kontoNamen,
+    deckung,
     proMonat: fluss.bedarf,
     zielwert: zielwertGesamt(ruecklagen),
     mindest: mindestRuecklage(einnahmen),
@@ -368,4 +438,30 @@ export async function ruecklagenLaden(
         kategorieId: sp.kategorieId,
       })),
   };
+}
+
+/**
+ * Der Verlauf einer Rücklage: die letzten `anzahl` Monate bis einschliesslich des Monats von
+ * `heute`, jeder als Fortschreibung (Übertrag, Rate, Entnahmen, Rest) — dieselbe Form wie
+ * beim Budget (`Budgetmonat`), für JEDE Rücklage. Bis Paket 4 hatte das nur das aufbauende
+ * Budget. Rein und ohne Ladevorgang: gerechnet wird gegen dieselbe Sicht wie die Liste.
+ */
+export function ruecklagenVerlauf(s: Pick<Ruecklagensicht, "verlaufsicht">, r: Ruecklage, heute: string, anzahl = 12): Budgetmonat[] {
+  const { vonMonat, bisMonat } = verlaufsfenster(heute, anzahl);
+  const entnahmen = ruecklagenEntnahmenAus(s.verlaufsicht).get(r.id) ?? [];
+  return ruecklagenFortschreibung(r, s.verlaufsicht.ausbuchungen ?? [], entnahmen, vonMonat, bisMonat);
+}
+
+/**
+ * Die Buchungen, die eine Rücklage in einem Monat des Verlaufs getragen hat — als
+ * `Buchungszeile`, mit Vorzeichen wie überall. Dieselbe Auswahl wie ihr Stand.
+ */
+export function ruecklagenzeilenImMonat(
+  s: Pick<Ruecklagensicht, "verlaufsicht" | "zeilenkontext">,
+  r: Ruecklage,
+  monat: Budgetmonat,
+): readonly Buchungszeile[] {
+  return getrageneBuchungen(s.verlaufsicht, r.id, monat.von, monat.bis).map((p) =>
+    buchungszeile(p.buchung, -p.betrag, p.kategorieId, s.zeilenkontext),
+  );
 }

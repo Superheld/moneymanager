@@ -20,12 +20,12 @@ import {
   type IstBuchung,
   type Zeilenkontext,
 } from "../../../application";
-import { Button, Card } from ".";
-import { Auswahl } from "./Auswahl";
-import { Buchungsliste } from "./Buchungsliste";
-import { geldFarbe } from "./geldFarbe";
-import { useGeld } from "./einstellungenKontext";
-import { BudgetVerlaufChart } from "./BudgetVerlaufChart";
+import { Button, Card } from "../bausteine";
+import { Auswahl } from "../bausteine/Auswahl";
+import { Buchungsliste } from "../bausteine/Buchungsliste";
+import { geldFarbe } from "../bausteine/geldFarbe";
+import { useGeld } from "../bausteine/einstellungenKontext";
+import { BudgetVerlaufChart } from "../bausteine/BudgetVerlaufChart";
 import { Collapsible } from "@base-ui/react/collapsible";
 
 interface Props {

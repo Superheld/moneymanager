@@ -43,8 +43,8 @@ ein Baustein; was einer benutzt, gehört in dessen Ordner** — auch wenn es all
 |---|---|
 | `uebersicht/` | „wie stehe ich gerade da": Monatskarten, Budgets, Was da ist, Depotstand (Regeln in `uebersicht/CLAUDE.md`) |
 | `analyse/` | „wie war es über einen Zeitraum": Register Verlauf, Kategorien, Ausblick, Befunde, Depot, Bericht |
-| `budgets/` | die monatlichen Budgets, Vorschläge (Tabelle, Dialog und Verlauf liegen in `bausteine/`) |
-| `ruecklagen/` | Rücklagen — von Hand ausgebucht und über die Kategorie (die aufbauenden Budgets) —, Fluss, Tacho, „Wo das Geld liegt" (je Konto, `GeldJeKontoKarte`) |
+| `budgets/` | die monatlichen Budgets: Tabelle, Dialog, Verlauf, Vorschläge |
+| `ruecklagen/` | Rücklagen beider Sorten in EINER Liste und ihr Verlauf (`RuecklageVerlauf`), Fluss, Tacho, „Wo das Geld liegt" (je Konto, `GeldJeKontoKarte`) |
 | `vermoegen/` | Nettovermögen mit Verlauf, Vermögenswerte und Schulden als Werte zum Stichtag |
 | `vertraege/` | Verträge und ihre Erkennung |
 | `konten/` | der Kontoauszug („Buchungen", `ScreenId` `konten`), Kontenverwaltung, Bankzugänge, Abgleich, Depotauszug |
@@ -96,24 +96,35 @@ Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlic
 | Ein Bereich, in dem noch nichts steht | `LeererZustand` — Satz, Erklärung, Knöpfe; keine Karte (unten, „Leere Zustände") |
 | Ein Schritt der Einrichtung samt Knopf in seinen Bereich | `Einrichtungsschritt` (`EinrichtungsschrittZeile`, `EINRICHTUNG_ZIEL`) |
 | Was auf einem Konto gebunden ist: Ansprüche, gedeckt, Stand, gebunden, frei | `BelegungTabelle` (ohne Karte; im Kontoauszug und in „Wo das Geld liegt") |
-| Budgets: Liste, Anlegen/Bearbeiten, Verlauf | `BudgetTabelle`, `BudgetDialog`, `BudgetVerlauf` (unten, „Rücklagen und Budgets") |
+| Eine Rücklage anlegen oder bearbeiten, beide Sorten | `RuecklageDialog` |
+| Verlauf als Balken mit Rahmen oder Stand | `BudgetVerlaufChart` (Form `monatlich` für ein Budget, `ruecklage` für eine Rücklage) |
 
 Was nicht in der Tabelle steht und an zwei Stellen gebraucht wird, ist ein Kandidat für
 einen neuen Eintrag — und gehört dann auch hier hinein.
 
 ## Rücklagen und Budgets — eine Sache, ein Wort
 
-Seit 2026-11-15 heisst ein aufbauendes Budget in der Oberfläche **Rücklage** (über die
-Kategorie) und steht im Bereich Rücklagen; der Bereich Budgets zeigt nur die monatlichen.
-Die Regel dahinter ist die des Nutzers: eine Sache heisst überall wie ihr Bereich. Im
-Modell bleibt es ein Budget (Gründe in `src/core/ruecklagen/CLAUDE.md`).
+Geld, das Monat für Monat für etwas Späteres zurückgelegt wird, heisst überall
+**Rücklage**; ein **Budget** ist ein Rahmen für einen Monat. Seit 2026-11-15 galt das in
+der Oberfläche, seit Migration 81 auch im Modell (`src/core/ruecklagen/CLAUDE.md`). Die
+Regel dahinter ist die des Nutzers: eine Sache heisst überall wie ihr Bereich. Die beiden
+Sorten heissen in der Oberfläche **„läuft weiter"** und **„wird abgeschlossen"** — keine
+anderen Wörter dafür.
 
 Was das für den Code hier heisst:
 
-- **Seit Migration 81 ist ein Budget nur noch monatlich**; Tabelle, Dialog und Verlauf
-  der Budgets kennen keine zweite Art mehr, und die Umleitung der Wörter
-  (`budgetTexte`) ist weg. Eine Rücklage hat ihren eigenen Dialog
-  (`ruecklagen/RuecklageDialog`, beide Sorten).
+- **Tabelle, Dialog und Verlauf der Budgets liegen in `budgets/`**, seit nur noch dieser
+  Bereich sie benutzt; bis Paket 4 lagen sie in `bausteine/`, weil der Bereich Rücklagen
+  sie für die aufbauenden mitbenutzte, und die Umleitung ihrer Wörter (`budgetTexte`)
+  ist mit ihnen gegangen. Geteilt bleibt nur der Chart (`bausteine/BudgetVerlaufChart`).
+- **EINE Liste, EIN Dialog für beide Sorten.** Der Bereich Rücklagen zeigt jede Rücklage
+  in derselben Liste (`RuecklagenScreen`, Zeilen fertig aus `Ruecklagenzeile`): Name,
+  Sorte als Pille, Kategorie, Rate, Stand (auch im Minus), mit Ziel der Fortschritt, das
+  Konto oder dass keines da ist. Der Name öffnet den Verlauf (`RuecklageVerlauf`), das
+  Ausbuchen steht nur an einer, die abgeschlossen wird. `RuecklageDialog` legt beide an:
+  Kategorie Pflicht, Sorte beim Anlegen wählbar und danach nur angezeigt, Ziel mit Frist
+  ODER Rate als Reihe mit „gilt ab". Ein Vorschlag „Rücklage" unter Budgets öffnet ihn
+  vorbelegt; weil ihn damit zwei Bereiche öffnen, liegt er in `bausteine/`.
 - **Gerechnet wird nicht hier.** Die Zeile „Rücklagen" der Ergebnisrechnung ist schon im
   Kern die Summe aller Rücklagen, und was aus einem Budget herausgerechnet ist, sagt
   `abgezogen` am Budgetstand (über die Zuständigkeit).
@@ -534,9 +545,9 @@ ihm etwas zu tun ist — mehrere Rücklagen hängen an seiner Kategorie (`wartet
 Einordnung). Sie trägt den gestrichelten Rahmen des Geplanten, keine Warnfarbe. Gewählt
 wird im Buchungsdialog (`buchung/RuecklagenwahlBlock`), mit einer `Auswahl` je Anteil;
 was dort zur Wahl steht und ob überhaupt, sagt die Sicht (`ruecklagenwahl` am
-Buchungsdetail), nicht der Block. Vorbelegt wird nichts. Entnahmen aus einer Rücklage und
-aus einem aufbauenden Budget sind EINE Art (`ruecklage`); die Pille nennt die Rücklage,
-wenn es eine gibt.
+Buchungsdetail), nicht der Block. Vorbelegt wird nichts. Entnahmen aus einer Rücklage sind EINE
+Art (`ruecklage`), seit Migration 81 auch die aus dem früheren aufbauenden Budget; die
+Pille nennt die Rücklage, wenn es eine gibt.
 
 ## Was im Konto steht, hat jemand belegt
 

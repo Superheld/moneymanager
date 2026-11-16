@@ -306,6 +306,10 @@ export {
   ruecklagenLaden,
   // Sortiert eine schon geladene Auswahl für EINE Rücklage — wie `budgetstaende(sicht, am)`.
   buchungswahlFuer,
+  // Verlauf und Buchungen EINER Rücklage aus der schon geladenen Sicht — wie `budgetVerlauf`.
+  ruecklagenVerlauf,
+  ruecklagenzeilenImMonat,
+  type Ruecklagenzeile,
   type Ausbuchungszeile,
   type Buchungswahl,
   type Buchungsvorschlag,

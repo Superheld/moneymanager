@@ -19,6 +19,9 @@
 //
 // Bis 2026-11-10 lag sein Zustand im `RuecklagenScreen`; als eigene Komponente mit eigenem
 // Zustand beginnt jeder Dialog frisch — der Screen sagt nur, für welche Rücklage.
+//
+// Er liegt in `bausteine/`, weil ihn zwei Bereiche öffnen: Rücklagen (anlegen, bearbeiten)
+// und Budgets (ein Vorschlag „Rücklage" legt eine an, die weiterläuft).
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -34,14 +37,14 @@ import {
   type Zahlungskonto,
 } from "../../../application";
 import { ruecklageAktualisieren, ruecklageAnlegen, ruecklageRateLoeschen } from "../../dienste";
-import { Button, FormField } from "../bausteine";
-import { Auswahl } from "../bausteine/Auswahl";
-import { CategoryPicker } from "../bausteine/CategoryPicker";
-import { Datumsfeld } from "../bausteine/Datumsfeld";
-import { IconButton, IconLeiste } from "../bausteine/IconButton";
-import { Modal } from "../bausteine/Modal";
-import { fehlerNachricht, useGeld } from "../bausteine/einstellungenKontext";
-import { useLoeschfrage } from "../bausteine/Loeschfrage";
+import { Button, FormField } from ".";
+import { Auswahl } from "./Auswahl";
+import { CategoryPicker } from "./CategoryPicker";
+import { Datumsfeld } from "./Datumsfeld";
+import { IconButton, IconLeiste } from "./IconButton";
+import { Modal } from "./Modal";
+import { fehlerNachricht, useGeld } from "./einstellungenKontext";
+import { useLoeschfrage } from "./Loeschfrage";
 
 /** Die beiden Formen einer Rücklage — die Wahl im Dialog, nicht im Datenmodell. */
 type Form = "ziel" | "rate";

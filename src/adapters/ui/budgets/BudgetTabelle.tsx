@@ -4,10 +4,10 @@
 
 import { useTranslation } from "react-i18next";
 import type { Budgetstand } from "../../../application";
-import { CoverageTrack, DataTable } from ".";
-import { IconButton, IconLeiste } from "./IconButton";
-import { geldFarbe } from "./geldFarbe";
-import { useGeld } from "./einstellungenKontext";
+import { CoverageTrack, DataTable } from "../bausteine";
+import { IconButton, IconLeiste } from "../bausteine/IconButton";
+import { geldFarbe } from "../bausteine/geldFarbe";
+import { useGeld } from "../bausteine/einstellungenKontext";
 
 export function BudgetTabelle({
   zeilen,

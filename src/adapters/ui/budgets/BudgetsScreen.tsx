@@ -27,10 +27,10 @@ import {
 import { budgetbereich, budgetLoeschen, vorschlagIgnorieren } from "../../dienste";
 import { Button, Card, DataTable, KPIStat, Pill } from "../bausteine";
 import { BuchungDetail } from "../buchung/BuchungDetail";
-import { BudgetVerlauf } from "../bausteine/BudgetVerlauf";
-import { BudgetDialog, type BudgetVorbelegung } from "../bausteine/BudgetDialog";
-import { BudgetTabelle } from "../bausteine/BudgetTabelle";
-import { RuecklageDialog, type RuecklageVorbelegung } from "../ruecklagen/RuecklageDialog";
+import { BudgetVerlauf } from "./BudgetVerlauf";
+import { BudgetDialog, type BudgetVorbelegung } from "./BudgetDialog";
+import { BudgetTabelle } from "./BudgetTabelle";
+import { RuecklageDialog, type RuecklageVorbelegung } from "../bausteine/RuecklageDialog";
 import { IconButton, IconLeiste } from "../bausteine/IconButton";
 import { betont } from "../bausteine/betonung";
 import { PageHead } from "../bausteine/PageHead";

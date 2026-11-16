@@ -178,7 +178,8 @@ describe("RuecklagenScreen", () => {
       ziel: 60000, fristMonate: 120,
     });
     rendere(<RuecklagenScreen />);
-    expect(await screen.findByText(/Waschmaschine/)).toBeInTheDocument();
+    // In der Liste und unter „Ohne Konto" in der Karte „Wo das Geld liegt".
+    expect((await screen.findAllByText(/Waschmaschine/)).length).toBeGreaterThan(0);
   });
 });
 

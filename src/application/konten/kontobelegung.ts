@@ -90,6 +90,8 @@ export async function anspruchsbestandLaden(deps: BudgetanspruchDeps): Promise<{
   bestand: Anspruchsbestand;
   /** Mitgegeben für die Hinweise im Dialog einer Rücklage (ein Budget an der Kategorie). */
   budgets: readonly Budget[];
+  /** Die Sicht dahinter — für den Verlauf einer Rücklage und ihre Buchungen je Monat. */
+  sicht: BudgetSicht;
 }> {
   const [buchungen, kategorien, budgets, vertragsBuchungen, rb] = await Promise.all([
     deps.ledger.alle(),
@@ -99,7 +101,7 @@ export async function anspruchsbestandLaden(deps: BudgetanspruchDeps): Promise<{
     ruecklagenbestandLaden(deps.ruecklagenRepo, deps.ruecklagenzuordnungRepo),
   ]);
   const sicht = budgetsichtMit({ buchungen, kategorien, budgets, vertragsBuchungen }, rb);
-  return { bestand: anspruchsbestand(sicht), budgets };
+  return { bestand: anspruchsbestand(sicht), budgets, sicht };
 }
 
 /**

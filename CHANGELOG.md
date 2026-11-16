@@ -40,6 +40,19 @@ im Kontoauszug.
 
 ### Geändert
 
+**Eine Rücklage, eine Liste, ein Dialog.** Was bisher „Rücklage über die Kategorie" hiess,
+ist jetzt eine Rücklage wie jede andere; der Bereich Rücklagen zeigt alle in einer Liste,
+mit Kategorie, Rate, Stand (auch im Minus), bei einem Ziel dem Fortschritt und dem Konto,
+auf dem das Geld liegt. Jede Rücklage **läuft weiter** oder **wird abgeschlossen**; das
+wählst du beim Anlegen. Ein Klick auf den Namen zeigt den Verlauf der letzten zwölf
+Monate. Ausgebucht wird nur eine, die abgeschlossen wird. Jede Rücklage braucht eine
+Kategorie — eine ältere ohne bleibt, wie sie ist, bis du sie bearbeitest. Eine
+geänderte Rate gilt ab dem Monat, den du wählst, wie beim Budget. Unter Budgets stehen nur
+noch Budgets für den Monat; ein Vorschlag „Rücklage" legt dort eine Rücklage an, die
+weiterläuft. Hängen mehrere Rücklagen an derselben Kategorie, warten Buchungen dort ab dem
+Tag, an dem die zweite zu finden beginnt, auf eine Zuordnung. Vergangene Monate rechnen
+wie vorher.
+
 **Eine Rücklage findet ihre Ausgaben über ihre Kategorie.** Ab dem Tag des Updates trägt
 eine Rücklage mit Kategorie jede Ausgabe in dieser Kategorie und ihren Unterkategorien von
 selbst, und was auf ihrem Konto für sie liegen soll, sinkt um das, was sie schon getragen

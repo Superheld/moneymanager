@@ -1,6 +1,6 @@
 // Ein monatliches Budget anlegen oder bearbeiten. Seit Migration 81 gibt es keine andere
 // Art mehr: was sich ansammeln soll, ist eine Rücklage und hat ihren eigenen Dialog
-// (`ruecklagen/RuecklageDialog`). Bis dahin trug dieser Dialog beide Arten, die der
+// (`bausteine/RuecklageDialog`). Bis dahin trug dieser Dialog beide Arten, die der
 // Bereich wählte, aus dem man anlegte.
 //
 // Der Dialog hält seinen eigenen Zustand (wie `RuecklageDialog`); der Screen merkt sich
@@ -11,14 +11,14 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { minorZuMajor, waehlbareKonten, type Budgetstand, type Kategorie, type Zahlungskonto } from "../../../application";
 import { budgetAnlegen as budgetSpeichern, budgetBetragLoeschen } from "../../dienste";
-import { Button, FormField } from ".";
-import { Auswahl } from "./Auswahl";
-import { CategoryPicker } from "./CategoryPicker";
-import { Datumsfeld } from "./Datumsfeld";
-import { IconButton, IconLeiste } from "./IconButton";
-import { Modal } from "./Modal";
-import { useGeld, fehlerNachricht } from "./einstellungenKontext";
-import { useLoeschfrage } from "./Loeschfrage";
+import { Button, FormField } from "../bausteine";
+import { Auswahl } from "../bausteine/Auswahl";
+import { CategoryPicker } from "../bausteine/CategoryPicker";
+import { Datumsfeld } from "../bausteine/Datumsfeld";
+import { IconButton, IconLeiste } from "../bausteine/IconButton";
+import { Modal } from "../bausteine/Modal";
+import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
+import { useLoeschfrage } from "../bausteine/Loeschfrage";
 
 /** Was ein Vorschlag beim Anlegen vorbelegt. */
 export interface BudgetVorbelegung {
