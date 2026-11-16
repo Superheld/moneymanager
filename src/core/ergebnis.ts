@@ -73,7 +73,7 @@ import type { Kategorie } from "./kategorien/kategorie";
 import { istVorsorgekonto, type Zahlungskonto } from "./konten/konto";
 import type { Ruecklage, Ruecklagenzyklus } from "./ruecklagen/ruecklage";
 import { entnahmeIm, ruecklagenart, zyklenpostenIm, type Ruecklagenentnahme, type Zyklusposten } from "./ruecklagen/topf";
-import type { Ruecklagenzuordnung } from "./ruecklagen/zustaendigkeit";
+import type { Ruecklagenzuordnung } from "./ruecklagen/zuordnung";
 import { tilgungIm } from "./vermoegen/tilgung";
 import { wirdGefuehrt, type VermoegensEingabe } from "./vermoegen/vermoegen";
 import { annahmeIm, vorsorgestand, vorsorgevermoegen, type Vorsorgezielannahme } from "./vorsorge/vorsorge";

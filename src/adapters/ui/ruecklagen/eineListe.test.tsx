@@ -118,7 +118,7 @@ describe("Rücklagen — die eine Liste", () => {
     // Vorbelegt der laufende Monat: Übertrag 170,00, Rate +100,00, nichts entnommen.
     expect(document.body.textContent).toMatch(/Übertrag 170,00/);
     // Der Vormonat zeigt die Buchung, die sie getragen hat.
-    await auswahlWaehlen(nutzer, i18n.t("budgets.verlaufMonatWaehlen"), monatVersetzt(-1));
+    await auswahlWaehlen(nutzer, i18n.t("ruecklagen.verlaufMonatWaehlen"), monatVersetzt(-1));
     expect(await screen.findByText(/Quelvin Ersatzteil/)).toBeInTheDocument();
     // Zweiter Klick auf den Namen schliesst ihn wieder.
     await nutzer.click(screen.getByRole("button", { name: i18n.t("ruecklagen.verlaufZu", { name: "Tellwick" }) }));
@@ -139,7 +139,7 @@ describe("Rücklagen — der eine Dialog", () => {
     expect(screen.getByLabelText(i18n.t("ruecklagen.feldSorte")).textContent).toBe(i18n.t("ruecklagen.sorte.fortlaufend"));
     // Die Reihe der Raten, mit dem Monat, ab dem sie gilt.
     expect(screen.getByText(i18n.t("ruecklagen.ratenTitel"))).toBeInTheDocument();
-    expect(screen.getByText(i18n.t("budgets.versionAb", { monat: monatVersetzt(-2) }))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t("ruecklagen.rateAb", { monat: monatVersetzt(-2) }))).toBeInTheDocument();
 
     // Eine geänderte Rate gilt ab dem laufenden Monat; die Monate davor behalten ihre.
     const rate = screen.getByLabelText(/^Rate im Monat/);

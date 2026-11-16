@@ -38,7 +38,8 @@ import { vormerkungslast, type Vormerkung } from "./vormerkung";
 import { realerKontostand, type IstBuchung } from "../buchung/istbuchung";
 import { projiziereRegel } from "../buchung/projektion";
 import type { Zahlungsregel } from "../basis/zahlungsregel";
-import { betragImMonat, budgetStand, type Budget, type BudgetSicht } from "../budgets/budget";
+import { betragImMonat, budgetStand, type Budget } from "../budgets/budget";
+import type { Zustaendigkeitssicht } from "../zustaendigkeit";
 import { istAktiv, type Zahlungskonto } from "./konto";
 
 export interface Verlaufsbefund {
@@ -65,7 +66,7 @@ export interface LiquiditaetsEingabe {
   readonly buchungen: readonly IstBuchung[];
   readonly regeln: readonly Zahlungsregel[];
   /** Für den Budgetanteil der erwarteten Linie. Ohne sie sind beide Linien gleich. */
-  readonly budgetsicht?: BudgetSicht;
+  readonly budgetsicht?: Zustaendigkeitssicht;
   /**
    * Was die Bank kennt und noch nicht gebucht hat. Fließt in BEIDE Linien ein, und zwar
    * in die feste zuerst.
@@ -127,7 +128,7 @@ function feste(
  */
 function budgetlast(
   kontoId: string,
-  sicht: BudgetSicht | undefined,
+  sicht: Zustaendigkeitssicht | undefined,
   heute: string,
 ): (datum: string) => Cent {
   if (!sicht) return () => 0;

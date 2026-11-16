@@ -15,7 +15,7 @@ import { useTranslation } from "react-i18next";
 import {
   budgetzeilenImMonat,
   budgetVerlauf,
-  type BudgetSicht,
+  type Zustaendigkeitssicht,
   type Budgetstand,
   type IstBuchung,
   type Zeilenkontext,
@@ -25,11 +25,11 @@ import { Auswahl } from "../bausteine/Auswahl";
 import { Buchungsliste } from "../bausteine/Buchungsliste";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { useGeld } from "../bausteine/einstellungenKontext";
-import { BudgetVerlaufChart } from "../bausteine/BudgetVerlaufChart";
+import { VerlaufChart } from "../bausteine/VerlaufChart";
 import { Collapsible } from "@base-ui/react/collapsible";
 
 interface Props {
-  sicht: BudgetSicht;
+  sicht: Zustaendigkeitssicht;
   stand: Budgetstand;
   /** Heute als ISO — der Verlauf endet im Monat dieses Datums. */
   heute: string;
@@ -97,7 +97,7 @@ export function BudgetVerlauf({ sicht, stand, heute, zeilenkontext, onSchliessen
         </span>
       }
     >
-      <BudgetVerlaufChart
+      <VerlaufChart
         monate={monate}
         art="monatlich"
         aktivIndex={gewaehlt}

@@ -174,3 +174,299 @@ describe("Schichtgrenzen", () => {
     expect(ueberfluessig).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Modulgrenzen — welcher Bereich welchen anderen nicht kennt
+// ---------------------------------------------------------------------------
+//
+// Die Schichtgrenzen oben sagen, in welche RICHTUNG eine Schicht blickt. Innerhalb einer
+// Schicht liegen die Bereiche nebeneinander (`core/budgets/`, `core/ruecklagen/` …), und
+// zwischen ihnen gibt es Richtungen, die gelten sollen, ohne dass der Compiler sie kennt.
+// Hier stehen sie als Daten: ein Eintrag „A kennt B nicht" gilt in Kern, Anwendung und
+// Oberfläche zugleich, mit denselben Bereichsnamen — sie heissen in allen drei Schichten
+// gleich, und genau dafür (Wurzel-`CLAUDE.md`, „Wie die Schichten innen gegliedert sind").
+//
+// Was BEIDE gegeneinander abwägt, gehört keinem von beiden, sondern in die Wurzel der
+// Schicht (`core/zustaendigkeit.ts`). Die Wurzel ist deshalb von jeder Grenze ausgenommen:
+// sie kennt beide Seiten, und das ist ihre Aufgabe.
+
+interface Modulgrenze {
+  /** Der Bereich, für den die Regel gilt. */
+  readonly bereich: string;
+  /** Der Bereich, den er nicht kennen darf — weder Code noch Texte. */
+  readonly kenntNicht: string;
+}
+
+/**
+ * Die Grenzen, die gelten. Eine neue Richtung ist eine Zeile hier.
+ *
+ * - **Rücklagen kennen keine Budgets** (2026-11-16). Ein Budget zählt „ohne die Rücklage
+ *   auf seiner Unterkategorie" und muss deshalb von ihr wissen; eine Rücklage braucht für
+ *   ihren Stand kein Budget. Wo das Budget doch mitspricht — am selben Knoten gewinnt es —,
+ *   ist das eine Abwägung zwischen beiden und steht in der Zuständigkeit in der Wurzel.
+ */
+const MODULGRENZEN: readonly Modulgrenze[] = [{ bereich: "ruecklagen", kenntNicht: "budgets" }];
+
+/** Die Schichten, die nach Bereichen gegliedert sind. */
+const SCHICHTEN_MIT_BEREICHEN: readonly string[] = ["core", "application", "adapters/ui"];
+
+/**
+ * Verstösse gegen eine Modulgrenze, die (noch) bleiben dürfen — als `datei → ziel`.
+ *
+ * **Sie ist leer**, und es gilt dasselbe wie bei der ALTLAST oben: ein Eintrag braucht einen
+ * Grund daneben, und ein Eintrag, der nichts mehr verletzt, macht den Test unten rot.
+ */
+const MODUL_ALTLAST: readonly string[] = [];
+
+/** Pfad relativ zu `src/`, immer mit `/` — damit die Altlast auf jeder Plattform gleich aussieht. */
+const pfadname = (d: string) => kurz(d).split(/[\\/]/).join("/");
+
+/** Der Bereich einer Datei innerhalb ihrer Schicht — `undefined` für die Wurzel der Schicht. */
+function bereich(datei: string): string | undefined {
+  const s = schicht(datei);
+  if (!SCHICHTEN_MIT_BEREICHEN.includes(s)) return undefined;
+  const teile = relative(join(WURZEL, s), datei).split(/[\\/]/);
+  return teile.length > 1 ? teile[0] : undefined;
+}
+
+/** Ein relativer Importpfad als Datei — wie TypeScript ihn auflöst, soweit es hier vorkommt. */
+function aufloesen(von: string, pfad: string): string | undefined {
+  const basis = resolve(dirname(von), pfad);
+  for (const k of [basis, `${basis}.ts`, `${basis}.tsx`, join(basis, "index.ts"), join(basis, "index.tsx")]) {
+    try {
+      if (statSync(k).isFile()) return k;
+    } catch {
+      // gibt es nicht — nächster Kandidat
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Der Quelltext ohne ganze Kommentarzeilen und ohne Blockkommentare am Zeilenanfang.
+ * Nötig, weil die Fassaden ihre Listen kommentieren — ein „(`budgetStand`, …)" darin ist
+ * kein Export. Kommentare HINTER Code bleiben stehen; sie kommen in Importlisten nicht vor.
+ */
+function ohneKommentare(quelle: string): string {
+  return quelle.replace(/^\s*\/\*[\s\S]*?\*\//gm, "").replace(/^\s*\/\/.*$/gm, "");
+}
+
+/** Die Namen in einer Liste `{ a, type B, c as d }` — je Eintrag [Name dort, Name hier]. */
+function namensliste(liste: string): [string, string][] {
+  return liste
+    .split(",")
+    .map((t) => t.trim().replace(/^type\s+/, ""))
+    .filter((t) => t.length > 0)
+    .map((t) => {
+      const [dort, hier] = t.split(/\s+as\s+/);
+      return [dort.trim(), (hier ?? dort).trim()];
+    });
+}
+
+const importeJeDatei = new Map<string, { ziel: string; namen: string[] }[]>();
+
+/** Die relativen Importe einer Datei, je Ziel die benannten Namen (die Namen DORT). */
+function importe(datei: string): { ziel: string; namen: string[] }[] {
+  const gemerkt = importeJeDatei.get(datei);
+  if (gemerkt) return gemerkt;
+  const quelle = ohneKommentare(readFileSync(datei, "utf8"));
+  const raus: { ziel: string; namen: string[] }[] = [];
+  importeJeDatei.set(datei, raus);
+  for (const [, klausel, pfad] of quelle.matchAll(/\bimport\s+([^;]*?)\s*from\s*"([^"]+)"/g)) {
+    if (!pfad.startsWith(".")) continue;
+    const ziel = aufloesen(datei, pfad);
+    if (!ziel) continue;
+    const liste = /\{([^}]*)\}/.exec(klausel)?.[1] ?? "";
+    raus.push({ ziel, namen: namensliste(liste).map(([dort]) => dort) });
+  }
+  return raus;
+}
+
+const herkunftJeDatei = new Map<string, Map<string, string>>();
+
+/**
+ * Woher jeder Name kommt, den eine Datei exportiert: aus ihr selbst oder — über
+ * `export … from` und `export * from` — aus der Datei, die ihn DEKLARIERT.
+ *
+ * Ohne das sähe die Regel nur die Hälfte: Anwendung und Oberfläche importieren nie aus
+ * einzelnen Kerndateien, sondern aus den Fassaden (`core/index.ts`, `application/index.ts`).
+ * Ein Typ aus `core/budgets/` käme dort als Import von „core" an und keinem Bereich
+ * zu — und eine Rücklage, die ihn benutzt, liefe grün durch.
+ */
+function exportHerkunft(datei: string, unterwegs = new Set<string>()): Map<string, string> {
+  const gemerkt = herkunftJeDatei.get(datei);
+  if (gemerkt) return gemerkt;
+  const raus = new Map<string, string>();
+  if (unterwegs.has(datei)) return raus;
+  unterwegs.add(datei);
+  const quelle = ohneKommentare(readFileSync(datei, "utf8"));
+  const deklariert =
+    /\bexport\s+(?:declare\s+)?(?:default\s+)?(?:async\s+)?(?:abstract\s+)?(?:function\*?|const|let|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/g;
+  for (const [, name] of quelle.matchAll(deklariert)) raus.set(name, datei);
+  for (const [, liste, pfad] of quelle.matchAll(/\bexport\s+(?:type\s+)?\{([^}]*)\}\s*from\s*"([^"]+)"/g)) {
+    const ziel = pfad.startsWith(".") ? aufloesen(datei, pfad) : undefined;
+    if (!ziel) continue;
+    const dort = exportHerkunft(ziel, unterwegs);
+    for (const [name, hier] of namensliste(liste)) raus.set(hier, dort.get(name) ?? ziel);
+  }
+  for (const [, pfad] of quelle.matchAll(/\bexport\s+(?:type\s+)?\*\s+from\s*"([^"]+)"/g)) {
+    const ziel = pfad.startsWith(".") ? aufloesen(datei, pfad) : undefined;
+    if (!ziel) continue;
+    for (const [name, herkunft] of exportHerkunft(ziel, unterwegs)) if (!raus.has(name)) raus.set(name, herkunft);
+  }
+  herkunftJeDatei.set(datei, raus);
+  return raus;
+}
+
+const DIENSTE = join(WURZEL, "adapters", "dienste.ts");
+
+/**
+ * Was eine Funktion aus `adapters/dienste.ts` aufruft: die Dateien, aus denen die Namen in
+ * ihrem Rumpf stammen. Die Oberfläche ruft Use-Cases nicht selbst, sondern über diese
+ * Verdrahtung — ohne den Blick hinein wäre „ruft einen Use-Case der Budgets auf" für die
+ * Regel nur „importiert aus dienste".
+ *
+ * Der Rumpf reicht bis zur nächsten Zeile, die am Rand mit `export`, `function`, `const`
+ * oder einem Kommentar beginnt; so ist die Datei gebaut. Gezählt werden nur Namen, die
+ * `dienste` selbst importiert — Repositories und Konstanten zählen nicht.
+ */
+function dienstHerkunft(name: string): string[] {
+  const quelle = readFileSync(DIENSTE, "utf8");
+  const zeilen = quelle.split("\n");
+  const start = zeilen.findIndex((z) => new RegExp(`^export\\s+(?:async\\s+)?function\\s+${name}\\b`).test(z));
+  if (start < 0) return [DIENSTE];
+  let ende = start + 1;
+  while (ende < zeilen.length && !/^(export|function|async|const|let|\/\/|\/\*)/.test(zeilen[ende])) ende++;
+  const rumpf = zeilen.slice(start, ende).join("\n");
+  const raus = new Set<string>();
+  for (const [, liste, pfad] of ohneKommentare(quelle).matchAll(/\bimport\s+(?:type\s+)?\{([^}]*)\}\s*from\s*"([^"]+)"/g)) {
+    const ziel = pfad.startsWith(".") ? aufloesen(DIENSTE, pfad) : undefined;
+    if (!ziel) continue;
+    // Gesucht wird der Name, unter dem `dienste` ihn führt — bei `budgetLoeschen as
+    // budgetLoeschenUseCase` der zweite —, zurückverfolgt wird der erste.
+    for (const [dort, hier] of namensliste(liste)) {
+      if (new RegExp(`\\b${hier}\\b`).test(rumpf)) raus.add(exportHerkunft(ziel).get(dort) ?? ziel);
+    }
+  }
+  return [...raus];
+}
+
+/**
+ * Jede Datei, aus der eine Datei etwas bezieht, bis zu ihrem Ursprung verfolgt: direkt,
+ * über eine Fassade (`index.ts`) bis zur deklarierenden Datei, über `dienste` bis zu den
+ * Use-Cases dahinter.
+ */
+function bezuege(datei: string): string[] {
+  const raus = new Set<string>();
+  for (const { ziel, namen } of importe(datei)) {
+    if (ziel === DIENSTE) {
+      for (const n of namen) for (const h of dienstHerkunft(n)) raus.add(h);
+    } else if (/[\\/]index\.tsx?$/.test(ziel)) {
+      const herkunft = exportHerkunft(ziel);
+      for (const n of namen) raus.add(herkunft.get(n) ?? ziel);
+      if (namen.length === 0) raus.add(ziel);
+    } else {
+      raus.add(ziel);
+    }
+  }
+  return [...raus];
+}
+
+/** Steht in der Datei ein i18n-Schlüssel aus dem Namensraum `bereich.`? In jeder Form. */
+function schluesselAus(datei: string, namensraum: string): string[] {
+  const quelle = readFileSync(datei, "utf8");
+  return [...quelle.matchAll(new RegExp(`["'\`](${namensraum}\\.[\\w.]+)`, "g"))].map((m) => m[1]);
+}
+
+const UI_BAUSTEINE = join(WURZEL, "adapters", "ui", "bausteine");
+
+/** Die Bereiche der Oberfläche, die eine Datei aus `bausteine/` direkt importieren — gemessen. */
+function nutzerBereiche(baustein: string): Set<string> {
+  const raus = new Set<string>();
+  for (const d of DATEIEN) {
+    if (schicht(d) !== "adapters/ui") continue;
+    const b = bereich(d);
+    if (!b || b === "bausteine") continue;
+    if (importe(d).some((i) => i.ziel === baustein)) raus.add(b);
+  }
+  return raus;
+}
+
+function modulverstoesse(g: Modulgrenze): string[] {
+  const raus = new Set<string>();
+  for (const d of DATEIEN) {
+    if (bereich(d) !== g.bereich) continue;
+    for (const z of bezuege(d)) if (bereich(z) === g.kenntNicht) raus.add(`${pfadname(d)} → ${pfadname(z)}`);
+  }
+  return [...raus].sort();
+}
+
+describe("Modulgrenzen", () => {
+  // Wie oben: eine Regel, die nichts sieht, ist grün. Hier gibt es mehr Stellen, an denen
+  // sie blind werden kann — die Bereichsordner, die Fassaden, `dienste`, die Bausteine,
+  // das Suchmuster der Schlüssel —, und jede wird einzeln geprüft.
+  it("sieht überhaupt etwas — Bereiche, Fassaden, dienste, Bausteine, Schlüssel", () => {
+    const blind: string[] = [];
+    for (const g of MODULGRENZEN) {
+      for (const s of SCHICHTEN_MIT_BEREICHEN) {
+        for (const b of [g.bereich, g.kenntNicht]) {
+          if (!DATEIEN.some((d) => schicht(d) === s && bereich(d) === b)) blind.push(`keine Datei in ${s}/${b}`);
+        }
+      }
+      for (const fassade of [join(WURZEL, "core", "index.ts"), join(WURZEL, "application", "index.ts")]) {
+        if (![...exportHerkunft(fassade).values()].some((h) => bereich(h) === g.kenntNicht)) {
+          blind.push(`${pfadname(fassade)} führt keinen Namen auf ${g.kenntNicht} zurück`);
+        }
+      }
+      const dienstNamen = [...exportHerkunft(DIENSTE).keys()];
+      if (!dienstNamen.some((n) => dienstHerkunft(n).some((h) => bereich(h) === g.kenntNicht))) {
+        blind.push(`keine Funktion in dienste führt auf ${g.kenntNicht} zurück`);
+      }
+      const bausteine = DATEIEN.filter((d) => dirname(d) === UI_BAUSTEINE);
+      if (!bausteine.some((b) => nutzerBereiche(b).has(g.bereich))) blind.push(`kein Baustein wird von ${g.bereich} benutzt`);
+      const ui = DATEIEN.filter((d) => schicht(d) === "adapters/ui" && bereich(d) === g.kenntNicht);
+      if (!ui.some((d) => schluesselAus(d, g.kenntNicht).length > 0)) blind.push(`kein Schlüssel ${g.kenntNicht}.… gefunden`);
+    }
+    expect(blind).toEqual([]);
+  });
+
+  // Geprüft wird jeder Bezug einer Produktivdatei des Bereichs — über alle Schichten
+  // hinweg: auch eine Rücklage der Anwendung, die einen Typ aus `core/budgets/` über die
+  // Fassade holt, kennt Budgets.
+  it("ein Bereich bezieht nichts aus einem Bereich, den er nicht kennen darf", () => {
+    const verstoesse = MODULGRENZEN.flatMap(modulverstoesse).filter((v) => !MODUL_ALTLAST.includes(v));
+    expect(verstoesse).toEqual([]);
+  });
+
+  // Die Oberfläche eines Bereichs benutzt keine Texte aus dem Namensraum des anderen —
+  // auch nicht, wo sie gleich lauten. Ein geteilter Schlüssel ändert sich sonst im einen
+  // Bereich und mit ihm still im anderen.
+  it("die Oberfläche eines Bereichs benutzt keine Schlüssel des anderen", () => {
+    const verstoesse = MODULGRENZEN.flatMap((g) =>
+      DATEIEN.filter((d) => schicht(d) === "adapters/ui" && bereich(d) === g.bereich).flatMap((d) =>
+        schluesselAus(d, g.kenntNicht).map((k) => `${pfadname(d)} → ${k}`),
+      ),
+    );
+    expect(verstoesse).toEqual([]);
+  });
+
+  // Ein Baustein, den ein Bereich benutzt, ist für die Dauer dieser Nutzung ein Teil von
+  // ihm: was er nicht kennen darf, darf der Baustein auch nicht — weder Code noch Texte.
+  // Geprüft wird, wer ihn DIREKT importiert; ein Baustein in einem Baustein erbt das nicht.
+  it("ein Baustein trägt keinen Bereich in einen anderen", () => {
+    const verstoesse: string[] = [];
+    for (const g of MODULGRENZEN) {
+      for (const b of DATEIEN.filter((d) => dirname(d) === UI_BAUSTEINE)) {
+        if (!nutzerBereiche(b).has(g.bereich)) continue;
+        for (const k of schluesselAus(b, g.kenntNicht)) verstoesse.push(`${pfadname(b)} → ${k}`);
+        for (const z of bezuege(b)) if (bereich(z) === g.kenntNicht) verstoesse.push(`${pfadname(b)} → ${pfadname(z)}`);
+      }
+    }
+    expect(verstoesse).toEqual([]);
+  });
+
+  it("die Altlast der Modulgrenzen enthält nur, was wirklich noch verletzt", () => {
+    const alle = new Set(MODULGRENZEN.flatMap(modulverstoesse));
+    expect(MODUL_ALTLAST.filter((v) => !alle.has(v))).toEqual([]);
+  });
+});

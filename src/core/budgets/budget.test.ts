@@ -14,8 +14,8 @@ import {
   verbrauchsFenster,
   zufuehrungIm,
   type Budget,
-  type BudgetSicht,
 } from "./budget";
+import type { Zustaendigkeitssicht } from "../zustaendigkeit";
 import type { IstBuchung } from "../buchung/istbuchung";
 import type { Kategorie } from "../kategorien/kategorie";
 
@@ -110,7 +110,7 @@ describe("Verschachtelung", () => {
 });
 
 /**
- * Eine `BudgetSicht` fürs Testen. `vertragsBuchungen` ist im Kern Pflicht — hier meist
+ * Eine `Zustaendigkeitssicht` fürs Testen. `vertragsBuchungen` ist im Kern Pflicht — hier meist
  * leer, weil die allermeisten Fälle nichts mit Verträgen zu tun haben; die Fälle, die es
  * tun, setzen sie ausdrücklich.
  */
@@ -118,7 +118,7 @@ function sicht(
   buchungen: readonly IstBuchung[],
   budgets: readonly Budget[],
   vertragsBuchungen: ReadonlySet<string> = new Set(),
-): BudgetSicht {
+): Zustaendigkeitssicht {
   return { buchungen, kategorien: BAUM, budgets, vertragsBuchungen };
 }
 

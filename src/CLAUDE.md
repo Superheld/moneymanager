@@ -49,7 +49,7 @@ Die Rolle übernehmen bis dahin drei andere:
   `noFallthroughCasesInSwitch` sind an. `npm run typecheck` muss grün sein.
   `lib` steht auf ES2020 — `Array.prototype.at`, `findLast` und Verwandte gibt es hier
   nicht. Ein Testlauf verschweigt das (Vitest transpiliert ohne Typprüfung), `tsc` nicht.
-- **Tests als Wächter.** `architektur.test.ts` (Schichtgrenzen), `doku.test.ts`
+- **Tests als Wächter.** `architektur.test.ts` (Schicht- und Modulgrenzen), `doku.test.ts`
   (Verweise in der Doku), `privatsphaere.test.ts` (keine IBAN einer echten Bank), der i18n-Test
   (de/en-Parität). Eine Regel, die zählt, wird ausführbar gemacht statt aufgeschrieben.
 - **Das LSP** (`typescript-lsp`, aktiviert in `.claude/settings.json`) liefert dieselben

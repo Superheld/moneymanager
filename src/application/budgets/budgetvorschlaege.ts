@@ -9,11 +9,12 @@
 //
 // Der Merkzettel `budgetvorschlag.ignoriert` ist älter als die Trennung. Was darin
 // steht, wurde womöglich als Rücklage verworfen; der Bereich Rücklagen liest ihn deshalb
-// mit, schreibt aber nur seinen eigenen.
+// mit, schreibt aber nur seinen eigenen. Der Schlüssel steht darum in der Wurzel
+// (`../ausgabenvorschlaege.ts`), nicht hier.
 
 import { ignorierenVermerken, ignorierteLesen } from "../einstellungen";
 import type { Budgetvorschlag, Ruecklage } from "../../core";
-import { ausgabenvorschlaegeLaden, ohneVerworfene } from "../ausgabenvorschlaege";
+import { ausgabenvorschlaegeLaden, ohneVerworfene, SCHLUESSEL_BUDGETVORSCHLAG_IGNORIERT } from "../ausgabenvorschlaege";
 import type {
   BudgetRepository,
   EinstellungenRepository,
@@ -22,9 +23,6 @@ import type {
   UmsatzRepository,
   VertragszuordnungRepository,
 } from "../ports";
-
-/** Exportiert, weil der Bereich Rücklagen ihn mitliest (Kopf der Datei). */
-export const SCHLUESSEL_BUDGETVORSCHLAG_IGNORIERT = "budgetvorschlag.ignoriert";
 
 export async function ignorierteBudgetvorschlaege(
   repo: EinstellungenRepository,

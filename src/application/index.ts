@@ -127,7 +127,6 @@ export {
   budgetzeilenZu,
   budgetzeilenImMonat,
   budgetVerlauf,
-  vertragsBuchungenLaden,
   type Budgetstand,
   type Budgetuebersicht,
   type BudgetsichtDeps,
@@ -190,6 +189,7 @@ export {
   zuordnungenAbgleichen,
   zuordnungVonHand,
   vertragsnamenLaden,
+  vertragsBuchungenLaden,
   type Sammelziel,
 } from "./vertraege/vertragszuordnung";
 export { vorschlagIgnorieren as vertragsvorschlagIgnorieren } from "./vertraege/vertragsvorschlaege";

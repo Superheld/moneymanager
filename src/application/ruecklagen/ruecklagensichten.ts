@@ -29,8 +29,8 @@ import {
   abschlussstaende,
   type Abschlussstand,
   type Ruecklagenentnahme,
-  type Budgetmonat,
-  type BudgetSicht,
+  type Fortschreibungsmonat,
+  type Zustaendigkeitssicht,
   type Ruecklagenart,
   type Cent,
   type IstBuchung,
@@ -309,7 +309,7 @@ export interface Ruecklagensicht {
   /** Die eine Liste des Bereichs, in der Reihenfolge der Rücklagen (nach Name). */
   readonly zeilen: readonly Ruecklagenzeile[];
   /** Die Sicht hinter Stand und Entnahmen — für den Verlauf einer Rücklage. */
-  readonly verlaufsicht: BudgetSicht;
+  readonly verlaufsicht: Zustaendigkeitssicht;
   /** Was die Buchungszeilen eines Monats im Verlauf brauchen. */
   readonly zeilenkontext: Zeilenkontext;
   readonly konten: readonly Zahlungskonto[];
@@ -522,10 +522,10 @@ export async function ruecklagenLaden(
 /**
  * Der Verlauf einer Rücklage: die letzten `anzahl` Monate bis einschliesslich des Monats von
  * `heute`, jeder als Fortschreibung (Übertrag, Rate, Entnahmen, Rest) — dieselbe Form wie
- * beim Budget (`Budgetmonat`), für JEDE Rücklage. Bis Paket 4 hatte das nur das aufbauende
+ * beim Budget (`Fortschreibungsmonat`), für JEDE Rücklage. Bis Paket 4 hatte das nur das aufbauende
  * Budget. Rein und ohne Ladevorgang: gerechnet wird gegen dieselbe Sicht wie die Liste.
  */
-export function ruecklagenVerlauf(s: Pick<Ruecklagensicht, "verlaufsicht">, r: Ruecklage, heute: string, anzahl = 12): Budgetmonat[] {
+export function ruecklagenVerlauf(s: Pick<Ruecklagensicht, "verlaufsicht">, r: Ruecklage, heute: string, anzahl = 12): Fortschreibungsmonat[] {
   const { vonMonat, bisMonat } = verlaufsfenster(heute, anzahl);
   const entnahmen = ruecklagenEntnahmenAus(s.verlaufsicht).get(r.id) ?? [];
   return ruecklagenFortschreibung(r, s.verlaufsicht.ausbuchungen ?? [], entnahmen, vonMonat, bisMonat);
@@ -538,7 +538,7 @@ export function ruecklagenVerlauf(s: Pick<Ruecklagensicht, "verlaufsicht">, r: R
 export function ruecklagenzeilenImMonat(
   s: Pick<Ruecklagensicht, "verlaufsicht" | "zeilenkontext">,
   r: Ruecklage,
-  monat: Budgetmonat,
+  monat: Fortschreibungsmonat,
 ): readonly Buchungszeile[] {
   return getrageneBuchungen(s.verlaufsicht, r.id, monat.von, monat.bis).map((p) =>
     buchungszeile(p.buchung, -p.betrag, p.kategorieId, s.zeilenkontext),

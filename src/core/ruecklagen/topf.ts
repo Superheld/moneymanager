@@ -21,7 +21,7 @@
 
 import { addMonate, addTage, parseIso, toIso } from "../basis/datum";
 import type { Cent } from "../basis/geld";
-import type { Budgetmonat } from "../budgets/budgetverlauf";
+import type { Fortschreibungsmonat } from "../fortschreibung";
 import { hatGeschichte, type Ruecklage, type Ruecklagenart, type Ruecklagenrate, type Ruecklagenzyklus } from "./ruecklage";
 
 /** Die Sorte einer Rücklage; ohne Angabe `abschliessend`, wie jede vor Migration 79. */
@@ -442,7 +442,7 @@ export function ruecklagenstand(
  * Eine Rücklage Monat für Monat: Übertrag aus dem Vormonat, plus was in diesem Monat
  * zurückgelegt wurde, minus was sie getragen hat, ergibt den Rest — die Fortschreibung,
  * die bis Migration 81 das aufbauende Budget hatte (`budgetFortschreibung`), jetzt für
- * JEDE Rücklage und in derselben Form (`Budgetmonat`).
+ * JEDE Rücklage und in derselben Form (`Fortschreibungsmonat`).
  *
  * Der Rest am Ende eines Monats ist der Stand am letzten Tag (`ruecklagenstand`), je
  * Sorte wie dort: bei einer abschliessenden kommt die Rate eines Monats erst im Folgemonat
@@ -467,7 +467,7 @@ export function ruecklagenFortschreibung(
   entnahmen: readonly Ruecklagenentnahme[],
   vonMonat: string,
   bisMonat: string,
-): Budgetmonat[] {
+): Fortschreibungsmonat[] {
   // Ein Zyklus ohne bekannte Geschichte trägt nichts und kostet nichts (`Zyklus.beginn`).
   const zs = zyklen(r, abschluesse).filter((z): z is Zyklus & { beginn: string } => !!z.beginn);
   if (zs.length === 0) return [];
@@ -481,7 +481,7 @@ export function ruecklagenFortschreibung(
 
   const erster = monatVon(zs[0].beginn);
   const start = erster > vonMonat ? erster : vonMonat;
-  const raus: Budgetmonat[] = [];
+  const raus: Fortschreibungsmonat[] = [];
   let letzteZufuehrung: Cent | undefined;
   for (let m = start; m <= bisMonat; m = monatVerschoben(m, 1)) {
     const vormonat = monatVerschoben(m, -1);

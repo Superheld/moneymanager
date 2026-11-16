@@ -1,4 +1,4 @@
-// BudgetVerlaufChart — je Monat ein Balken für das, was abgeflossen ist, und dahinter
+// VerlaufChart — je Monat ein Balken für das, was abgeflossen ist, und dahinter
 // eine Linie für das, was verfügbar war. Die Linie hat zwei Formen — für ein Budget und
 // für eine Rücklage, die den Verlauf seit Migration 81 mit ihm teilt (vorher das
 // aufbauende Budget):
@@ -27,14 +27,20 @@
 // Der Verbrauch kann NEGATIV werden (ein Monat, in dem eine Erstattung die Ausgaben
 // überwiegt). Solche Monate wachsen nach unten statt auf null geklemmt zu werden: ein
 // leerer Balken hiesse „nichts ausgegeben", und das wäre eine andere Aussage.
+//
+// **Seine Texte stehen unter `verlaufChart.*`, nicht unter `budgets.*`** (seit
+// 2026-11-16, Wortlaut unverändert; bis dahin hiess er `BudgetVerlaufChart`). Ein
+// Baustein, den beide Bereiche benutzen, trägt keinen davon in den anderen — sonst zeigte
+// der Bereich Rücklagen Texte, die im Bereich Budgets geändert werden
+// (`src/architektur.test.ts`, „Modulgrenzen").
 
 import { useTranslation } from "react-i18next";
-import type { Budgetmonat } from "../../../application";
+import type { Fortschreibungsmonat } from "../../../application";
 import { useGeld } from "./einstellungenKontext";
 import { flussFarbe, warnFlaeche } from "./geldFarbe";
 
 interface Props {
-  monate: readonly Budgetmonat[];
+  monate: readonly Fortschreibungsmonat[];
   /** Entscheidet die Form der Linie hinter den Balken — Grenze oder Stand. */
   art: "monatlich" | "ruecklage";
   width?: number;
@@ -44,7 +50,7 @@ interface Props {
   aktivIndex?: number | null;
 }
 
-export function BudgetVerlaufChart({ monate, art, width = 1000, height = 220, onMonatClick, aktivIndex }: Props) {
+export function VerlaufChart({ monate, art, width = 1000, height = 220, onMonatClick, aktivIndex }: Props) {
   const { t } = useTranslation();
   const geld = useGeld();
   const padL = 60;
@@ -60,7 +66,7 @@ export function BudgetVerlaufChart({ monate, art, width = 1000, height = 220, on
   // das soll er, sonst sähe „Rahmen genau ausgeschöpft" aus wie „Rahmen gerissen".
   const oben = Math.max(1, ...monate.map((m) => Math.max(m.verfuegbar, m.verbraucht)));
   /** Wo die Linie im Monat steht: beim Monatlichen die Grenze, beim Aufbauenden der Stand nach dem Monat. */
-  const linienwert = (m: Budgetmonat) => Math.max(0, art === "ruecklage" ? m.rest : m.verfuegbar);
+  const linienwert = (m: Fortschreibungsmonat) => Math.max(0, art === "ruecklage" ? m.rest : m.verfuegbar);
   const unten = Math.min(0, ...monate.map((m) => m.verbraucht));
   const spanne = oben - unten;
   const y = (v: number) => padT + ((oben - v) / spanne) * innerH;
@@ -136,8 +142,8 @@ export function BudgetVerlaufChart({ monate, art, width = 1000, height = 220, on
                   Minusbetrag liest sich trotzdem als ausgegeben — das Wort gewinnt gegen
                   das Vorzeichen. Also das Wort wechseln und den Betrag ohne zeigen. */}
               <title>{m.ohnePlan
-                ? `${m.monat} · ${t(m.verbraucht < 0 ? "budgets.verlaufOhnePlanKurzZurueck" : "budgets.verlaufOhnePlanKurz", { verbraucht: geld.formatMitSymbol(Math.abs(m.verbraucht)) })}`
-                : `${m.monat} · ${t(m.verbraucht < 0 ? "budgets.verlaufTooltipZurueck" : "budgets.verlaufTooltip", {
+                ? `${m.monat} · ${t(m.verbraucht < 0 ? "verlaufChart.ohnePlanKurzZurueck" : "verlaufChart.ohnePlanKurz", { verbraucht: geld.formatMitSymbol(Math.abs(m.verbraucht)) })}`
+                : `${m.monat} · ${t(m.verbraucht < 0 ? "verlaufChart.tooltipZurueck" : "verlaufChart.tooltip", {
                     verfuegbar: geld.formatMitSymbol(m.verfuegbar),
                     verbraucht: geld.formatMitSymbol(Math.abs(m.verbraucht)),
                     rest: geld.formatMitSymbol(m.rest),
@@ -176,14 +182,14 @@ export function BudgetVerlaufChart({ monate, art, width = 1000, height = 220, on
         })}
       </svg>
       <div style={{ display: "flex", gap: "var(--sp-5)", marginTop: "var(--sp-2)", fontSize: "var(--fs-sm)", color: "var(--ink-2)", flexWrap: "wrap" }}>
-        <span><span style={{ display: "inline-block", width: 14, height: 2, borderRadius: 1, background: "var(--accent-deep)", verticalAlign: "middle", marginRight: 6 }} />{t(art === "monatlich" ? "budgets.legendeRahmen" : "budgets.legendeStand")}</span>
-        <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "var(--ink)", opacity: 0.78, verticalAlign: "middle", marginRight: 6 }} />{t("budgets.legendeVerbraucht")}</span>
-        <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: warnFlaeche(true), verticalAlign: "middle", marginRight: 6 }} />{t("budgets.legendeUeberzogen")}</span>
+        <span><span style={{ display: "inline-block", width: 14, height: 2, borderRadius: 1, background: "var(--accent-deep)", verticalAlign: "middle", marginRight: 6 }} />{t(art === "monatlich" ? "verlaufChart.legendeRahmen" : "verlaufChart.legendeStand")}</span>
+        <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "var(--ink)", opacity: 0.78, verticalAlign: "middle", marginRight: 6 }} />{t("verlaufChart.legendeVerbraucht")}</span>
+        <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: warnFlaeche(true), verticalAlign: "middle", marginRight: 6 }} />{t("verlaufChart.legendeUeberzogen")}</span>
         {monate.some((m) => m.ohnePlan) && (
-          <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "var(--ink)", opacity: 0.3, verticalAlign: "middle", marginRight: 6 }} />{t("budgets.legendeOhnePlan")}</span>
+          <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "var(--ink)", opacity: 0.3, verticalAlign: "middle", marginRight: 6 }} />{t("verlaufChart.legendeOhnePlan")}</span>
         )}
         {monate.some((m) => m.zufuehrungVorher != null) && (
-          <span><span style={{ display: "inline-block", width: 2, height: 11, background: "var(--accent-deep)", verticalAlign: "middle", marginRight: 8, marginLeft: 4 }} />{t("budgets.legendeAenderung")}</span>
+          <span><span style={{ display: "inline-block", width: 2, height: 11, background: "var(--accent-deep)", verticalAlign: "middle", marginRight: 8, marginLeft: 4 }} />{t("verlaufChart.legendeAenderung")}</span>
         )}
       </div>
     </div>

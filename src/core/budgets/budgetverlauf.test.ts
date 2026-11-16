@@ -5,12 +5,12 @@
 
 import { describe, it, expect } from "vitest";
 import { euroZuCent } from "../basis/geld";
-import { budgetStand as standDesBudgets, ruecklagenEntnahmenAus, type Budget, type BudgetSicht } from "./budget";
+import { budgetStand as standDesBudgets, type Budget } from "./budget";
+import { ruecklagenEntnahmenAus, type Zustaendigkeitssicht } from "../zustaendigkeit";
+import { verlaufsfenster, type Fortschreibungsmonat } from "../fortschreibung";
 import {
   budgetFortschreibung as fortschreibungDesBudgets,
   budgetMonatsstand as monatsstandDesBudgets,
-  verlaufsfenster,
-  type Budgetmonat,
 } from "./budgetverlauf";
 import type { Ruecklage } from "../ruecklagen/ruecklage";
 import { ruecklagenFortschreibung, ruecklagenstand } from "../ruecklagen/topf";
@@ -37,18 +37,18 @@ const alsRuecklage = (b: TestBudget): Ruecklage => ({
   id: b.id, bezeichnung: "", beginn: b.start, kategorieId: b.kategorieId, kontoId: b.kontoId, art: "fortlaufend", raten: b.betraege,
 });
 
-function budgetFortschreibung(s: BudgetSicht, b: TestBudget, von: string, bis: string): Budgetmonat[] {
+function budgetFortschreibung(s: Zustaendigkeitssicht, b: TestBudget, von: string, bis: string): Fortschreibungsmonat[] {
   if (b.art === "monatlich") return fortschreibungDesBudgets(s, b as Budget, von, bis);
   return ruecklagenFortschreibung(alsRuecklage(b), [], ruecklagenEntnahmenAus(s).get(b.id) ?? [], von, bis);
 }
 
-function budgetMonatsstand(s: BudgetSicht, b: TestBudget, am: string): Budgetmonat {
+function budgetMonatsstand(s: Zustaendigkeitssicht, b: TestBudget, am: string): Fortschreibungsmonat {
   if (b.art === "monatlich") return monatsstandDesBudgets(s, b as Budget, am);
   const m = am.slice(0, 7);
   return budgetFortschreibung(s, b, m, m)[0] ?? { monat: m, von: "", bis: "", uebertrag: 0, zufuehrung: 0, verfuegbar: 0, verbraucht: 0, rest: 0 };
 }
 
-function budgetStand(s: BudgetSicht, b: TestBudget, am: string): { rest: number } {
+function budgetStand(s: Zustaendigkeitssicht, b: TestBudget, am: string): { rest: number } {
   if (b.art === "monatlich") return standDesBudgets(s, b as Budget, am);
   return { rest: ruecklagenstand(alsRuecklage(b), [], ruecklagenEntnahmenAus(s).get(b.id) ?? [], am).stand };
 }
@@ -73,7 +73,7 @@ function buchung(over: Partial<IstBuchung>): IstBuchung {
   };
 }
 
-function sicht(buchungen: readonly IstBuchung[], budgets: readonly TestBudget[]): BudgetSicht {
+function sicht(buchungen: readonly IstBuchung[], budgets: readonly TestBudget[]): Zustaendigkeitssicht {
   return {
     buchungen,
     kategorien: BAUM,

@@ -14,12 +14,12 @@
 // (`ruecklagenvorschlag.ignoriert`); gelesen wird dazu der der Budgets: bis zur Trennung
 // verwarf man auch eine Rücklage über „kein Budget", und was dort steht, soll hier nicht
 // wieder auftauchen. Eine Migration braucht es dafür nicht — es ist dieselbe Tabelle,
-// nur ein Schlüssel mehr beim Lesen.
+// nur ein Schlüssel mehr beim Lesen. Der alte Schlüssel steht in der Wurzel
+// (`../ausgabenvorschlaege.ts`): gelesen wird er hier, ohne die Budgets zu fragen.
 
 import { ignorierenVermerken, ignorierteLesen } from "../einstellungen";
 import { ruecklagenAnteile, type Ruecklagenvorschlag } from "../../core";
-import { ausgabenvorschlaegeLaden, ohneVerworfene } from "../ausgabenvorschlaege";
-import { ignorierteBudgetvorschlaege } from "../budgets/budgetvorschlaege";
+import { ausgabenvorschlaegeLaden, ohneVerworfene, SCHLUESSEL_BUDGETVORSCHLAG_IGNORIERT } from "../ausgabenvorschlaege";
 import { anspruchsbestandLaden, type BudgetanspruchDeps } from "../konten/kontobelegung";
 import type { EinstellungenRepository, UmsatzRepository } from "../ports";
 
@@ -36,7 +36,7 @@ export async function ignorierteRuecklagenvorschlaege(
 ): Promise<Set<string>> {
   const [eigene, alte] = await Promise.all([
     ignorierteLesen(repo, SCHLUESSEL_IGNORIERT),
-    ignorierteBudgetvorschlaege(repo),
+    ignorierteLesen(repo, SCHLUESSEL_BUDGETVORSCHLAG_IGNORIERT),
   ]);
   return new Set([...eigene, ...alte]);
 }
@@ -54,7 +54,7 @@ export async function ruecklagenvorschlagIgnorieren(
  * hängt, ohne die verworfenen.
  *
  * Die Anteile, die eine Rücklage schon trägt, kommen aus derselben Sicht wie im Bereich
- * Budgets (`budgetsichtMit`), damit dieselbe Kategorie hier wie dort denselben Betrag
+ * Budgets (`zustaendigkeitssichtMit`), damit dieselbe Kategorie hier wie dort denselben Betrag
  * bekommt.
  */
 export async function ruecklagenvorschlaegeLaden(

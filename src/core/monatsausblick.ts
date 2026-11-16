@@ -42,11 +42,9 @@ import type { Cent } from "./basis/geld";
 import {
   geglaetteterMonatsabfluss,
   budgetBuchungen,
-  getrageneBuchungen,
   type Budget,
-  type BudgetSicht,
-  type Verbrauchsposten,
 } from "./budgets/budget";
+import { getrageneBuchungen, type Verbrauchsposten, type Zustaendigkeitssicht } from "./zustaendigkeit";
 import type { Ruecklage } from "./ruecklagen/ruecklage";
 import { planrateIm, ruecklagenart } from "./ruecklagen/topf";
 import { istInterneUmbuchung } from "./buchung/historie";
@@ -220,7 +218,7 @@ export function monatsAusblick(e: MonatsAusblickEingabe): MonatsAusblick {
   // Budgets standen. Die abschliessenden bleiben aus der Sicht, wie vorher die Rücklagen
   // von Hand — der Ausblick rechnet unverändert.
   const fortlaufende = (e.ruecklagen ?? []).filter((r) => ruecklagenart(r) === "fortlaufend" && !r.beendetAm);
-  const sicht: BudgetSicht = {
+  const sicht: Zustaendigkeitssicht = {
     buchungen: offenesIst,
     kategorien: e.kategorien,
     budgets: e.budgets,
@@ -379,7 +377,7 @@ function zeileAusRegeln(
  * ist ein Schlüssel, kein Name. Abschliessende Rücklagen stehen nicht darin, wie vorher.
  */
 function budgetsZeilen(
-  sicht: BudgetSicht,
+  sicht: Zustaendigkeitssicht,
   fortlaufende: readonly Ruecklage[],
   von: string,
   bis: string,

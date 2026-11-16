@@ -4,7 +4,7 @@
 // verliert; das aufbauende ist inzwischen eine Rücklage und steht in keinem Budgetbaum.
 
 import { describe, expect, it } from "vitest";
-import type { Budget, BudgetSicht, Kategorie, Ruecklage } from "../../core";
+import type { Budget, Zustaendigkeitssicht, Kategorie, Ruecklage } from "../../core";
 import { budgetstaende } from "./budgetsichten";
 
 const kategorien: Kategorie[] = [
@@ -22,7 +22,7 @@ const ruecklage = (over: Partial<Ruecklage> & { id: string; kategorieId: string 
   bezeichnung: over.id, beginn: "2026-01-01", art: "fortlaufend", raten: [{ abMonat: "2026-01", betrag: 5000 }], ...over,
 });
 
-const sicht = (budgets: Budget[], ruecklagen: Ruecklage[]): BudgetSicht => ({
+const sicht = (budgets: Budget[], ruecklagen: Ruecklage[]): Zustaendigkeitssicht => ({
   buchungen: [], kategorien, budgets, vertragsBuchungen: new Set(), ruecklagen,
 });
 

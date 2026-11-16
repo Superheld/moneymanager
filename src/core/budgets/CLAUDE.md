@@ -2,6 +2,19 @@
 
 Gilt für Budgets in Kern, Anwendung und Oberfläche. Was überall gilt, steht in der Wurzel-`CLAUDE.md`.
 
+## Budgets kennen Rücklagen — nicht umgekehrt
+
+Seit 2026-11-16 eine Modulgrenze (`src/architektur.test.ts`, „Modulgrenzen"): Code unter
+`budgets/` darf aus `ruecklagen/` importieren, Code unter `ruecklagen/` nie aus `budgets/`,
+in keiner der drei Schichten. Ein Budget zählt „ohne die Rücklage auf seiner
+Unterkategorie" und muss von ihr wissen; eine Rücklage braucht für ihren Stand kein Budget.
+
+Was beide gegeneinander abwägt, steht in der Wurzel und gehört keinem: wer einen Anteil
+trägt (`core/zustaendigkeit.ts` samt `Zustaendigkeitssicht` und `getrageneBuchungen`), die
+Form eines Monats im Verlauf (`core/fortschreibung.ts`), der alte Merkzettel der
+Vorschläge (`application/ausgabenvorschlaege.ts`). Wer hier etwas baut, das auch eine
+Rücklage braucht, legt es dorthin — nicht hierher, sonst holt die Rücklage es hier ab.
+
 ## Ein Budget ist monatlich (seit Migration 81)
 
 Ein Budget ist ein Rahmen für EINEN Monat; was übrig bleibt, verfällt zum Ersten. Bis

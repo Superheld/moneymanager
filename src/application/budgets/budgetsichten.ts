@@ -17,7 +17,7 @@
 // Vermutung gegen eine Tatsache, nicht das Verhalten.
 
 import { buchungszeile, zeilenkontext, type Buchungszeile, type Zeilenkontext } from "../buchung/buchungszeile";
-import { vertragsnamenLaden } from "../vertraege/vertragszuordnung";
+import { vertragsBuchungenLaden, vertragsnamenLaden } from "../vertraege/vertragszuordnung";
 import {
   betragImMonat,
   budgetBuchungen,
@@ -30,15 +30,15 @@ import {
   verbrauchsFenster,
   verlaufsfenster,
   type Budget,
-  type Budgetmonat,
-  type BudgetSicht,
+  type Fortschreibungsmonat,
+  type Zustaendigkeitssicht,
   type Budgetvorschlag,
   type Cent,
   type Kategorie,
   type Zahlungskonto,
 } from "../../core";
 import { budgetvorschlaegeLaden, ignorierteBudgetvorschlaege } from "./budgetvorschlaege";
-import { budgetsichtMit } from "../konten/kontobelegung";
+import { zustaendigkeitssichtMit } from "../konten/kontobelegung";
 import { ruecklagenbestandLaden } from "../ruecklagen/ruecklagenbestand";
 import type {
   BudgetRepository,
@@ -90,7 +90,7 @@ export interface Budgetstand {
    * Derselbe Stand als Aufrechnung DIESES Monats. `monat.rest === rest`, immer — siehe
    * `core/budgets/budgetverlauf`.
    */
-  readonly monat: Budgetmonat;
+  readonly monat: Fortschreibungsmonat;
   /**
    * Die Namen der Rücklagen, die diesem Budget heute Buchungen abnehmen, weil sie
    * darunter hängen (`herausgerechnet`). Ohne den Hinweis wäre der Verbrauch kleiner als
@@ -108,20 +108,7 @@ export interface Budgetuebersicht {
    * Budgets holen können, ohne alles neu zu laden, aber weiterhin nicht selbst über
    * die Auswahl entscheiden.
    */
-  readonly sicht: BudgetSicht;
-}
-
-/**
- * Die IDs aller Buchungen, die an einem Vertrag hängen.
- *
- * `vertragId === null` ist eine Aussage („gehört zu keinem Vertrag") und kein fehlender
- * Wert — solche Zeilen zählen normal gegen ihr Budget.
- */
-export async function vertragsBuchungenLaden(
-  repo: VertragszuordnungRepository,
-): Promise<Set<string>> {
-  const zuordnungen = await repo.alle();
-  return new Set(zuordnungen.filter((z) => z.vertragId).map((z) => z.istbuchungId));
+  readonly sicht: Zustaendigkeitssicht;
 }
 
 /**
@@ -139,12 +126,12 @@ export async function budgetuebersichtLaden(
     vertragsBuchungenLaden(deps.zuordnungRepo),
     ruecklagenbestandLaden(deps.ruecklagenRepo, deps.ruecklagenzuordnungRepo),
   ]);
-  const sicht = budgetsichtMit({ buchungen, kategorien, budgets, vertragsBuchungen }, rb);
+  const sicht = zustaendigkeitssichtMit({ buchungen, kategorien, budgets, vertragsBuchungen }, rb);
   return { staende: budgetstaende(sicht, am), sicht };
 }
 
 /** Reine Baumordnung + Stände über eine fertige Sicht — getrennt, damit sie testbar ist. */
-export function budgetstaende(sicht: BudgetSicht, am: string): Budgetstand[] {
+export function budgetstaende(sicht: Zustaendigkeitssicht, am: string): Budgetstand[] {
   const { budgets, kategorien } = sicht;
   const name = new Map(kategorien.map((k: Kategorie) => [k.id, k.name]));
 
@@ -193,7 +180,7 @@ export function budgetstaende(sicht: BudgetSicht, am: string): Budgetstand[] {
  * also negativ, die Erstattung positiv.
  */
 export function budgetzeilenZu(
-  sicht: BudgetSicht,
+  sicht: Zustaendigkeitssicht,
   stand: Budgetstand,
   kontext: Zeilenkontext,
 ): readonly Buchungszeile[] {
@@ -202,9 +189,9 @@ export function budgetzeilenZu(
 
 /** Dieselbe Auswahl für einen beliebigen Monat des Verlaufs. */
 export function budgetzeilenImMonat(
-  sicht: BudgetSicht,
+  sicht: Zustaendigkeitssicht,
   budget: Budget,
-  monat: Budgetmonat,
+  monat: Fortschreibungsmonat,
   kontext: Zeilenkontext,
 ): readonly Buchungszeile[] {
   return budgetBuchungen(sicht, budget, monat.von, monat.bis).map((p) =>
@@ -220,11 +207,11 @@ export function budgetzeilenImMonat(
  * aufgeklappter Zeile rechnete gegen einen womöglich anderen Bestand als die Zeile selbst.
  */
 export function budgetVerlauf(
-  sicht: BudgetSicht,
+  sicht: Zustaendigkeitssicht,
   budget: Budget,
   am: string,
   anzahl = 12,
-): Budgetmonat[] {
+): Fortschreibungsmonat[] {
   const { vonMonat, bisMonat } = verlaufsfenster(am, anzahl);
   return budgetFortschreibung(sicht, budget, vonMonat, bisMonat);
 }

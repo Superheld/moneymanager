@@ -57,7 +57,8 @@ import { kategorieAnteile, type IstBuchung } from "./buchung/istbuchung";
 import type { Budget } from "./budgets/budget";
 import type { Kategorie } from "./kategorien/kategorie";
 import type { Ruecklage, Ruecklagenzyklus } from "./ruecklagen/ruecklage";
-import { zustaendigkeit, type Ruecklagenzuordnung } from "./ruecklagen/zustaendigkeit";
+import type { Ruecklagenzuordnung } from "./ruecklagen/zuordnung";
+import { zustaendigkeit } from "./zustaendigkeit";
 
 export type Einordnungsart =
   | "einnahme"
@@ -108,7 +109,7 @@ export interface Einordnungskontext {
   readonly budgets: readonly Budget[];
   /**
    * Buchungs-ID → Vertrags-ID, nur für zugeordnete Buchungen. Pflichtfeld aus demselben
-   * Grund wie `vertragsBuchungen` in der `BudgetSicht`: eine leere Abbildung ist eine
+   * Grund wie `vertragsBuchungen` in der `Zustaendigkeitssicht`: eine leere Abbildung ist eine
    * Aussage und muss hingeschrieben werden.
    */
   readonly vertragJeBuchung: ReadonlyMap<string, string>;

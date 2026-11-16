@@ -2,10 +2,11 @@
 // Die Äquivalenz zur heutigen Einordnung steht in `topf.test.ts`. Namen je Testfall.
 
 import { describe, expect, it } from "vitest";
-import type { Budget } from "../budgets/budget";
-import type { Kategorie } from "../kategorien/kategorie";
-import type { Ruecklage } from "./ruecklage";
-import { zustaendigkeit, type Ruecklagenzuordnung } from "./zustaendigkeit";
+import type { Budget } from "./budgets/budget";
+import type { Kategorie } from "./kategorien/kategorie";
+import type { Ruecklage } from "./ruecklagen/ruecklage";
+import type { Ruecklagenzuordnung } from "./ruecklagen/zuordnung";
+import { zustaendigkeit } from "./zustaendigkeit";
 
 const kategorien: Kategorie[] = [
   { id: "freizeit", name: "Freizeit", defaultCharakter: "Aufwand" },
