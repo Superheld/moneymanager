@@ -25,6 +25,10 @@ import {
   ruecklagenFortschreibung,
   ruecklagenstand,
   verlaufsfenster,
+  abschliessen,
+  abschlussstaende,
+  type Abschlussstand,
+  type Ruecklagenentnahme,
   type Budgetmonat,
   type BudgetSicht,
   type Ruecklagenart,
@@ -52,6 +56,7 @@ import type { Umsatz } from "../import/umsatz";
 import { buchungszeile, zeilenkontext, type Buchungszeile, type Zeilenkontext } from "../buchung/buchungszeile";
 import { vertragsnamenLaden } from "../vertraege/vertragszuordnung";
 import { anspruchsbestandLaden, type BudgetanspruchDeps } from "../konten/kontobelegung";
+import { wartendeZuordnungen, type WartendeZuordnung } from "./wartendeZuordnungen";
 
 /**
  * Die Budget-Seite gehört dazu, weil der Anspruch einer Rücklage um das sinkt, was sie über
@@ -88,9 +93,10 @@ export interface Buchungsvorschlag extends Buchungswahl {
  * Die Auswahl beim Ausbuchen EINER Rücklage: zuerst, was in ihrer Kategorie liegt, dann
  * die jüngsten Abflüsse.
  *
- * Die Kategorie einer Rücklage ist hier ein VORSCHLAG: verknüpft wird beim Ausbuchen von
- * Hand, eine Buchung je Ausbuchung. Seit Paket 3 findet eine Rücklage mit Kategorie ihre
- * Ausgaben ausserdem von selbst; das Ausbuchen ohne Buchungswahl kommt mit Paket 5.
+ * Seit Paket 5 nur noch für den Altbestand: ausgebucht wird nur eine Rücklage OHNE
+ * Kategorie; eine mit Kategorie findet ihre Ausgaben selbst und wird ohne Buchungswahl
+ * abgeschlossen (`ruecklageAbschliessen`). Die Sortierung nach der Kategorie bleibt
+ * trotzdem stehen — sie schadet ohne Kategorie nicht, und die Tests der Regel tragen sie.
  *
  * Ohne Kategorie an der Rücklage ist die Liste dieselbe wie bisher.
  */
@@ -146,6 +152,25 @@ export interface Ausbuchungszeile {
   readonly ungedeckt: Cent | null;
   /** Hat diese Ausbuchung die Rücklage beendet? */
   readonly beendet: boolean;
+  /**
+   * War es ein ABSCHLIESSEN (seit Paket 5): eine Rücklage mit Kategorie, ohne verknüpfte
+   * Buchung und ohne eingetragenen Betrag. Dann ist `ausgabe` das, was sie im Zyklus über
+   * ihre Kategorie getragen hat, `angespart` die Raten bis zum Vormonat, und `frei` sagt,
+   * was auf dem Konto frei geworden ist.
+   */
+  readonly abschluss: boolean;
+  /** Beim Abschliessen: was frei geworden ist (über null); sonst `null`. */
+  readonly frei: Cent | null;
+}
+
+/**
+ * Was die Geschichte braucht, um ein Abschliessen zu rechnen: die Rücklagen (laufende und
+ * beendete, für ihre Ratenreihe) und was jede über ihre Kategorie getragen hat — dieselben
+ * Entnahmen wie im Anspruch auf dem Konto.
+ */
+export interface Abschlussbestand {
+  readonly ruecklagen: readonly Ruecklage[];
+  readonly entnahmen: ReadonlyMap<string, readonly Ruecklagenentnahme[]>;
 }
 
 /**
@@ -163,8 +188,21 @@ export function ruecklagenGeschichte(
   beendete: readonly Ruecklage[],
   buchungen: readonly IstBuchung[],
   umsaetze: readonly Umsatz[],
+  bestand?: Abschlussbestand,
 ): Ausbuchungszeile[] {
   const beendetIds = new Set(beendete.map((r) => r.id));
+  // Je Rücklage einmal: der Stand jedes ihrer Zyklen am Abschlusstag (`abschlussstaende`).
+  const staende = new Map<string, ReadonlyMap<string, Abschlussstand>>();
+  const standVon = (a: RuecklagenAusbuchung): Abschlussstand | undefined => {
+    const r = bestand?.ruecklagen.find((x) => x.id === a.ruecklageId);
+    if (!r || !bestand) return undefined;
+    let je = staende.get(r.id);
+    if (!je) {
+      je = abschlussstaende(r, ausbuchungen, bestand.entnahmen.get(r.id) ?? []);
+      staende.set(r.id, je);
+    }
+    return je.get(a.id);
+  };
   const buchungJeId = new Map(buchungen.map((b) => [b.id, b]));
   const umsatzJeBuchung = belegZuBuchung(umsaetze);
   const sortiert = [...ausbuchungen].sort((a, b) => b.datum.localeCompare(a.datum) || b.id.localeCompare(a.id));
@@ -178,6 +216,25 @@ export function ruecklagenGeschichte(
     const ausgabe = buchung ? Math.max(0, -buchung.betrag) : a.betrag;
     const beendet = beendetIds.has(a.ruecklageId) && !gesehen.has(a.ruecklageId);
     gesehen.add(a.ruecklageId);
+    // Ein Abschliessen erkennt man an dem, was ihm fehlt: keine Buchung, kein Betrag, aber
+    // eine Kategorie und ein festgehaltener Zyklus. Eine Ausbuchung aus der Zeit davor
+    // trägt eine Buchung oder einen Betrag und wird gezeigt wie bisher.
+    const stand = !a.istbuchungId && a.betrag === 0 && a.kategorieId && hatGeschichte(a) ? standVon(a) : undefined;
+    if (stand) {
+      return {
+        id: a.id,
+        ruecklageId: a.ruecklageId,
+        bezeichnung: a.bezeichnung ?? "",
+        datum: a.datum,
+        ausgabe: stand.entnahmen,
+        buchungsname: "",
+        angespart: stand.raten,
+        ungedeckt: Math.max(0, -stand.stand),
+        beendet,
+        abschluss: true,
+        frei: Math.max(0, stand.stand),
+      };
+    }
     return {
       id: a.id,
       ruecklageId: a.ruecklageId,
@@ -189,6 +246,8 @@ export function ruecklagenGeschichte(
       angespart: hatGeschichte(a) ? zyklusSoll(a, a.datum) : null,
       ungedeckt: zyklusUngedeckt(a, ausgabe),
       beendet,
+      abschluss: false,
+      frei: null,
     };
   });
 
@@ -204,6 +263,8 @@ export function ruecklagenGeschichte(
       angespart: null,
       ungedeckt: null,
       beendet: true,
+      abschluss: false,
+      frei: null,
     }));
 
   return [...zeilen, ...ohneAusbuchung].sort((a, b) => b.datum.localeCompare(a.datum));
@@ -233,8 +294,14 @@ export interface Ruecklagenzeile {
   readonly tatsaechlich: Cent | null;
   /** Der Name des Kontos; fehlt ohne Konto oder wenn es das Konto nicht mehr gibt. */
   readonly kontoName?: string;
-  /** Nur eine, die abgeschlossen wird, lässt sich ausbuchen. */
+  /** Nur eine, die abgeschlossen wird, lässt sich abschliessen (bzw. im Altbestand ausbuchen). */
   readonly ausbuchbar: boolean;
+  /**
+   * Wie: `abschliessen` bei einer mit Kategorie (Paket 5, ohne Buchungswahl),
+   * `ausbuchen` beim Altbestand ohne Kategorie (mit Buchungswahl, wie vorher). Fehlt bei
+   * einer, die weiterläuft.
+   */
+  readonly abschlussweg?: "abschliessen" | "ausbuchen";
 }
 
 export interface Ruecklagensicht {
@@ -277,6 +344,8 @@ export interface Ruecklagensicht {
   readonly fluss: Ruecklagenfluss;
   /** Was an jeder Kategorie schon hängt — für die Hinweise im Dialog. */
   readonly kategoriebelegung: Kategoriebelegung;
+  /** Was auf eine Zuordnung wartet — die Karte „Wartet auf Zuordnung" (`wartendeZuordnungen`). */
+  readonly wartend: readonly WartendeZuordnung[];
 }
 
 /**
@@ -351,7 +420,7 @@ export async function ruecklagenLaden(
   deps: RuecklagenDeps,
   heute: string,
 ): Promise<Ruecklagensicht> {
-  const [ruecklagen, beendete, buchungen, konten, regeln, vertraege, ausbuchungen, umsaetze, budget, kategorien, vertragsnamen] =
+  const [ruecklagen, beendete, buchungen, konten, regeln, vertraege, ausbuchungen, umsaetze, budget, kategorien, vertragsnamen, vertragszuordnungen, ruecklagenzuordnungen] =
     await Promise.all([
       deps.ruecklagenRepo.alle(),
       deps.ruecklagenRepo.beendete(),
@@ -364,6 +433,8 @@ export async function ruecklagenLaden(
       anspruchsbestandLaden(deps),
       deps.kategorieRepo.alle(),
       vertragsnamenLaden(deps.zuordnungRepo, deps.vertragRepo),
+      deps.zuordnungRepo.alle(),
+      deps.ruecklagenzuordnungRepo.alle(),
     ]);
   const kontostaende = new Map(konten.map((k) => [k.id, realerKontostand(k, buchungen)]));
   // Nur laufende Verträge: ein gekündigter zahlt nicht mehr ein, und eine Mindestrücklage
@@ -400,6 +471,7 @@ export async function ruecklagenLaden(
       tatsaechlich: p.tatsaechlich,
       kontoName: r.kontoId ? kontoNamen.get(r.kontoId) : undefined,
       ausbuchbar: art !== "fortlaufend",
+      ...(art !== "fortlaufend" ? { abschlussweg: r.kategorieId ? ("abschliessen" as const) : ("ausbuchen" as const) } : {}),
     };
   });
 
@@ -420,7 +492,14 @@ export async function ruecklagenLaden(
       0,
     ),
     vertragseinnahmen: einnahmen,
-    geschichte: ruecklagenGeschichte(ausbuchungen, beendete, buchungen, umsaetze),
+    geschichte: ruecklagenGeschichte(ausbuchungen, beendete, buchungen, umsaetze, {
+      ruecklagen: [...ruecklagen, ...beendete],
+      entnahmen: budget.bestand.entnahmen ?? new Map(),
+    }),
+    wartend: wartendeZuordnungen({
+      buchungen, kategorien, budgets: budget.budgets, konten, zuordnungen: vertragszuordnungen, vertraege,
+      ausbuchungen, ruecklagen, beendete, ruecklagenzuordnungen,
+    }, umsaetze),
     fluss,
     kategoriebelegung: kategoriebelegung(ruecklagen, budget.budgets),
     buchungswahl: spurenAus(buchungen, umsaetze)
@@ -464,4 +543,34 @@ export function ruecklagenzeilenImMonat(
   return getrageneBuchungen(s.verlaufsicht, r.id, monat.von, monat.bis).map((p) =>
     buchungszeile(p.buchung, -p.betrag, p.kategorieId, s.zeilenkontext),
   );
+}
+
+/** Was ein Abschluss an einem Tag ergäbe — der Stand, den der Dialog vor dem Speichern zeigt. */
+export interface Abschlussvorschau {
+  /** Was der Zyklus bis zum Vormonat des Tages angespart hat. */
+  readonly angespart: Cent;
+  /** Was er bis einschliesslich des Tages über seine Kategorie getragen hat. */
+  readonly getragen: Cent;
+  /** Was frei würde, über null. */
+  readonly frei: Cent;
+  /** Was mehr getragen wurde, als da war — hat seinen Monat schon gekostet. */
+  readonly ungedeckt: Cent;
+}
+
+/**
+ * Der Stand einer Rücklage, wenn sie am Tag `am` abgeschlossen würde — dieselbe Rechnung
+ * wie beim Speichern (`abschliessen` im Kern), gegen dieselbe Sicht wie die Liste.
+ * Rein und ohne Ladevorgang, damit der Dialog bei jedem Datum neu fragen kann.
+ */
+export function abschlussvorschau(s: Pick<Ruecklagensicht, "verlaufsicht">, r: Ruecklage, am: string): Abschlussvorschau | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(am)) return null;
+  const entnahmen = ruecklagenEntnahmenAus(s.verlaufsicht).get(r.id) ?? [];
+  try {
+    const a = abschliessen(r, (s.verlaufsicht.ausbuchungen ?? []).filter((x) => x.ruecklageId === r.id), entnahmen, am, "ende");
+    return { angespart: a.raten, getragen: a.entnahmen, frei: a.frei, ungedeckt: a.ungedeckt };
+  } catch {
+    // Ein Tag, den es nicht gibt (`parseIso` wirft): der Dialog zeigt dann keinen Stand,
+    // und beim Speichern sagt die Anwendungsgrenze, was falsch ist.
+    return null;
+  }
 }

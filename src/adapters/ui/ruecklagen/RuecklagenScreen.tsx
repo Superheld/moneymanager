@@ -38,6 +38,8 @@ import { FaustformelTacho } from "./FaustformelTacho";
 import { RuecklageDialog } from "../bausteine/RuecklageDialog";
 import { RuecklageVerlauf } from "./RuecklageVerlauf";
 import { AusbuchungDialog } from "./AusbuchungDialog";
+import { AbschlussDialog } from "./AbschlussDialog";
+import { WartetKarte } from "./WartetKarte";
 import { AusbuchungenKarte } from "./AusbuchungenKarte";
 import { GeldJeKontoKarte } from "./GeldJeKontoKarte";
 import { PageHead } from "../bausteine/PageHead";
@@ -78,6 +80,8 @@ export function RuecklagenScreen() {
   // `AusbuchungDialog`), der Screen merkt sich nur, für welche Rücklage.
   const [bearbeitet, setBearbeitet] = useState<Ruecklage | "neu" | null>(null);
   const [ausbuchen, setAusbuchen] = useState<Ruecklage | null>(null);
+  /** Eine Rücklage mit Kategorie, deren Abschluss gerade im Dialog steht. */
+  const [abschliessen, setAbschliessen] = useState<Ruecklage | null>(null);
   /** Welche Rücklage ihren Verlauf zeigt — höchstens eine. */
   const [offeneRuecklage, setOffeneRuecklage] = useState<string | null>(null);
   /** Eine Buchung aus dem Verlauf, die gerade im Dialog steht. */
@@ -282,9 +286,11 @@ export function RuecklagenScreen() {
                     <span className="muted" style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-2)" }}>
                       {t("ruecklagen.rate")} {geld.format(z.rate)} {geld.symbol}{t("ruecklagen.proMonatSuffix")}
                       <IconLeiste>
-                        {/* Ausbuchen nur an einer, die abgeschlossen wird — eine, die
-                            weiterläuft, beginnt nie neu. Das Abschliessen kommt mit Paket 5. */}
-                        {z.ausbuchbar && <IconButton icon="uebernehmen" label={t("ruecklagen.ausbuchen")} onClick={() => ausbuchenOeffnen(r)} />}
+                        {/* Nur an einer, die abgeschlossen wird — eine, die weiterläuft,
+                            beginnt nie neu. Mit Kategorie wird sie abgeschlossen (ohne
+                            Buchungswahl), der Altbestand ohne Kategorie ausgebucht wie vorher. */}
+                        {z.abschlussweg === "abschliessen" && <IconButton icon="uebernehmen" label={t("ruecklagen.abschliessen")} onClick={() => setAbschliessen(r)} />}
+                        {z.abschlussweg === "ausbuchen" && <IconButton icon="uebernehmen" label={t("ruecklagen.ausbuchen")} onClick={() => ausbuchenOeffnen(r)} />}
                         <IconButton icon="bearbeiten" label={t("ruecklagen.bearbeiten")} onClick={() => bearbeiten(r)} />
                         <IconButton icon="loeschen" ton="gefahr" label={t("ruecklagen.loeschen")} onClick={() => loeschfrage.stellen({
                             name: r.bezeichnung,
@@ -348,6 +354,10 @@ export function RuecklagenScreen() {
       )}
 
 
+      {/* Was auf eine Zuordnung wartet — direkt nach der Liste, weil hier etwas zu tun ist;
+          ist nichts offen, steht die Karte nicht da (`WartetKarte`). */}
+      <WartetKarte zeilen={sicht?.wartend ?? LEERE_LISTE} onGewaehlt={laden} />
+
       {/* Nach der Liste und nicht davor: dort wird gearbeitet (anlegen, ausbuchen),
           hier wird nachgesehen, auf welchem Konto das alles liegt. Vor den Listen schöbe
           eine Karte mit einem Abschnitt je Konto die Handlungen aus dem ersten Blick. */}
@@ -383,6 +393,15 @@ export function RuecklagenScreen() {
           buchungswahl={sicht ? buchungswahlFuer(sicht, ausbuchen) : []}
           onClose={() => setAusbuchen(null)}
           onGespeichert={async () => { setAusbuchen(null); await laden(); }}
+        />
+      )}
+      {abschliessen && sicht && (
+        <AbschlussDialog
+          ruecklage={abschliessen}
+          sicht={sicht}
+          heute={heute}
+          onClose={() => setAbschliessen(null)}
+          onGespeichert={async () => { setAbschliessen(null); await laden(); }}
         />
       )}
       {detail && <BuchungDetail buchung={detail} onClose={() => setDetail(null)} onGeaendert={laden} />}

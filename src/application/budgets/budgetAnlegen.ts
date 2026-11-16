@@ -14,7 +14,7 @@ import {
   type Budgetbetrag,
   type Cent,
 } from "../../core";
-import type { BudgetRepository } from "../ports";
+import type { BudgetRepository, RuecklagenRepository } from "../ports";
 
 export interface BudgetEingabe {
   kategorieId: string;
@@ -34,10 +34,15 @@ export interface BudgetEingabe {
   abMonat: string;
 }
 
+/**
+ * `ruecklagenRepo` ist optional, damit ein Aufrufer ohne Rücklagen (die Tests der Formen)
+ * keines mitbringen muss; `dienste` gibt es immer mit.
+ */
 export async function budgetAnlegen(
   repo: BudgetRepository,
   eingabe: BudgetEingabe,
   id?: string,
+  ruecklagenRepo?: RuecklagenRepository,
 ): Promise<Budget> {
   if (!eingabe.kategorieId) throw new FachlicherFehler("kategorie.waehlen");
   if (!eingabe.kontoId) throw new FachlicherFehler("konto.waehlen");
@@ -54,6 +59,19 @@ export async function budgetAnlegen(
   }
 
   const vorhanden = bestehende.find((b) => b.id === id);
+
+  // Ein monatliches Budget nicht an eine Kategorie, an der schon eine Rücklage hängt —
+  // die Gegenrichtung von `ruecklage.kategorieHatBudget` (Paket 5, ADR-0006). Am selben
+  // Knoten gewinnt das Budget (`zustaendigkeit`), und die Rücklage fände ab dann nichts
+  // mehr von selbst: ein neues Budget änderte still, was sie trägt. Wer beides will, nimmt
+  // eine Unterkategorie. Geprüft wird nur, wo die Kategorie NEU gewählt wird — ein Altfall
+  // bleibt stehen, wie er ist, und dort gewinnt weiter das Budget.
+  if (ruecklagenRepo && vorhanden?.kategorieId !== eingabe.kategorieId) {
+    const ruecklagen = await ruecklagenRepo.alle();
+    if (ruecklagen.some((r) => r.kategorieId === eingabe.kategorieId)) {
+      throw new FachlicherFehler("budget.kategorieHatRuecklage");
+    }
+  }
   // Die Betragsreihe kommt aus dem Bestand und wird ERGÄNZT, nicht ersetzt: `speichern`
   // rührt sie nicht an (siehe Repository), und ein Bearbeiten von Konto oder Art darf die
   // Planungshistorie nicht mitnehmen.

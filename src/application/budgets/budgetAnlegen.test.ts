@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Budget } from "../../core";
-import type { BudgetRepository } from "../ports";
+import type { BudgetRepository, RuecklagenRepository } from "../ports";
 import { budgetAnlegen, type BudgetEingabe } from "./budgetAnlegen";
 
 function memRepo(): BudgetRepository & { daten: Budget[] } {
@@ -73,5 +73,33 @@ describe("budgetAnlegen", () => {
     const geaendert = await budgetAnlegen(repo, eingabe({ betragProMonat: 15000 }), b.id);
     expect(geaendert.art).toBe("monatlich");
     expect(repo.daten).toHaveLength(1);
+  });
+});
+
+/**
+ * Die Gegenrichtung von `ruecklage.kategorieHatBudget` (Paket 5, ADR-0006): ein NEUES
+ * monatliches Budget nicht an eine Kategorie, an der eine Rücklage hängt — dort gewönne das
+ * Budget, und die Rücklage fände still nichts mehr. Ein Altfall bleibt stehen.
+ */
+describe("budgetAnlegen neben einer Rücklage", () => {
+  const ruecklagen = { alle: async () => [{ id: "r-1", bezeichnung: "Tavroki", beginn: "2026-01-01", kategorieId: "kat1" }] } as unknown as RuecklagenRepository;
+
+  it("weist ein neues Budget an der Kategorie einer Rücklage ab und verweist auf eine Unterkategorie", async () => {
+    const repo = memRepo();
+    await expect(budgetAnlegen(repo, eingabe(), undefined, ruecklagen)).rejects.toThrow("budget.kategorieHatRuecklage");
+    expect(repo.daten).toHaveLength(0);
+    // Eine andere Kategorie geht.
+    await budgetAnlegen(repo, eingabe({ kategorieId: "kat2" }), undefined, ruecklagen);
+    expect(repo.daten).toHaveLength(1);
+  });
+
+  it("lässt einen Altfall stehen: dasselbe Budget lässt sich weiter bearbeiten", async () => {
+    const repo = memRepo();
+    const alt = await budgetAnlegen(repo, eingabe());
+    const geaendert = await budgetAnlegen(repo, eingabe({ betragProMonat: 12000 }), alt.id, ruecklagen);
+    expect(geaendert.kategorieId).toBe("kat1");
+    // Wechselt es aber die Kategorie AUF die einer Rücklage, ist das eine neue Wahl.
+    const anderes = await budgetAnlegen(repo, eingabe({ kategorieId: "kat3" }));
+    await expect(budgetAnlegen(repo, eingabe({ kategorieId: "kat1" }), anderes.id, ruecklagen)).rejects.toThrow();
   });
 });

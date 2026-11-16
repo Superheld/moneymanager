@@ -246,13 +246,28 @@ describe("ruecklageAktualisieren", () => {
  * Ausbuchen — die Stelle, an der die Form der Rücklage über das Ergebnis entscheidet.
  * Genau deshalb gibt es kein Feld „wiederkehrend": es könnte der Form widersprechen.
  */
+/**
+ * Seit Paket 5 wird nur noch eine Rücklage OHNE Kategorie ausgebucht — der Altbestand von
+ * vor der Umstellung. `ruecklageAnlegen` verlangt eine Kategorie; die Fälle hier nehmen sie
+ * ihr deshalb wieder, wie sie im Bestand stünde.
+ */
+const altfall = (r: Ruecklage): Ruecklage => ({ ...r, kategorieId: undefined, findetAb: undefined });
+
 describe("ruecklageAusbuchen", () => {
+  it("weist eine Rücklage mit Kategorie ab — sie wird abgeschlossen", async () => {
+    const { repo, ausgebucht } = memRuecklagen();
+    const { ledger } = memLedger();
+    const r = await ruecklageAnlegen(repo, mitZiel);
+    await expect(ruecklageAusbuchen(repo, ledger, r, { datum: "2026-05-04" })).rejects.toThrow("ruecklage.abschliessenStattAusbuchen");
+    expect(ausgebucht).toHaveLength(0);
+  });
+
   it("startet eine Rücklage mit Ziel neu, statt sie zu löschen", async () => {
     const { repo, daten } = memRuecklagen();
     const { ledger } = memLedger();
     const r = await ruecklageAnlegen(repo, mitZiel);
 
-    const nachher = await ruecklageAusbuchen(repo, ledger, r, { datum: "2026-05-04" });
+    const nachher = await ruecklageAusbuchen(repo, ledger, altfall(r), { datum: "2026-05-04" });
 
     expect(nachher?.beginn).toBe("2026-05-04");
     expect(daten).toHaveLength(1);
@@ -263,7 +278,7 @@ describe("ruecklageAusbuchen", () => {
     const { ledger } = memLedger();
     const r = await ruecklageAnlegen(repo, mitZiel);
 
-    const nachher = await ruecklageAusbuchen(repo, ledger, r, { datum: "2026-05-04", ziel: 72000 });
+    const nachher = await ruecklageAusbuchen(repo, ledger, altfall(r), { datum: "2026-05-04", ziel: 72000 });
 
     expect(nachher?.ziel).toBe(72000);
   });
@@ -273,7 +288,7 @@ describe("ruecklageAusbuchen", () => {
     const { ledger } = memLedger();
     const r = await ruecklageAnlegen(repo, frei);
 
-    const nachher = await ruecklageAusbuchen(repo, ledger, r, { datum: "2026-05-04" });
+    const nachher = await ruecklageAusbuchen(repo, ledger, altfall(r), { datum: "2026-05-04" });
 
     expect(nachher).toBeNull();
     // Beendet, nicht gelöscht: mit der Zeile ginge ihre Ausbuchung per CASCADE mit.
@@ -286,7 +301,7 @@ describe("ruecklageAusbuchen", () => {
     const { ledger } = memLedger();
     const r = await ruecklageAnlegen(repo, mitZiel);
 
-    await ruecklageAusbuchen(repo, ledger, r, { datum: "2026-05-04", ziel: 72000 });
+    await ruecklageAusbuchen(repo, ledger, altfall(r), { datum: "2026-05-04", ziel: 72000 });
 
     // Der ALTE Zyklus, nicht der neue: Beginn und Ziel von vor dem Ausbuchen.
     expect(ausgebucht[0]).toMatchObject({ zyklusBeginn: r.beginn, zyklusZiel: r.ziel, zyklusFrist: r.fristMonate });
@@ -297,7 +312,7 @@ describe("ruecklageAusbuchen", () => {
     const { ledger } = memLedger();
     const r = await ruecklageAnlegen(repo, frei);
 
-    await ruecklageAusbuchen(repo, ledger, r, { datum: "2026-05-04", betrag: 120000 });
+    await ruecklageAusbuchen(repo, ledger, altfall(r), { datum: "2026-05-04", betrag: 120000 });
 
     expect(ausgebucht).toHaveLength(1);
     expect(ausgebucht[0].betrag).toBe(120000);
@@ -313,7 +328,7 @@ describe("ruecklageAusbuchen", () => {
     ]);
     const r = await ruecklageAnlegen(repo, mitZiel);
 
-    await ruecklageAusbuchen(repo, ledger, r, { datum: "2026-05-04", istbuchungId: "b1" });
+    await ruecklageAusbuchen(repo, ledger, altfall(r), { datum: "2026-05-04", istbuchungId: "b1" });
 
     expect(daten[0].budgetrelevant).toBe(false);
   });
@@ -329,7 +344,7 @@ describe("ruecklageAusbuchen", () => {
     ]);
     const r = await ruecklageAnlegen(repo, mitZiel);
 
-    await ruecklageAusbuchen(repo, ledger, r, { datum: "2026-05-04", istbuchungId: "b1" });
+    await ruecklageAusbuchen(repo, ledger, altfall(r), { datum: "2026-05-04", istbuchungId: "b1" });
 
     expect(daten[0].rohHash).toBe("h1");
     expect(daten[0].zuPruefen).toBe(true);
@@ -341,7 +356,7 @@ describe("ruecklageAusbuchen", () => {
     const { ledger } = memLedger();
     const r = await ruecklageAnlegen(repo, mitZiel);
 
-    await ruecklageAusbuchen(repo, ledger, r, { datum: "2026-05-04", istbuchungId: "weg" });
+    await ruecklageAusbuchen(repo, ledger, altfall(r), { datum: "2026-05-04", istbuchungId: "weg" });
 
     // Die Ausbuchung steht trotzdem — sie hat stattgefunden.
     expect(ausgebucht).toHaveLength(1);
@@ -351,7 +366,7 @@ describe("ruecklageAusbuchen", () => {
     const { repo } = memRuecklagen();
     const { ledger } = memLedger();
     const r = await ruecklageAnlegen(repo, mitZiel);
-    await expect(ruecklageAusbuchen(repo, ledger, r, { datum: "4.5.2026" })).rejects.toThrow(
+    await expect(ruecklageAusbuchen(repo, ledger, altfall(r), { datum: "4.5.2026" })).rejects.toThrow(
       "ruecklage.datumUngueltig",
     );
   });
@@ -372,7 +387,7 @@ describe("ruecklageAusbuchen an einer, die weiterläuft", () => {
     const { repo } = memRuecklagen();
     const r = await ruecklageAnlegen(repo, { ...frei, art: "fortlaufend" });
     const ledger = { alle: async () => [], speichern: async () => {} } as unknown as LedgerPort;
-    await expect(ruecklageAusbuchen(repo, ledger, r, { datum: "2026-05-01" })).rejects.toThrow("ruecklage.laeuftWeiter");
+    await expect(ruecklageAusbuchen(repo, ledger, altfall(r), { datum: "2026-05-01" })).rejects.toThrow("ruecklage.laeuftWeiter");
   });
 });
 

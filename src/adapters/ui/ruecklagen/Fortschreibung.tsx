@@ -1,4 +1,5 @@
-// Die Aufrechnung eines Monats einer Rücklage in einer Zeile: Übertrag, Rate, Entnahmen.
+// Die Aufrechnung eines Monats einer Rücklage in einer Zeile: Übertrag, Rate, Entnahmen —
+// und im Monat eines Abschlusses, was dabei frei geworden ist.
 //
 // Bis Paket 4 (ADR-0006) war das die Zeile des aufbauenden Budgets und lag in
 // `bausteine/` (als `BudgetFortschreibung`). Seither zeigt sie der Verlauf JEDER Rücklage
@@ -39,13 +40,24 @@ export function Fortschreibung({ monat }: { monat: Budgetmonat }) {
     rest: geld.formatMitSymbol(monat.rest),
   };
 
+  // Im Monat eines Abschlusses verlässt der Stand des alten Zyklus die Rücklage: frei
+  // geworden oder als Minus abgeschlossen. Ohne diesen Teil ginge die Zeile nicht auf den
+  // Rest auf, der daneben steht (`ruecklagenFortschreibung`).
+  const abschluss =
+    monat.abgeschlossen == null
+      ? ""
+      : monat.abgeschlossen >= 0
+        ? t("ruecklagen.fortschreibungFrei", { betrag: geld.formatMitSymbol(monat.abgeschlossen) })
+        : t("ruecklagen.fortschreibungImMinus", { betrag: geld.formatMitSymbol(monat.abgeschlossen) });
+  const dazu = abschluss ? ` · ${abschluss}` : "";
+
   return (
     <span
       className="muted"
       style={{ fontSize: "var(--fs-2xs)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}
-      title={t(zurueck ? "ruecklagen.fortschreibungTitelZurueck" : "ruecklagen.fortschreibungTitel", satz)}
+      title={`${t(zurueck ? "ruecklagen.fortschreibungTitelZurueck" : "ruecklagen.fortschreibungTitel", satz)}${dazu}`}
     >
-      {t("ruecklagen.fortschreibung", werte)}
+      {t("ruecklagen.fortschreibung", werte)}{dazu}
     </span>
   );
 }

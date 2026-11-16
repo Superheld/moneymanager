@@ -450,8 +450,15 @@ export function ruecklagenstand(
  * und nicht stur die Rate des Monats — sonst ginge der Rest nicht auf den Stand auf, der
  * daneben in der Liste steht.
  *
- * Beginnt in einem Monat ein neuer Zyklus (nach einem Ausbuchen), fängt die Reihe dort
- * bei null an; was der alte in diesem Monat noch getragen hat, steht in seiner Ausbuchung.
+ * **Im Monat eines Abschlusses rechnen beide Zyklen mit** (seit Paket 5): der alte bringt
+ * seinen Übertrag und was er bis zum Abschlusstag trug, der neue, was er danach trug; was
+ * der alte am Abschlusstag noch hatte, steht als `abgeschlossen` da — positiv frei
+ * geworden, negativ das Minus, mit dem er abgeschlossen wurde. So geht der Monat auf:
+ * Übertrag + Zuführung − Verbrauch − abgeschlossen = Rest, und der Rest ist der Stand des
+ * neuen Zyklus. Bis dahin fing die Reihe dort bei null an, und was der alte Zyklus in
+ * diesem Monat noch trug, stand nur in seiner Ausbuchung — der Monat zeigte Buchungen,
+ * die in keiner Zahl darüber vorkamen.
+ *
  * Vor dem ersten Beginn gibt es keine Monate — wie beim aufbauenden Budget vor seinem Start.
  */
 export function ruecklagenFortschreibung(
@@ -461,43 +468,95 @@ export function ruecklagenFortschreibung(
   vonMonat: string,
   bisMonat: string,
 ): Budgetmonat[] {
-  const zs = zyklen(r, abschluesse);
-  const erster = zs.find((z) => z.beginn)?.beginn;
-  if (!erster) return [];
+  // Ein Zyklus ohne bekannte Geschichte trägt nichts und kostet nichts (`Zyklus.beginn`).
+  const zs = zyklen(r, abschluesse).filter((z): z is Zyklus & { beginn: string } => !!z.beginn);
+  if (zs.length === 0) return [];
   const fortlaufend = ruecklagenart(r) === "fortlaufend";
-  const amEnde = (m: string) => {
-    const naechster = ersterTag(monatVerschoben(m, 1));
-    const z = zyklusAm(zs, toIso(addTage(parseIso(naechster), -1)));
-    if (!z) return { z, raten: 0, weg: 0 };
-    return { z, raten: ratenBis(z, fortlaufend ? m : monatVerschoben(m, -1)), weg: entnommen(z, entnahmen, naechster) };
-  };
+  // Raten und Entnahmen eines Zyklus bis zum Ende von `m`, je Sorte wie `ruecklagenstand`.
+  // Ein abgeschlossener wächst nach seinem Ende nicht mehr (`ratenBis`, `imFenster`).
+  const raten = (z: Zyklus, m: string) => ratenBis(z, fortlaufend ? m : monatVerschoben(m, -1));
+  const weg = (z: Zyklus, m: string) => entnommen(z, entnahmen, ersterTag(monatVerschoben(m, 1)));
+  // Ein Zyklus zählt in `m`, wenn er bis dahin begonnen hat und nicht vorher abgeschlossen ist.
+  const zaehlt = (z: Zyklus & { beginn: string }, m: string) => monatVon(z.beginn) <= m && (!z.ende || monatVon(z.ende) >= m);
 
-  const start = monatVon(erster) > vonMonat ? monatVon(erster) : vonMonat;
+  const erster = monatVon(zs[0].beginn);
+  const start = erster > vonMonat ? erster : vonMonat;
   const raus: Budgetmonat[] = [];
-  let vorher = amEnde(monatVerschoben(start, -1));
   let letzteZufuehrung: Cent | undefined;
   for (let m = start; m <= bisMonat; m = monatVerschoben(m, 1)) {
-    const jetzt = amEnde(m);
-    const weiter = !!jetzt.z && vorher.z === jetzt.z;
-    const uebertrag = weiter ? vorher.raten - vorher.weg : 0;
-    const zufuehrung = weiter ? jetzt.raten - vorher.raten : jetzt.raten;
-    const verbraucht = weiter ? jetzt.weg - vorher.weg : jetzt.weg;
+    const vormonat = monatVerschoben(m, -1);
+    const hier = zs.filter((z) => zaehlt(z, m));
+    let uebertrag = 0;
+    let zufuehrung = 0;
+    let verbraucht = 0;
+    let abgeschlossen: Cent | undefined;
+    for (const z of hier) {
+      // Beginnt der Zyklus erst in diesem Monat, ist beides im Vormonat 0 — von selbst.
+      uebertrag += raten(z, vormonat) - weg(z, vormonat);
+      zufuehrung += raten(z, m) - raten(z, vormonat);
+      verbraucht += weg(z, m) - weg(z, vormonat);
+      if (z.ende && monatVon(z.ende) === m) abgeschlossen = (abgeschlossen ?? 0) + raten(z, m) - weg(z, m);
+    }
     const verfuegbar = uebertrag + zufuehrung;
+    // Im Monat, in dem die Rücklage beginnt, zählt erst ab ihrem Beginn — dasselbe Fenster,
+    // über das `verbraucht` hier zählt. Hat ein früherer Zyklus den Monat schon getragen,
+    // gilt der ganze Monat.
+    const frueher = hier.some((z) => monatVon(z.beginn) < m);
+    const beginnImMonat = hier.map((z) => z.beginn).filter((b) => monatVon(b) === m).sort()[0];
+    const weiter = abgeschlossen == null && m > erster;
     raus.push({
       monat: m,
-      // Im Monat, in dem der Zyklus beginnt, zählt erst ab seinem Beginn — dasselbe
-      // Fenster, über das `verbraucht` hier zählt.
-      von: jetzt.z?.beginn && monatVon(jetzt.z.beginn) === m ? jetzt.z.beginn : ersterTag(m),
+      von: !frueher && beginnImMonat ? beginnImMonat : ersterTag(m),
       bis: ersterTag(monatVerschoben(m, 1)),
       uebertrag,
       zufuehrung,
       verfuegbar,
       verbraucht,
-      rest: verfuegbar - verbraucht,
+      rest: verfuegbar - verbraucht - (abgeschlossen ?? 0),
+      ...(abgeschlossen != null ? { abgeschlossen } : {}),
       ...(weiter && letzteZufuehrung != null && letzteZufuehrung !== zufuehrung ? { zufuehrungVorher: letzteZufuehrung } : {}),
     });
     letzteZufuehrung = zufuehrung;
-    vorher = jetzt;
+  }
+  return raus;
+}
+
+/** Was ein Zyklus am Tag seines Abschlusses hatte. */
+export interface Abschlussstand {
+  /** Was er angespart hat: die Raten bis zum Vormonat des Abschlusses. */
+  readonly raten: Cent;
+  /** Was er bis einschliesslich zum Abschlusstag getragen hat, positiv. */
+  readonly entnahmen: Cent;
+  /** `raten − entnahmen`; über null frei geworden, darunter das Minus. */
+  readonly stand: Cent;
+}
+
+/**
+ * Der Stand eines Zyklus am Tag `am` (beim abgeschlossenen sein Ende), gezählt nach der
+ * Regel der abschliessenden Rücklage: Raten bis zum Vormonat — die des Abschlussmonats
+ * gehört dem neuen Zyklus —, Entnahmen bis einschliesslich `am`. EINE Stelle für das
+ * Abschliessen selbst und für die Geschichte, die danach zeigt, was frei geworden ist.
+ */
+export function abschlussstand(z: Zyklus, entnahmen: readonly Ruecklagenentnahme[], am = z.ende): Abschlussstand {
+  if (!am || !z.beginn) return { raten: 0, entnahmen: 0, stand: 0 };
+  const raten = ratenBis(z, monatVerschoben(monatVon(am), -1));
+  const weg = entnommen(z, entnahmen, tagDanach(am));
+  return { raten, entnahmen: weg, stand: raten - weg };
+}
+
+/**
+ * Je Abschluss einer Rücklage (ID der Ausbuchung) der Stand am Abschlusstag — nur für
+ * Zyklen mit bekannter Geschichte. Ob eine Ausbuchung ein Abschliessen war oder ein
+ * Ausbuchen mit Kauf, entscheidet der Aufrufer; gerechnet wird hier für beide gleich.
+ */
+export function abschlussstaende(
+  r: Ruecklage,
+  abschluesse: readonly Ruecklagenzyklus[],
+  entnahmen: readonly Ruecklagenentnahme[],
+): Map<string, Abschlussstand> {
+  const raus = new Map<string, Abschlussstand>();
+  for (const z of zyklen(r, abschluesse)) {
+    if (z.abschlussId && z.beginn) raus.set(z.abschlussId, abschlussstand(z, entnahmen));
   }
   return raus;
 }
@@ -549,9 +608,7 @@ export function abschliessen(
   neuesZiel?: Cent,
 ): Abschluss {
   const laufend = zyklen(r, abschluesse).find((z) => !z.ende);
-  const raten = laufend ? ratenBis(laufend, monatVerschoben(monatVon(am), -1)) : 0;
-  const weg = laufend ? entnommen(laufend, entnahmen, tagDanach(am)) : 0;
-  const stand = raten - weg;
+  const { raten, entnahmen: weg, stand } = laufend ? abschlussstand(laufend, entnahmen, am) : { raten: 0, entnahmen: 0, stand: 0 };
   const mitReihe = (r.raten?.length ?? 0) > 0;
   return {
     abschluss: {

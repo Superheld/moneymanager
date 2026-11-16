@@ -6,7 +6,7 @@
 // anlegen, und „ausgebucht" startet den Zyklus neu, statt nur ein Datum zu ändern.
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Database } from "sql.js";
 
@@ -28,15 +28,18 @@ beforeEach(() => {
   halter.setzen(pluginApi(db));
 });
 
-/** Legt eine Rücklage mit Ziel und Frist an und wartet, bis der Screen sie zeigt. */
-async function mitRuecklage(bezeichnung: string, ziel: number, frist: number) {
+/**
+ * Legt eine Rücklage mit Ziel und Frist an und wartet, bis der Screen sie zeigt. `ohneKategorie`
+ * baut den Altbestand von vor der Umstellung — nur der wird seit Paket 5 noch ausgebucht.
+ */
+async function mitRuecklage(bezeichnung: string, ziel: number, frist: number, ohneKategorie = false) {
   await sqliteRuecklagenRepository.speichern({
     id: `rue-${bezeichnung}`,
     bezeichnung,
     beginn: "2024-03-01",
     ziel,
     fristMonate: frist,
-    kategorieId: "kat-tellwick",
+    kategorieId: ohneKategorie ? undefined : "kat-tellwick",
   });
   rendere(<RuecklagenScreen />);
   await waitFor(() => expect(document.body.textContent).toMatch(bezeichnung));
@@ -66,10 +69,10 @@ describe("Rücklagen — bearbeiten", () => {
   });
 });
 
-describe("Rücklagen — ausbuchen", () => {
+describe("Rücklagen — ausbuchen (Altbestand ohne Kategorie)", () => {
   it("startet den Zyklus neu und zieht das Ziel nach", async () => {
     const nutzer = userEvent.setup();
-    await mitRuecklage("Rasenmaeher", 40000, 96);
+    await mitRuecklage("Rasenmaeher", 40000, 96, true);
 
     await nutzer.click(screen.getByRole("button", { name: "ausgebucht" }));
 
@@ -89,7 +92,7 @@ describe("Rücklagen — ausbuchen", () => {
 
   it("meldet ein unbrauchbares Ziel, statt es zu speichern", async () => {
     const nutzer = userEvent.setup();
-    await mitRuecklage("Werkbank", 30000, 60);
+    await mitRuecklage("Werkbank", 30000, 60, true);
 
     await nutzer.click(screen.getByRole("button", { name: "ausgebucht" }));
     const ziel = await screen.findByLabelText(/^Ziel/);
@@ -126,6 +129,89 @@ describe("Rücklagen — ausbuchen", () => {
     });
     // Was sie gekostet hat, bleibt trotzdem festgehalten.
     expect(await sqliteRuecklagenRepository.ausbuchungen()).toHaveLength(1);
+  });
+});
+
+/** Der Tag `tag` im Monat, `n` Monate von heute versetzt — der Screen liest die Uhr selbst. */
+function tagVersetzt(n: number, tag = 1): string {
+  const d = new Date();
+  const m = new Date(d.getFullYear(), d.getMonth() + n, 1);
+  return `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}-${String(tag).padStart(2, "0")}`;
+}
+
+/**
+ * Eine Rücklage MIT Kategorie wird abgeschlossen, nicht ausgebucht (Paket 5): keine
+ * Buchungswahl, der Dialog zeigt, was frei wird, und lässt neu beginnen oder beenden.
+ * Erfunden: frei 100,00 im Monat seit drei Monaten, im Vormonat 150,00 über die Kategorie
+ * getragen → angespart 300,00, frei 150,00.
+ */
+describe("Rücklagen — abschliessen", () => {
+  async function bestand() {
+    const { sqliteLedgerRepository } = await import("../../persistence/sqliteLedgerRepository");
+    const { sqliteKategorieRepository, sqliteZahlungskontoRepository } = await import("../../persistence/sqliteStammdatenRepositories");
+    await sqliteZahlungskontoRepository.speichern({ id: "giro", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 100000 });
+    await sqliteKategorieRepository.speichern({ id: "kat-drav", name: "Dravunel", defaultCharakter: "Aufwand" });
+    await sqliteRuecklagenRepository.speichern({
+      id: "rue-drav", bezeichnung: "Quenvala", kategorieId: "kat-drav", art: "abschliessend", kontoId: "giro",
+      beginn: tagVersetzt(-3), findetAb: tagVersetzt(-3),
+    });
+    await sqliteRuecklagenRepository.rateSpeichern("rue-drav", { abMonat: tagVersetzt(-3).slice(0, 7), betrag: 10000 });
+    await sqliteLedgerRepository.speichern({
+      id: "b-drav", datum: tagVersetzt(-1, 10), betrag: -15000, kontoId: "giro", charakter: "Aufwand",
+      quelle: "manuell", kategorieId: "kat-drav", notiz: "Lirvasko",
+    });
+    rendere(<RuecklagenScreen />);
+    await waitFor(() => expect(document.body.textContent).toMatch("Quenvala"));
+  }
+
+  it("zeigt den Rest, beendet ohne Buchungswahl und führt den Abschluss mit dem Freigewordenen", async () => {
+    const { default: i18n } = await import("../../../i18n/i18n");
+    const nutzer = userEvent.setup();
+    await bestand();
+
+    await nutzer.click(screen.getByRole("button", { name: i18n.t("ruecklagen.abschliessen") }));
+    const dialog = await screen.findByRole("dialog");
+    // Keine Buchungswahl: das Feld „Buchung" des Ausbuchens steht hier nicht.
+    expect(within(dialog).queryByLabelText(i18n.t("ruecklagen.feldAusBuchung"))).toBeNull();
+    expect(dialog.textContent).toMatch(/300,00/);
+    expect(dialog.textContent).toMatch(/150,00/);
+    // Eine freie Rate ist mit „beenden" vorbelegt — wie das Ausbuchen bis Paket 4.
+    await nutzer.click(within(dialog).getByRole("button", { name: i18n.t("ruecklagen.abschliessen") }));
+
+    await waitFor(async () => {
+      const [r] = await sqliteRuecklagenRepository.beendete();
+      expect(r?.id).toBe("rue-drav");
+    });
+    // Aufgezeichnet ohne Buchung und ohne Betrag — gebucht wird nichts.
+    const [a] = await sqliteRuecklagenRepository.ausbuchungen();
+    expect(a).toMatchObject({ ruecklageId: "rue-drav", betrag: 0 });
+    expect(a.istbuchungId).toBeUndefined();
+
+    const pille = await screen.findByText(i18n.t("ruecklagen.pillBeendet"));
+    const zeile = pille.closest("tr") as HTMLElement;
+    expect(zeile.textContent).toContain("Quenvala");
+    // Angespart 300,00, getragen 150,00, frei geworden 150,00, nichts ungedeckt.
+    expect(zeile.textContent).toMatch(/300,00/);
+    expect(zeile.textContent).toMatch(/150,00/);
+    expect(document.body.textContent).toContain(i18n.t("ruecklagen.geschichteFrei"));
+  });
+
+  it("beginnt auf Wunsch neu — der Anspruch fällt auf den neuen Zyklus", async () => {
+    const { default: i18n } = await import("../../../i18n/i18n");
+    const { auswahlWaehlen } = await import("../../../testwerkzeug/harness");
+    const nutzer = userEvent.setup();
+    await bestand();
+
+    await nutzer.click(screen.getByRole("button", { name: i18n.t("ruecklagen.abschliessen") }));
+    const dialog = await screen.findByRole("dialog");
+    await auswahlWaehlen(nutzer, i18n.t("ruecklagen.feldFolge"), i18n.t("ruecklagen.folge.neu"), within(dialog));
+    await nutzer.click(within(dialog).getByRole("button", { name: i18n.t("ruecklagen.abschliessen") }));
+
+    await waitFor(async () => {
+      const [r] = await sqliteRuecklagenRepository.alle();
+      expect(r.beginn).not.toBe(tagVersetzt(-3));
+    });
+    expect(await sqliteRuecklagenRepository.beendete()).toHaveLength(0);
   });
 });
 

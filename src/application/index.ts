@@ -309,6 +309,9 @@ export {
   // Verlauf und Buchungen EINER Rücklage aus der schon geladenen Sicht — wie `budgetVerlauf`.
   ruecklagenVerlauf,
   ruecklagenzeilenImMonat,
+  // Was ein Abschluss an einem Tag ergäbe — rein, aus der schon geladenen Sicht.
+  abschlussvorschau,
+  type Abschlussvorschau,
   type Ruecklagenzeile,
   type Ausbuchungszeile,
   type Buchungswahl,
@@ -331,6 +334,12 @@ export {
   type RuecklagenzuordnenDeps,
   type RuecklagenzuordnenEingabe,
 } from "./ruecklagen/ruecklageZuordnen";
+export {
+  ruecklageAbschliessen,
+  type AbschliessenEingabe,
+  type Abschlussergebnis,
+} from "./ruecklagen/ruecklageAbschliessen";
+export type { WartendeZuordnung } from "./ruecklagen/wartendeZuordnungen";
 export {
   kontoloeschungPruefen,
   kontoVollstaendigLoeschen,

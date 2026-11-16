@@ -95,6 +95,30 @@ describe("ruecklagenGeschichte", () => {
     expect(g.filter((z) => z.beendet).map((z) => z.id)).toEqual(["a-frei"]);
   });
 
+  it("führt eine Ausbuchung von davor weiter als Ausbuchung, nicht als Abschluss", () => {
+    const g = ruecklagenGeschichte(ausbuchungen, beendete, [kauf], [], { ruecklagen: beendete, entnahmen: new Map() });
+    expect(g.every((z) => !z.abschluss && z.frei === null)).toBe(true);
+  });
+
+  it("zeigt ein Abschliessen mit dem, was die Rücklage über ihre Kategorie trug und was frei wurde", () => {
+    // Frei 60,00 im Monat seit Januar an `geraete`, abgeschlossen am 10.05. → Raten Januar
+    // bis April 240,00, getragen 90,00 → frei 150,00.
+    const r: Ruecklage = {
+      id: "r-ab", bezeichnung: "Plimsaro", beginn: "2026-05-10", kategorieId: "geraete", art: "abschliessend",
+      findetAb: "2026-01-01", raten: [{ abMonat: "2026-01", betrag: 6000 }],
+    };
+    const abschluss: RuecklagenAusbuchung = {
+      id: "a-ab", ruecklageId: "r-ab", bezeichnung: "Plimsaro", kategorieId: "geraete", datum: "2026-05-10", betrag: 0,
+      zyklusBeginn: "2026-01-01",
+    };
+    const entnahmen = new Map([["r-ab", [{ datum: "2026-03-02", betrag: -9000 }]]]);
+    const [z] = ruecklagenGeschichte([abschluss], [], [], [], { ruecklagen: [r], entnahmen });
+    expect(z).toMatchObject({ abschluss: true, angespart: 24000, ausgabe: 9000, frei: 15000, ungedeckt: 0, buchungsname: "" });
+    // Im Minus: frei nichts, das Minus steht als ungedeckt da.
+    const [minus] = ruecklagenGeschichte([abschluss], [], [], [], { ruecklagen: [r], entnahmen: new Map([["r-ab", [{ datum: "2026-03-02", betrag: -30000 }]]]) });
+    expect(minus).toMatchObject({ abschluss: true, frei: 0, ungedeckt: 6000 });
+  });
+
   it("zeigt eine beendete Rücklage auch dann, wenn keine Ausbuchung zu ihr gehört", () => {
     const ohne: Ruecklage = { id: "r-ohne", bezeichnung: "Tessendorf", beginn: "2024-01-01", rate: 1000, beendetAm: "2025-09-30" };
     const [z] = ruecklagenGeschichte([], [ohne], [], []);

@@ -13,6 +13,11 @@
 // es etwas zu zeigen gibt; eine leere Geschichte sagt nichts.
 //
 // Ohne Seiten: Ausbuchungen sind seltene Ereignisse, kein Kontoauszug.
+//
+// Seit Paket 5 stehen hier auch die Abschlüsse einer Rücklage mit Kategorie, in derselben
+// Tabelle: „Ausgegeben" ist dann, was sie im Zyklus über ihre Kategorie getragen hat, und
+// die Spalte „Frei geworden" sagt, was auf dem Konto frei wurde. Ein Abschluss im Minus
+// steht unter „Ungedeckt".
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -92,6 +97,16 @@ export function AusbuchungenKarte({
           <span style={{ color: warnFarbe(z.ungedeckt > 0) }}>{geld.format(z.ungedeckt)}</span>
         ),
       sortValue: (z) => z.ungedeckt ?? -1,
+      schmal: "zweitzeile",
+    },
+    {
+      key: "frei",
+      label: `${t("ruecklagen.geschichteFrei")} ${geld.symbol}`,
+      align: "right",
+      // Nur beim Abschliessen (seit Paket 5): beim Ausbuchen mit Kauf wurde nichts frei
+      // gerechnet, und eine 0 behauptete dort etwas, das nie gefragt war.
+      render: (z) => (z.frei == null ? "" : geld.format(z.frei)),
+      sortValue: (z) => z.frei ?? -1,
       schmal: "zweitzeile",
     },
     {
