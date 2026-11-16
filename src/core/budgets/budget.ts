@@ -370,8 +370,8 @@ export function ruecklagenEntnahmenAus(sicht: BudgetSicht): Map<string, Ruecklag
 
 /**
  * Die Anteile (`buchungId#index`), die eine Rücklage trägt oder die auf eine Zuordnung
- * warten — für den Budgetvorschlag, der sie auslässt: was eine Rücklage trägt, soll kein
- * Budget messen.
+ * warten — für die Ausgabenvorschläge (`../ausgabenvorschlaege.ts`), die sie auslassen:
+ * was eine Rücklage schon trägt, soll weder ein Budget messen noch eine zweite Rücklage.
  *
  * Bis Migration 81 hiess das `vonRuecklagenGetragen` und nahm die aufbauenden Budgets
  * aus (deren Kategorien schloss der Vorschlag ohnehin aus, weil dort ein Budget lag).

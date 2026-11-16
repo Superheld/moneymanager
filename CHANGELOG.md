@@ -45,6 +45,16 @@ im Kontoauszug.
 
 ### Geändert
 
+**Jeder Bereich schlägt nur vor, was in ihm landet.** Unter Budgets stehen nur noch
+Budgetvorschläge — keine Spalte „Art" mehr, und „übernehmen" legt immer ein Budget an.
+Für eine Kategorie, in der nur selten etwas anfällt, dann aber viel, steht der Vorschlag
+jetzt im Bereich Rücklagen, unter der Liste: „übernehmen" öffnet dort den Dialog einer
+Rücklage, die weiterläuft, mit Kategorie, Name und Rate vorbelegt. Die Beträge sind
+dieselben wie vorher. Was du unter Budgets schon verworfen hattest, bleibt in beiden
+Bereichen verworfen; „keine Rücklage" gilt nur für die Rücklagen. Im Dialog einer
+Rücklage heisst die Reihe der Raten jetzt auch beim Korrigieren und Entfernen „Rate"
+statt „Betrag".
+
 **Eine Rücklage wird abgeschlossen, nicht ausgebucht.** Eine Rücklage mit Kategorie, die
 abgeschlossen wird, hat statt „ausgebucht" den Knopf „abschließen" — mit dem Kauf oder am
 Ende des Urlaubs, es ist derselbe Handgriff. Eine Buchung wählst du dabei nicht mehr: ihre

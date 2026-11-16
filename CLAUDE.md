@@ -82,7 +82,8 @@ Was **keinem** Bereich gehört, bleibt in der Wurzel der Schicht: die Fassaden (
 `ports.ts`), der Start (`bootstrap.ts`) und die bewusst querliegenden Sichten
 (`uebersicht.ts`, `analysesichten.ts`, `core/monatsausblick.ts`, `core/auswertung.ts`,
 `core/einordnung.ts`, `core/ergebnis.ts`, `core/reichweite.ts`, `core/bericht.ts`,
-`core/einrichtung.ts`) —
+`core/einrichtung.ts`, `ausgabenvorschlaege.ts` in Kern und Anwendung — die eine
+Einstufung „Budget oder Rücklage?" für zwei Bereiche) —
 sie rechnen über mehrere Bereiche hinweg, und das ist ihre Aufgabe, kein Fehler. In `ui/` liegen aus demselben Grund
 die bereichsübergreifenden Tests oben (`screens`, `interaktion`, `formulare`).
 

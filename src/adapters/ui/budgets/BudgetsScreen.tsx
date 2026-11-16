@@ -24,13 +24,12 @@ import {
   type Budgetvorschlag,
   type IstBuchung,
 } from "../../../application";
-import { budgetbereich, budgetLoeschen, vorschlagIgnorieren } from "../../dienste";
+import { budgetbereich, budgetLoeschen, budgetvorschlagVerwerfen } from "../../dienste";
 import { Button, Card, DataTable, KPIStat, Pill } from "../bausteine";
 import { BuchungDetail } from "../buchung/BuchungDetail";
 import { BudgetVerlauf } from "./BudgetVerlauf";
 import { BudgetDialog, type BudgetVorbelegung } from "./BudgetDialog";
 import { BudgetTabelle } from "./BudgetTabelle";
-import { RuecklageDialog, type RuecklageVorbelegung } from "../bausteine/RuecklageDialog";
 import { IconButton, IconLeiste } from "../bausteine/IconButton";
 import { betont } from "../bausteine/betonung";
 import { PageHead } from "../bausteine/PageHead";
@@ -91,16 +90,14 @@ export function BudgetsScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => v
   }
 
   /**
-   * Der Dialog: `null` zu, `"neu"` zum Anlegen (mit Art und Vorbelegung aus einem
-   * Vorschlag), sonst die ID des bearbeiteten Budgets. Sein Zustand gehört ihm
+   * Der Dialog: `null` zu, `"neu"` zum Anlegen (mit Vorbelegung aus einem Vorschlag),
+   * sonst die ID des bearbeiteten Budgets. Sein Zustand gehört ihm
    * (`BudgetDialog`); der aktuelle Stand wird bei jedem Render aus der Liste gesucht, damit
    * er nach dem Entfernen einer Version die neue Reihe zeigt.
    */
   const [dialog, setDialog] = useState<
     { neu: true; vorbelegung?: BudgetVorbelegung } | { neu: false; id: string } | null
   >(null);
-  /** Ein übernommener Vorschlag „Rücklage" — er öffnet den Dialog einer Rücklage. */
-  const [ruecklageVorschlag, setRuecklageVorschlag] = useState<RuecklageVorbelegung | null>(null);
 
   // EIN Ladevorgang, EIN setState: gestaffelte await/setState-Paare lassen abgeleitete
   // Werte kurz gegen leere Listen rechnen (ein Kategorie-Lookup meldet dann für einen
@@ -154,21 +151,17 @@ export function BudgetsScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => v
   /**
    * Übernimmt einen Vorschlag in die Anlege-Maske — bestätigt wird dort.
    *
-   * Was vorgeschlagen wird, gehört zum Vorschlag: bei einer Kategorie, in der zweimal im
-   * Jahr etwas passiert, wäre ein monatlicher Rahmen die falsche Zusage. Ein Vorschlag
-   * „Rücklage" öffnet deshalb den Dialog einer Rücklage, die weiterläuft, vorbelegt mit
-   * Kategorie, Name und Rate; die Pille in der Tabelle sagt es vorher.
+   * Hier stehen nur Budgets. Eine Kategorie, in der zweimal im Jahr etwas passiert,
+   * bekäme mit einem monatlichen Rahmen die falsche Zusage; ihr Vorschlag steht im
+   * Bereich Rücklagen. Bis 2026-11-16 stand er hier mit der Art „Rücklage" und öffnete
+   * den Dialog einer Rücklage — wer hier ein Budget erwartete, fand danach keins.
    */
   function vorschlagUebernehmen(v: Budgetvorschlag) {
-    if (v.art === "ruecklage") {
-      setRuecklageVorschlag({ kategorieId: v.kategorieId, bezeichnung: v.name, rate: v.vorschlag, art: "fortlaufend" });
-      return;
-    }
     setDialog({ neu: true, vorbelegung: { kategorieId: v.kategorieId, betrag: v.vorschlag } });
   }
 
   async function vorschlagVerwerfen(v: Budgetvorschlag) {
-    await vorschlagIgnorieren(v.kategorieId);
+    await budgetvorschlagVerwerfen(v.kategorieId);
     await laden();
   }
 
@@ -300,18 +293,6 @@ export function BudgetsScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => v
             columns={[
               { key: "kategorie", label: t("budgets.spalteKategorie"), render: (v: Budgetvorschlag) => v.name },
               {
-                // Die Art steht VOR den Zahlen, weil sie sie deutet: dieselben 100 €
-                // heißen einmal „jeden Monat neu" und einmal „sammelt sich an".
-                key: "art",
-                label: t("budgets.spalteArt"),
-                sortValue: (v: Budgetvorschlag) => v.art,
-                render: (v: Budgetvorschlag) => (
-                  <Pill variant={v.art === "ruecklage" ? "um" : "neutral"}>
-                    {t(`budgets.art.${v.art}`)}
-                  </Pill>
-                ),
-              },
-              {
                 key: "median",
                 label: `${t("budgets.spalteBisher")} ${geld.symbol}`,
                 align: "right",
@@ -342,12 +323,7 @@ export function BudgetsScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => v
                 align: "right",
                 sortValue: (v: Budgetvorschlag) => v.schwankung,
                 render: (v: Budgetvorschlag) =>
-                  // Bei einer Rücklage sagt die Schwankung nichts: dort ist der eine
-                  // teure Monat der Zweck und nicht der Ausreißer. Eine Warnpille
-                  // stünde da als Warnung vor dem Erwarteten.
-                  v.art === "ruecklage" ? (
-                    <span className="muted">—</span>
-                  ) : v.schwankung <= 2 ? (
+                  v.schwankung <= 2 ? (
                     <Pill variant="ok">{t("budgets.stabil")}</Pill>
                   ) : (
                     <Pill variant="warn">{t("budgets.schwankend", { faktor: v.schwankung })}</Pill>
@@ -382,18 +358,6 @@ export function BudgetsScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => v
           onClose={() => setDialog(null)}
           onGespeichert={async () => { setDialog(null); await laden(); }}
           onGeaendert={laden}
-        />
-      )}
-
-      {ruecklageVorschlag && bereich && (
-        <RuecklageDialog
-          ruecklage={null}
-          vorbelegung={ruecklageVorschlag}
-          heute={heute}
-          konten={konten}
-          kategorien={kategorien}
-          onClose={() => setRuecklageVorschlag(null)}
-          onGespeichert={async () => { setRuecklageVorschlag(null); await laden(); }}
         />
       )}
 

@@ -147,6 +147,12 @@ export {
   ignorierteBudgetvorschlaege,
 } from "./budgets/budgetvorschlaege";
 export {
+  ruecklagenvorschlaegeLaden,
+  ruecklagenvorschlagIgnorieren,
+  ignorierteRuecklagenvorschlaege,
+  type RuecklagenvorschlagDeps,
+} from "./ruecklagen/ruecklagenvorschlaege";
+export {
   vertraegeLaden,
   type Vertragssicht,
   type Vertragszeile,

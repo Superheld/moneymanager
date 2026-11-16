@@ -96,6 +96,11 @@ import { stammdatenLaden, type Stammdaten } from "../application/stammdaten/stam
 import { ruecklagenLaden, type Ruecklagensicht } from "../application/ruecklagen/ruecklagensichten";
 import { kontobelegungLaden, type Belegungssicht } from "../application/konten/kontobelegung";
 import { geldJeKontoLaden, type GeldJeKonto } from "../application/ruecklagen/geldJeKonto";
+import {
+  ruecklagenvorschlaegeLaden,
+  ruecklagenvorschlagIgnorieren,
+} from "../application/ruecklagen/ruecklagenvorschlaege";
+import type { Ruecklagenvorschlag } from "../core";
 import { depotsLaden, type Depotdaten } from "../application/depot/depotsichten";
 import { vermoegenLaden, type Vermoegenssicht } from "../application/vermoegen/vermoegensichten";
 import {
@@ -311,7 +316,8 @@ export function budgetAnlegen(eingabe: BudgetEingabe, id?: string) {
   return budgetAnlegenUseCase(sqliteBudgetRepository, eingabe, id, sqliteRuecklagenRepository);
 }
 
-export function vorschlagIgnorieren(kategorieId: string): Promise<void> {
+/** Einen Budgetvorschlag verwerfen — nur im Bereich Budgets. */
+export function budgetvorschlagVerwerfen(kategorieId: string): Promise<void> {
   return budgetvorschlagIgnorieren(sqliteEinstellungenRepository, kategorieId);
 }
 
@@ -676,6 +682,16 @@ const RUECKLAGEN_DEPS = {
 
 export function ruecklagen(heute: string): Promise<Ruecklagensicht> {
   return ruecklagenLaden(RUECKLAGEN_DEPS, heute);
+}
+
+/** Wofür sich nach den bisherigen Ausgaben eine Rücklage lohnt — ohne die verworfenen. */
+export function ruecklagenvorschlaege(heute: string): Promise<Ruecklagenvorschlag[]> {
+  return ruecklagenvorschlaegeLaden({ ...RUECKLAGEN_DEPS, einstellungenRepo: sqliteEinstellungenRepository }, heute);
+}
+
+/** Einen Rücklagenvorschlag verwerfen — nur im Bereich Rücklagen. */
+export function ruecklagenvorschlagVerwerfen(kategorieId: string): Promise<void> {
+  return ruecklagenvorschlagIgnorieren(sqliteEinstellungenRepository, kategorieId);
 }
 
 /** Wem das Geld auf jedem Konto gehört — die Rücklagen beider Sorten, anteilig gedeckt. */

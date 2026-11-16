@@ -1,6 +1,6 @@
 // Ein monatliches Budget anlegen oder bearbeiten. Seit Migration 81 gibt es keine andere
 // Art mehr: was sich ansammeln soll, ist eine Rücklage und hat ihren eigenen Dialog
-// (`bausteine/RuecklageDialog`). Bis dahin trug dieser Dialog beide Arten, die der
+// (`ruecklagen/RuecklageDialog`). Bis dahin trug dieser Dialog beide Arten, die der
 // Bereich wählte, aus dem man anlegte.
 //
 // Der Dialog hält seinen eigenen Zustand (wie `RuecklageDialog`); der Screen merkt sich

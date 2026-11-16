@@ -494,16 +494,6 @@ select.field {
   margin-top: var(--gap-card);
 }
 
-/* Zwei Listen nebeneinander IN einer Karte (Budgets: monatlich | aufbauend). Wie
-   `karten-paar`, nur ohne eigenen Rand oben — die Karte hat ihn schon. `min()` lässt
-   eine Spalte schmal die volle Breite nehmen, statt die Seite aufzuziehen. */
-.budget-spalten {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
-  gap: var(--sp-5);
-  align-items: start;
-}
-
 
 /* ============================================================
    Eine Buchungszeile in einer aufgeklappten Liste.

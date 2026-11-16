@@ -40,7 +40,9 @@ Bereiche wie im Kern (`buchung/`, `konten/`, `budgets/`, `vertraege/`, `kategori
 In der Wurzel bleibt, was keinem Bereich gehört: `index.ts` (Fassade zur UI), `ports.ts`
 (die Interfaces, von 76 Stellen benutzt), `bootstrap.ts`, `einstellungen.ts` und die
 querliegenden Sichten `uebersicht.ts` und `analysesichten.ts` — die rechnen absichtlich über
-mehrere Bereiche.
+mehrere Bereiche. Dazu `ausgabenvorschlaege.ts`: es lädt die Vorschläge für Budgets UND
+Rücklagen in einem Zug, damit beide Bereiche dieselbe Einstufung sehen; was je Bereich
+verworfen ist, filtern `budgets/budgetvorschlaege.ts` und `ruecklagen/ruecklagenvorschlaege.ts`.
 
 ## Ports
 

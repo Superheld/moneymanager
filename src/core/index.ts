@@ -22,7 +22,7 @@ export * from "./vertraege/umbuchungErkennung";
 export * from "./vertraege/merkmalsableitung";
 export * from "./budgets/budget";
 export * from "./budgets/budgetverlauf";
-export * from "./budgets/budgetVorschlag";
+export * from "./ausgabenvorschlaege";
 export * from "./ruecklagen/ruecklage";
 export * from "./ruecklagen/fluss";
 export * from "./ruecklagen/topf";
