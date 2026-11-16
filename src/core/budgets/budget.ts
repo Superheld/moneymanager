@@ -18,15 +18,15 @@
 // (Puffer mit Schätzbetrag+Frist, Spartopf mit Zuführung+Sparziel, plus eigener
 // Entnahme-Buchung über `Verwendung`). Drei Arten, vier Zielwert-Begriffe und zwei
 // Tabellen für dieselbe Frage „was lege ich monatlich für X zurück?". Zusammengelegt
-// 2026-08-19; die Töpfe waren zu dem Zeitpunkt leer (0 Zeilen, 0 Buchungen darauf).
+// 2026-08-19; die Töpfe waren zu dem Zeitpunkt leer.
 //
 // **Verträge zählen NICHT.** Ein Budget steuert Verhalten — „diesen Monat noch 120 € für
 // Auswärtsessen". Eine Vertragsrate kann man nicht steuern; sie ist anderswo geplant und
 // steht im Monatsausblick in ihrer eigenen Zeile. Zählte sie zusätzlich gegen das Budget,
 // stünde dieselbe Zahlung zweimal in der Aufrechnung, und ein Rahmen, der (wie der
 // Budgetvorschlag ihn errechnet) den Vertragsanteil schon abgezogen hat, würde gegen
-// einen Verbrauch mitsamt Verträgen gemessen. Auf echten Daten: „Familie & Kinder",
-// Rahmen 110 €, zeigte 425 € Verbrauch — die Kinderbetreuung, ein erfasster Vertrag.
+// einen Verbrauch mitsamt Verträgen gemessen — ein Rahmen, der eingehalten ist, stünde
+// dann als überzogen da, nur weil ein erfasster Vertrag in seiner Kategorie liegt.
 //
 // Welche Buchungen das sind, entscheidet der Kern NICHT selbst: die Verknüpfung
 // Buchung↔Vertrag entsteht in `vertragszuordnung` (Anwendungsschicht) aus den
