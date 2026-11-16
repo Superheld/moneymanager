@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { hatZiel, minorZuMajor, monatsRuecklage, waehlbareKonten, type Kategorie, type Ruecklage, type Zahlungskonto } from "../../../application";
+import { hatZiel, minorZuMajor, monatsRuecklage, waehlbareKonten, type Kategorie, type Kategoriebelegung, type Ruecklage, type Zahlungskonto } from "../../../application";
 import { ruecklageAktualisieren, ruecklageAnlegen } from "../../dienste";
 import { Button, FormField } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
@@ -25,6 +25,7 @@ export function RuecklageDialog({
   heute,
   konten,
   kategorien,
+  kategoriebelegung,
   onClose,
   onGespeichert,
 }: {
@@ -33,6 +34,8 @@ export function RuecklageDialog({
   heute: string;
   konten: readonly Zahlungskonto[];
   kategorien: readonly Kategorie[];
+  /** Was an jeder Kategorie schon hängt — für die beiden Hinweise unter dem Feld. */
+  kategoriebelegung?: Kategoriebelegung;
   onClose: () => void;
   onGespeichert: () => void | Promise<void>;
 }) {
@@ -49,6 +52,11 @@ export function RuecklageDialog({
   const [kontoId, setKontoId] = useState(r?.kontoId ?? "");
   const [kategorieId, setKategorieId] = useState(r?.kategorieId ?? "");
   const [fehler, setFehler] = useState<string | null>(null);
+  // Die beiden Hinweise zur Kategorie: eine andere Rücklage daran heisst, dass Buchungen
+  // dort künftig warten; ein monatliches Budget daran nimmt eine neu gewählte Kategorie
+  // nicht an (der Altfall bleibt, wie er ist — das Budget gewinnt).
+  const andere = (kategorieId && kategoriebelegung?.ruecklagen.get(kategorieId)?.filter((x) => x.id !== r?.id)) || [];
+  const mitBudget = !!kategorieId && kategorieId !== r?.kategorieId && !!kategoriebelegung?.monatlich.has(kategorieId);
 
   async function speichern() {
     setFehler(null);
@@ -126,14 +134,22 @@ export function RuecklageDialog({
             optionen={[{ wert: "", text: t("ruecklagen.kontoKeins") }, ...waehlbareKonten(konten, kontoId).map((k) => ({ wert: k.id, text: k.bezeichnung }))]}
           />
         </FormField>
-        {/* Die Kategorie ist ein Vorschlag fürs Ausbuchen und keine Regel: sie holt die
-            passenden Buchungen nach vorn. Deshalb optional, und deshalb mit einem Weg
+        {/* Über die Kategorie findet die Rücklage ihre Ausgaben von selbst. Noch optional
+            (eine Rücklage ohne rechnet wie vor der Umstellung), und deshalb mit einem Weg
             zurück — der Picker selbst kennt kein „keine". */}
         <FormField label={t("ruecklagen.feldKategorie")} hint={t("ruecklagen.feldKategorieHinweis")}>
           <Feldzeile
             feld={<CategoryPicker kategorien={[...kategorien]} value={kategorieId} onChange={setKategorieId} placeholder={t("ruecklagen.kategorieKeine")} />}
             knopf={kategorieId ? <Button variant="link" onClick={() => setKategorieId("")}>{t("ruecklagen.kategorieEntfernen")}</Button> : null}
           />
+          {andere.length > 0 && (
+            <div className="hinweis" style={{ marginTop: 6 }}>
+              {t("ruecklagen.kategorieSchonBelegt", { namen: andere.map((x) => x.bezeichnung).join(", ") })}
+            </div>
+          )}
+          {mitBudget && (
+            <div className="hinweis" style={{ marginTop: 6 }}>{t("ruecklagen.kategorieHatBudget")}</div>
+          )}
         </FormField>
       </div>
     </Modal>

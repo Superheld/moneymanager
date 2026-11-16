@@ -14,7 +14,7 @@
 //
 //     Kosten bis M = max(Σ Raten bis M, Σ Entnahmen bis Ende M)
 //
-// die Regel des aufbauenden Budgets (`topfKosten` in `ergebnis.ts`), jetzt je Zyklus.
+// die Regel des aufbauenden Budgets (bis Paket 3 `topfKosten` in `ergebnis.ts`), jetzt je Zyklus.
 // Ausgenommen sind nur Zyklen, die vor der Umstellung mit einer verknüpften Buchung
 // ausgebucht wurden: für die gilt die alte Regel weiter (`altabschlussKosten`), damit
 // kein vergangener Monat anders kostet als vorher.
@@ -244,7 +244,7 @@ const ersterTag = (monat: string) => `${monat}-01`;
 
 /**
  * Was der Zyklus in `monat` KOSTET, positiv — die Regel des aufbauenden Budgets
- * (`topfKosten`), je Zyklus:
+ * (bis Paket 3 `topfKosten`), je Zyklus:
  *
  *     Kosten bis M = max(Raten bis M, Entnahmen bis Ende M)
  *
@@ -268,7 +268,7 @@ export function zyklusKosten(z: Zyklus, entnahmen: readonly Ruecklagenentnahme[]
 
 /**
  * Was ein Zyklus kostet, der VOR der Umstellung mit einer verknüpften Buchung ausgebucht
- * wurde — die heutige Regel von `zyklusPosten` in `ergebnis.ts`, unverändert:
+ * wurde — die Regel, die bis Paket 3 inline in `ergebnis.ts` stand, unverändert:
  *
  *   • jeder Monat seine Rate (`rateIm`),
  *   • dazu im Monat des KAUFS, was der Kauf über dem Angesparten am Abschlusstag liegt:

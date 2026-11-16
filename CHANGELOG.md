@@ -40,6 +40,16 @@ im Kontoauszug.
 
 ### Geändert
 
+**Eine Rücklage findet ihre Ausgaben über ihre Kategorie.** Ab dem Tag des Updates trägt
+eine Rücklage mit Kategorie jede Ausgabe in dieser Kategorie und ihren Unterkategorien von
+selbst, und was auf ihrem Konto für sie liegen soll, sinkt um das, was sie schon getragen
+hat. Vergangene Monate rechnen wie vorher. Hängen mehrere Rücklagen an derselben
+Kategorie, steht an der Buchung „wartet auf Zuordnung": sie zählt als ungeplant, bis du im
+Buchungsdialog wählst, welche Rücklage sie trägt (oder keine). Der Dialog einer Rücklage
+sagt dir, wenn an der gewählten Kategorie schon eine hängt, und an der Kategorie eines
+monatlichen Budgets lässt sich keine neue anlegen — nimm dafür eine Unterkategorie. Eine
+geänderte freie Rate gilt ab dem laufenden Monat; die Monate davor behalten ihre.
+
 **Die Kennzahlen im Bereich Rücklagen zählen beide Formen.** „Soll heute", „Tatsächlich
 da" und der Deckungsgrad rechnen die Rücklagen über die Kategorie mit — ihr Soll ist, was
 von ihnen übrig ist —, der Bedarf unter „Diesen Monat" ihre Monatsrate. „Ziele gesamt"

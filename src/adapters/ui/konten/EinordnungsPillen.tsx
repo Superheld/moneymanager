@@ -19,7 +19,8 @@ import type { PillVariante } from "../bausteine/Pill";
  * grün, was hereinkommt; Akzent, was nur den Ort wechselt; kräftiger Rahmen, was schon
  * vorher bezahlt wurde (Rücklage). Alles, was den Monat als Kosten trifft, bleibt
  * neutral — auch „Ungeplant": es ist eine Auskunft und keine Mahnung, und eine
- * Warnfarbe an jeder zweiten Zeile läse nach einer Woche niemand mehr.
+ * Warnfarbe an jeder zweiten Zeile läse nach einer Woche niemand mehr. Was auf eine
+ * Zuordnung wartet, trägt den gestrichelten Rahmen des Geplanten: es ist noch offen.
  */
 const VARIANTE: Record<Einordnungsart, PillVariante> = {
   einnahme: "ertrag",
@@ -37,7 +38,13 @@ export function einordnungsText(
   e: Buchungseinordnung,
 ): string {
   // Eine Rücklage mit Namen nennt ihn; eine Entnahme über eine alte Ausbuchung hat keinen.
-  const schluessel = e.art === "ruecklage" && (e.budgetName || e.ruecklageId) ? "ruecklageBenannt" : e.art;
+  // Eine Buchung, die auf eine Zuordnung wartet, sagt das statt „Ungeplant": gerechnet
+  // wird sie so, aber an ihr ist etwas zu tun.
+  const schluessel = e.wartetAuf
+    ? "wartet"
+    : e.art === "ruecklage" && (e.budgetName || e.ruecklageId)
+      ? "ruecklageBenannt"
+      : e.art;
   return t(`einordnung.pille.${schluessel}`, { budget: e.budgetName ?? "—" });
 }
 
@@ -57,7 +64,7 @@ export function EinordnungsPillen({ einordnung }: { einordnung: readonly Buchung
           // nicht (dieselbe Regel wie bei Vertrag und Dublettenverdacht nebenan). Er
           // trägt den vollen Text, weil ein langer Budgetname abgeschnitten wird.
           <span key={i} title={text} style={{ display: "inline-flex", minWidth: 0, maxWidth: 190, overflow: "hidden" }}>
-            <Pill variant={VARIANTE[e.art]} style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{text}</Pill>
+            <Pill variant={e.wartetAuf ? "plan" : VARIANTE[e.art]} style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{text}</Pill>
           </span>
         );
       })}

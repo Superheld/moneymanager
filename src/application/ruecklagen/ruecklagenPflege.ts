@@ -3,7 +3,25 @@
 // der Abgleich passiert beim Anzeigen.
 
 import { FachlicherFehler, freieRate, hatZiel, type Cent, type Ruecklage } from "../../core";
-import type { LedgerPort, RuecklagenAusbuchung, RuecklagenRepository } from "../ports";
+import type { BudgetRepository, LedgerPort, RuecklagenAusbuchung, RuecklagenRepository } from "../ports";
+
+/**
+ * Darf an dieser Kategorie eine Rücklage hängen? Nicht an der eines MONATLICHEN Budgets:
+ * dort gewinnt das Budget (`zustaendigkeit`), und die Rücklage fände nie etwas von selbst.
+ * Wer beides will, nimmt eine Unterkategorie (Teil B des Entwurfs zu ADR-0006,
+ * Abschnitt 5). Ein Altfall bleibt stehen, wie er ist — geprüft wird nur, wo eine
+ * Kategorie neu gewählt wird.
+ *
+ * Optional, damit ein Aufrufer ohne Budgets (Tests der Formen) nicht eines mitbringen
+ * muss; `dienste` gibt es immer mit.
+ */
+async function kategoriePruefen(budgetRepo: BudgetRepository | undefined, kategorieId: string | undefined): Promise<void> {
+  if (!budgetRepo || !kategorieId) return;
+  const budgets = await budgetRepo.alle();
+  if (budgets.some((b) => b.art === "monatlich" && b.kategorieId === kategorieId)) {
+    throw new FachlicherFehler("ruecklage.kategorieHatBudget");
+  }
+}
 
 export interface RuecklagenEingabe {
   bezeichnung: string;
@@ -66,8 +84,10 @@ function baue(e: RuecklagenEingabe, id: string): Ruecklage {
 export async function ruecklageAnlegen(
   repo: RuecklagenRepository,
   e: RuecklagenEingabe,
+  budgetRepo?: BudgetRepository,
 ): Promise<Ruecklage> {
   const gebaut = baue(e, crypto.randomUUID());
+  await kategoriePruefen(budgetRepo, gebaut.kategorieId);
   const r: Ruecklage = {
     ...gebaut,
     rate: undefined,
@@ -100,9 +120,11 @@ export async function ruecklageAktualisieren(
   ruecklageId: string,
   e: RuecklagenEingabe,
   heute: string,
+  budgetRepo?: BudgetRepository,
 ): Promise<Ruecklage> {
   const gebaut = baue(e, ruecklageId);
   const vorher = (await repo.alle()).find((r) => r.id === ruecklageId);
+  if (gebaut.kategorieId !== vorher?.kategorieId) await kategoriePruefen(budgetRepo, gebaut.kategorieId);
   const reihe = vorher?.raten ?? [];
   const nachgetragen = !!gebaut.kategorieId && !vorher?.kategorieId;
   const findetAb = nachgetragen ? heute : vorher?.findetAb;

@@ -232,6 +232,31 @@ export interface Ruecklagensicht {
   readonly buchungswahl: readonly Buchungswahl[];
   /** Was von den liquiden Mitteln in die Rücklagen wandert — Bedarf, Plan und Ist. */
   readonly fluss: Ruecklagenfluss;
+  /** Was an jeder Kategorie schon hängt — für die Hinweise im Dialog. */
+  readonly kategoriebelegung: Kategoriebelegung;
+}
+
+/**
+ * Was an einer Kategorie schon hängt, für den Dialog einer Rücklage: hängt dort schon
+ * eine, warten Buchungen dort künftig auf eine Zuordnung; liegt dort ein monatliches
+ * Budget, nimmt eine neue Rücklage dort nichts an (Hinweis auf eine Unterkategorie).
+ */
+export interface Kategoriebelegung {
+  /** Kategorie-ID → die laufenden Rücklagen daran. */
+  readonly ruecklagen: ReadonlyMap<string, readonly { readonly id: string; readonly bezeichnung: string }[]>;
+  /** Kategorien mit einem monatlichen Budget. */
+  readonly monatlich: ReadonlySet<string>;
+}
+
+function kategoriebelegung(ruecklagen: readonly Ruecklage[], budgets: readonly { art: string; kategorieId: string }[]): Kategoriebelegung {
+  const an = new Map<string, { id: string; bezeichnung: string }[]>();
+  for (const r of ruecklagen) {
+    if (!r.kategorieId) continue;
+    const liste = an.get(r.kategorieId) ?? [];
+    liste.push({ id: r.id, bezeichnung: r.bezeichnung });
+    an.set(r.kategorieId, liste);
+  }
+  return { ruecklagen: an, monatlich: new Set(budgets.filter((b) => b.art === "monatlich").map((b) => b.kategorieId)) };
 }
 
 /**
@@ -332,6 +357,7 @@ export async function ruecklagenLaden(
     vertragseinnahmen: einnahmen,
     geschichte: ruecklagenGeschichte(ausbuchungen, beendete, buchungen, umsaetze),
     fluss,
+    kategoriebelegung: kategoriebelegung(ruecklagen, budget.budgets),
     buchungswahl: spurenAus(buchungen, umsaetze)
       // Nur Abflüsse: eine Rücklage wird ausgegeben, nicht eingenommen.
       .filter((sp) => sp.betrag < 0)

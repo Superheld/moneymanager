@@ -171,3 +171,31 @@ export function zustaendigkeit(
     return { art: "ungeplant" };
   };
 }
+
+/**
+ * Die Rücklagen, denen ein Anteil mit dieser Kategorie zugeordnet werden darf: jede, die
+ * an der Kategorie oder an einem ihrer Vorfahren hängt — an der Kategorie samt ihren
+ * Unterkategorien, wie sie auch von selbst findet. Nächste Ebene zuerst.
+ *
+ * Eine Rücklage ohne Kategorie steht nie darin (Teil B des Entwurfs, Abschnitt 1): sie
+ * findet nur über ihre Ausbuchung, und eine Zuordnung zu ihr wäre eine zweite, stille
+ * Regel daneben. Beendete gehören nicht dazu — ihnen wird nichts mehr zugeordnet.
+ *
+ * Die eine Stelle für die Prüfung an der Anwendungsgrenze (`ruecklageZuordnen`) und für
+ * die Auswahl im Buchungsdialog: was man sieht, ist genau das, was sich speichern lässt.
+ */
+export function waehlbareRuecklagen(
+  kategorien: readonly Kategorie[],
+  ruecklagen: readonly Ruecklage[],
+  kategorieId: string | undefined,
+): Ruecklage[] {
+  if (!kategorieId) return [];
+  const eltern = new Map(kategorien.map((k) => [k.id, k.elternId]));
+  const raus: Ruecklage[] = [];
+  let knoten: string | undefined = kategorieId;
+  for (let i = 0; knoten && i < 100; i++) {
+    for (const r of ruecklagen) if (!r.beendetAm && r.kategorieId === knoten) raus.push(r);
+    knoten = eltern.get(knoten);
+  }
+  return raus;
+}

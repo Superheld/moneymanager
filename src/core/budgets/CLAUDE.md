@@ -7,7 +7,8 @@ Gilt für Budgets in Kern, Anwendung und Oberfläche. Was überall gilt, steht i
 Seit 2026-11-15 zeigt der Bereich Budgets nur die monatlichen. Ein aufbauendes Budget
 heisst in der Oberfläche **Rücklage** („über die Kategorie") und steht im Bereich
 Rücklagen; für den Nutzer ist es dieselbe Sache wie eine Rücklage. Im Modell bleibt es ein
-Budget mit `art = aufbauend`, mit Betragsreihe, Übertrag und `topfKosten` — warum die
+Budget mit `art = aufbauend`, mit Betragsreihe und Übertrag; gerechnet wird es seit Paket 3
+als Rücklage (`alsRuecklage`, `zyklusKosten`) — warum die
 Trennung im Datenmodell stehen bleibt, steht in `../ruecklagen/CLAUDE.md`.
 
 Drei Folgen, die man kennen muss:

@@ -194,6 +194,10 @@ import {
   type RuecklagenEingabe,
 } from "../application/ruecklagen/ruecklagenPflege";
 import {
+  ruecklageZuordnen as ruecklageZuordnenUseCase,
+  type RuecklagenzuordnenEingabe,
+} from "../application/ruecklagen/ruecklageZuordnen";
+import {
   kategorieAnlegen as kategorieAnlegenUseCase,
   kontoAnlegen as kontoAnlegenUseCase,
   personAnlegen as personAnlegenUseCase,
@@ -680,11 +684,27 @@ export function geldJeKonto(heute: string): Promise<GeldJeKonto> {
 }
 
 export function ruecklageAnlegen(eingabe: RuecklagenEingabe) {
-  return ruecklageAnlegenUseCase(sqliteRuecklagenRepository, eingabe);
+  return ruecklageAnlegenUseCase(sqliteRuecklagenRepository, eingabe, sqliteBudgetRepository);
 }
 
 export function ruecklageAktualisieren(id: string, eingabe: RuecklagenEingabe, heute: string) {
-  return ruecklageAktualisierenUseCase(sqliteRuecklagenRepository, id, eingabe, heute);
+  return ruecklageAktualisierenUseCase(sqliteRuecklagenRepository, id, eingabe, heute, sqliteBudgetRepository);
+}
+
+/**
+ * Einen Anteil einer Buchung einer Rücklage zuordnen, ausdrücklich keiner, oder die
+ * Entscheidung lösen (`ruecklageZuordnen`).
+ */
+export function ruecklageZuordnen(eingabe: RuecklagenzuordnenEingabe) {
+  return ruecklageZuordnenUseCase(
+    {
+      ledger: sqliteLedgerRepository,
+      kategorieRepo: sqliteKategorieRepository,
+      ruecklagenRepo: sqliteRuecklagenRepository,
+      ruecklagenzuordnungRepo: sqliteRuecklagenzuordnungRepository,
+    },
+    eingabe,
+  );
 }
 
 export function ruecklageAusbuchen(

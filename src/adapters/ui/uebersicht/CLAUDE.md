@@ -44,7 +44,8 @@ von Hand und die über die Kategorie (im Modell aufbauende Budgets) in EINER Zei
 standen zwei Zeilen untereinander, „Rücklagen" und „Aufbauende Budgets", für etwas, das
 für den Nutzer dasselbe ist. Was aus ihnen bezahlt wurde, ist eine Entnahme: sie steht
 am Posten daneben und in der Überleitung, nicht in den Kosten. Reicht eine Rücklage über
-die Kategorie nicht, zählt das Ungedeckte als Kosten des Monats (`topfKosten`).
+die Kategorie nicht, zählt das Ungedeckte als Kosten des Monats (`zyklusKosten` in
+`core/ruecklagen/topf.ts`, die max-Regel je Zyklus).
 
 **Fixkosten sind, was einem Vertrag ZUGEORDNET ist.** Die alte Karte fand die Zahlung zu
 einem Plan-Posten über Betragsnähe; jetzt entscheidet die Vertragszuordnung der Buchung,

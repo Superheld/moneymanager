@@ -330,6 +330,7 @@ und wurde deshalb 2026-08-25 herausgezogen:
 | `DublettenBlock` | steht sie womöglich schon ein zweites Mal da? |
 | `BuchungsHerkunft` | woher sie kommt — reine Anzeige |
 | `EinordnungsBlock` | was sie kaufmännisch ist, und WARUM — reine Anzeige (unten, „Die Einordnung an der Zeile") |
+| `RuecklagenwahlBlock` | welche Rücklage sie trägt — nur, wo mehrere an ihrer Kategorie hängen oder schon entschieden ist; speichert sofort |
 | `JournalBlock` | was daran geändert wurde — und der Weg zurück |
 | `Richtungswahl` | Höhe und Richtung des Betrags, samt der Zerlegung dahinter |
 | `SplitModal` · `ZurUmbuchungModal` | die beiden Folge-Dialoge (S-7, S-1) |
@@ -502,8 +503,8 @@ einer Entscheidung.
 ## Die Einordnung an der Zeile
 
 Seit 2026-11-15 trägt jede Zeile des Kontoauszugs eine Spalte **Einordnung**
-(`konten/EinordnungsPillen.tsx`): Einnahme, Fixkosten, laufende Kosten, „aus Budget …",
-aus Rücklage, Vorsorge, Umbuchung, ungeplant. Der Buchungsdialog sagt dasselbe als Satz
+(`konten/EinordnungsPillen.tsx`): Einnahme, Fixkosten, laufende Kosten, „aus Rücklage …",
+Vorsorge, Umbuchung, ungeplant, wartet auf Zuordnung. Der Buchungsdialog sagt dasselbe als Satz
 mit der Begründung (`buchung/EinordnungsBlock.tsx`) — „zählt als Fixkosten, weil sie dem
 Vertrag … zugeordnet ist". Der Satz ist die eigentliche Hilfe: das Wort allein erklärt
 niemandem ohne Rechnungswesen, warum eine grosse Ausgabe den Monat nicht belastet.
@@ -532,6 +533,16 @@ Drei Entscheidungen daran:
 
 Eine aufgeteilte Buchung kann mehrere Einordnungen tragen (eingeordnet wird der Anteil);
 gezeigt werden die verschiedenen, jede einmal.
+
+**Seit Paket 3 des Umbaus gibt es eine Pille, die keine Art ist: „wartet auf Zuordnung".**
+Gerechnet wird ein solcher Anteil als ungeplant; die Pille sagt statt „Ungeplant", dass an
+ihm etwas zu tun ist — mehrere Rücklagen hängen an seiner Kategorie (`wartetAuf` an der
+Einordnung). Sie trägt den gestrichelten Rahmen des Geplanten, keine Warnfarbe. Gewählt
+wird im Buchungsdialog (`buchung/RuecklagenwahlBlock`), mit einer `Auswahl` je Anteil;
+was dort zur Wahl steht und ob überhaupt, sagt die Sicht (`ruecklagenwahl` am
+Buchungsdetail), nicht der Block. Vorbelegt wird nichts. Entnahmen aus einer Rücklage und
+aus einem aufbauenden Budget sind EINE Art (`ruecklage`); die Pille nennt die Rücklage,
+wenn es eine gibt.
 
 ## Was im Konto steht, hat jemand belegt
 

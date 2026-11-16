@@ -41,6 +41,7 @@ import type {
   RuecklagenzuordnungRepository,
 } from "../ports";
 import { ruecklagenbestandLaden } from "../ruecklagen/ruecklagenbestand";
+import { ruecklagenwahlJeBuchung, type Ruecklagenwahl } from "../ruecklagen/ruecklageZuordnen";
 
 export interface BuchungsdetailDeps {
   readonly kontoRepo: ZahlungskontoRepository;
@@ -112,6 +113,11 @@ export interface Buchungsdetaildaten {
    * (Bezeichnung, Kategorie, Vertrag): die gehört dem Nutzer, nicht der Bank.
    */
   readonly onlineKonten: ReadonlySet<string>;
+  /**
+   * Buchungs-ID → die Anteile, für die eine Rücklage zu wählen ist (`ruecklagenwahlJeBuchung`).
+   * Fehlt eine Buchung, gibt es bei ihr nichts zu wählen.
+   */
+  readonly ruecklagenwahl: ReadonlyMap<string, readonly Ruecklagenwahl[]>;
 }
 
 export async function buchungsdetailLaden(
@@ -133,6 +139,11 @@ export async function buchungsdetailLaden(
   const zuordnungen_online = deps.kontozuordnungen ? await deps.kontozuordnungen() : [];
 
   const umsatzZuBuchung = belegZuBuchung(umsaetze);
+  const rb = await ruecklagenbestandLaden(deps.ruecklagenRepo, deps.ruecklagenzuordnungRepo);
+  const einordnungen = einordnungJeBuchung({ buchungen, kategorien, budgets, konten, zuordnungen, vertraege, ...rb });
+  // Welche Anteile gerade auf eine Zuordnung warten — aus derselben Einordnung wie die Pille.
+  const wartend = new Set<string>();
+  for (const [id, liste] of einordnungen) for (const e of liste) if (e.wartetAuf) wartend.add(`${id}\u0000${e.kategorieId ?? ""}`);
 
   const freigegeben = freigegebenePaare(freigaben);
 
@@ -144,10 +155,8 @@ export async function buchungsdetailLaden(
     dublettenverdacht: ledgerVerdacht(umsaetze, new Set(buchungen.map((b) => b.id)), freigegeben),
     freigegeben,
     freigaben,
-    einordnungen: einordnungJeBuchung({
-      buchungen, kategorien, budgets, konten, zuordnungen, vertraege,
-      ...(await ruecklagenbestandLaden(deps.ruecklagenRepo, deps.ruecklagenzuordnungRepo)),
-    }),
+    einordnungen,
     onlineKonten: new Set(zuordnungen_online.map((z) => z.zahlungskontoId)),
+    ruecklagenwahl: ruecklagenwahlJeBuchung(buchungen, kategorien, rb.ruecklagen, rb.ruecklagenzuordnungen, wartend),
   };
 }
