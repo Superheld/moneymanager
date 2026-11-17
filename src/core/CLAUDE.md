@@ -11,7 +11,9 @@ macht jeden Test von der Laufzeit abhängig. Zeitpunkte kommen als Parameter her
 `basis/` hält die Primitive, die quer durch alles gehen: `geld`, `waehrung`, `datum`,
 `zahlungsregel`, `muster`, `fehler`, `region`. Alles Fachliche liegt in seinem Bereich
 (`buchung/`, `konten/`, `budgets/`, `vertraege/`, `kategorien/`, `ruecklagen/`,
-`vermoegen/`, `vorsorge/`, `stammdaten/`). In der Wurzel bleibt nur, was über Bereiche hinweg rechnet
+`vermoegen/`, `vorsorge/`, `stammdaten/`, `depot/`, `klassifikator/`, `zugang/`,
+`sicherung/`), und zwischen ihnen gilt die Rangfolge aus der Wurzel-`CLAUDE.md`
+(„Zwischen den Bereichen gibt es eine Rangfolge"). In der Wurzel bleibt nur, was über Bereiche hinweg rechnet
 (`monatsausblick.ts`, `einordnung.ts`, `ergebnis.ts`, `reichweite.ts`, `bericht.ts`, `einrichtung.ts`,
 `ausgabenvorschlaege.ts` — Budget oder Rücklage, für beide Bereiche in einer Rechnung) und die Fassade `index.ts`.
 

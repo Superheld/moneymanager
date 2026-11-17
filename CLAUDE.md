@@ -89,24 +89,66 @@ Monats, die Budget und Rücklage beide schreiben) —
 sie rechnen über mehrere Bereiche hinweg, und das ist ihre Aufgabe, kein Fehler. In `ui/` liegen aus demselben Grund
 die bereichsübergreifenden Tests oben (`screens`, `interaktion`, `formulare`).
 
-**Zwischen den Bereichen gibt es Richtungen** (Modulgrenzen, seit 2026-11-16). Die erste:
-**Budgets dürfen Rücklagen kennen, Rücklagen kennen keine Budgets** — in Kern, Anwendung
-und Oberfläche, Texte eingeschlossen. Ein Budget zählt „ohne die Rücklage auf seiner
-Unterkategorie" und muss deshalb von ihr wissen; eine Rücklage braucht für ihren Stand
-kein Budget. Daraus folgen zwei Regeln, die für jede weitere Richtung genauso gelten:
+**Zwischen den Bereichen gibt es eine Rangfolge** (Modulgrenzen, seit 2026-11-17). Ein
+Bereich kennt nur Bereiche UNTER sich, gleichrangige kennen sich nicht — in Kern,
+Anwendung und Oberfläche, mit denselben Namen. Eine Stufe je Zeile statt einer Liste von
+Paaren: so ist auch jedes Paar geregelt, zwischen dem es heute keinen Bezug gibt.
 
-- **Was beide gegeneinander ABWÄGT, gehört keinem von beiden**, sondern in die Wurzel der
-  Schicht — so die Zuständigkeit (am selben Knoten gewinnt das Budget). Was beide nur als
-  FORM teilen, ebenso, wenn es kein Primitiv quer durch alles ist (`fortschreibung.ts`).
-- **Ein Baustein trägt keinen Bereich in einen anderen**: was ein Bereich nicht kennen
-  darf, darf ein Baustein, den er benutzt, auch nicht — weder einen Use-Case noch einen
-  i18n-Schlüssel aus dessen Namensraum. Ein geteilter Baustein hat seinen eigenen
-  Namensraum (`verlaufChart.*`).
+| Rang | Bereich | warum hier |
+|---|---|---|
+| 0 | `stammdaten` · `kategorien` (der Baum) · `zugang` · `sicherung` | Person, Kategorienbaum, Passphrase, Rotation der Sicherungen brauchen nichts Fachliches |
+| 1 | `konten` | ein Konto braucht keine Buchung, nur einen Inhaber |
+| 2 | `import` (der Beleg) | ein Beleg liegt auf einem Konto und braucht keine Buchung |
+| 3 | `dubletten` · `fints` | vergleichen Belege bzw. holen sie und ordnen Bankkonten den eigenen zu |
+| 4 | `buchung` · `depot` | die Buchung verweist auf ihren Beleg; das Depot übernimmt, was die Bank meldet |
+| 5 | `vertraege` | ein Vertrag erkennt sich in Buchungen, eine Buchung braucht keinen Vertrag |
+| 6 | `klassifikator` | die Kategorisierung wägt Vertrag gegen Modell ab und steht darüber |
+| 7 | `ruecklagen` | eine Rücklage braucht Konto, Buchung und Vertrag (die Umbuchungsregel) |
+| 8 | `budgets` | ein Budget zählt „ohne die Rücklage auf seiner Unterkategorie" und muss von ihr wissen |
+| 9 | `vermoegen` (mit `vorsorge`) | sammelt Konten und Depots; Vorsorge rechnet mit dem Nettovermögen |
+| 10 | `analyse` · `uebersicht` · `einstellungen` | Sichten ziehen zusammen, was darunter liegt, und niemand braucht sie |
 
-Ausführbar in `src/architektur.test.ts` („Modulgrenzen"): eine Richtung ist dort eine
-Zeile in `MODULGRENZEN`, geprüft über alle drei Schichten — direkte Importe, Namen über
-die Fassaden bis zu ihrer Herkunft, `dienste`-Aufrufe bis zum Use-Case, Schlüssel in der
-Oberfläche und in den Bausteinen, die der Bereich benutzt.
+Zwei Ordner zählen unter anderem Namen: `ui/training` ist `kategorien` (siehe unten), und
+`vorsorge` ist ein Teil von `vermoegen` — ein Bereich für die Regel, die Ordner bleiben
+vorerst. `klassifikator` gibt es als Ordner bisher nur im Kern; der Teil in
+`application/kategorien` und `ui/training` zählt bis zu seinem Umzug als `kategorien`.
+
+**Ein neuer Bereichsordner braucht einen Rang.** Jeder Ordner direkt unter `core/`,
+`application/` und `adapters/ui/` steht in der Tabelle oder ausdrücklich als „kein
+Bereich" (`basis`, `bausteine`); ein unbekannter Ordner macht den Test rot. Sonst liefe
+ein neuer Bereich still ohne Regel.
+
+**Die Wurzel der Schicht wägt ab, Bereiche dürfen das Ergebnis benutzen.** Was zwei
+Bereiche gegeneinander ABWÄGT, gehört keinem von beiden, sondern in die Wurzel — so die
+Zuständigkeit (`core/zustaendigkeit.ts`: am selben Knoten gewinnt das Budget). Was beide
+nur als FORM teilen, ebenso, wenn es kein Primitiv quer durch alles ist
+(`fortschreibung.ts`). Bezüge Bereich → Wurzel sind deshalb erlaubt und werden nicht
+verfolgt. Das ist eine bewusste Grenze der Regel: ein Weg Bereich → Wurzel → anderer
+Bereich bleibt für den Test unsichtbar. Er ist gewollt, solange die Wurzeldatei wirklich
+abwägt — eine Datei, die nur dorthin zieht, um der Regel zu entgehen, findet die
+Durchsicht, nicht der Test.
+
+**Einzelne Paare gelten strenger.** Rücklagen kennen keine Budgets auch in ihren TEXTEN
+nicht, und ebenso wenig in den Bausteinen, die sie benutzen (`MODULGRENZEN`). Daraus die
+Regel, die für jedes so geführte Paar gilt: **ein Baustein trägt keinen Bereich in einen
+anderen** — was ein Bereich nicht kennen darf, darf ein Baustein, den er benutzt, auch
+nicht, weder einen Use-Case noch einen i18n-Schlüssel aus dessen Namensraum. Ein geteilter
+Baustein hat seinen eigenen Namensraum (`verlaufChart.*`). Für die übrigen Paare prüft
+das niemand, weil die i18n-Namensräume heute nicht den Ordnern folgen.
+
+Ausführbar in `src/architektur.test.ts` („Modulgrenzen", „Rangfolge der Bereiche"): `RANG`
+ist die Tabelle oben, geprüft wird jeder Bezug über alle drei Schichten — direkte Importe,
+Namen über die Fassaden bis zu ihrer Herkunft, `dienste`-Aufrufe bis zum Use-Case.
+
+**Die heutigen Verstösse stehen als Altlast in `src/architektur.altlast.ts`**, je
+Bereichspaar mit einem Satz, wie der Abbau aussieht. Ein Eintrag ist eine Quelldatei mit
+ihrer Zieldatei: ein weiterer Name aus derselben Datei bricht nichts, ein Bezug auf eine
+andere schon. **Wer eine Datei umzieht, streicht ihre Einträge** — ein Eintrag, der nichts
+mehr verletzt, macht den Test rot, damit ein abgebauter Bezug nicht still zurückkommt. Der
+Abbau ist fast überall dasselbe: drei Ordner tragen heute zwei Ebenen (`konten` auch den
+Kontoauszug, `kategorien` auch das Training, `buchung` auch den Buchungsdialog), und die
+obere Hälfte zieht in die Wurzel, nach `bausteine/` oder in ihren eigenen Bereich. Neue
+Einträge gehören nicht hinein.
 
 Zwei Namen weichen ab, beide weil die OBERFLÄCHE der Navigation folgt und nicht der
 Fachgliederung:
