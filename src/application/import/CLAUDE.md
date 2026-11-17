@@ -1,6 +1,6 @@
 # Import — der Beleg
 
-Gilt für den Import und alles, was einen Beleg liest. Was überall gilt, steht in der Wurzel-`CLAUDE.md`.
+Gilt für den Import und alles, was einen Beleg liest. Was überall gilt, steht in der `CLAUDE.md` des Projekts.
 
 ## Der Beleg und was wir daraus gemacht haben
 

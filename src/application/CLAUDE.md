@@ -37,7 +37,7 @@ die Stelle, an der geprüft wird:
 Bereiche wie im Kern (`buchung/`, `konten/`, `budgets/`, `vertraege/`, `kategorien/`,
 `ruecklagen/`, `dubletten/`, `stammdaten/`) plus die eigenen Kontexte `import/` und `fints/`.
 
-In der Wurzel bleibt, was keinem Bereich gehört: `index.ts` (Fassade zur UI), `ports.ts`
+Direkt in `src/application/` bleibt, was keinem Bereich gehört: `index.ts` (Fassade zur UI), `ports.ts`
 (die Interfaces, von 76 Stellen benutzt), `bootstrap.ts`, `einstellungen.ts` und die
 querliegenden Sichten `uebersicht.ts` und `analysesichten.ts` — die rechnen absichtlich über
 mehrere Bereiche. Dazu `ausgabenvorschlaege.ts`: es lädt die Vorschläge für Budgets UND

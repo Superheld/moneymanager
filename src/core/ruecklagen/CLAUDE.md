@@ -1,6 +1,6 @@
 # Rücklagen
 
-Gilt für Rücklagen in Kern, Anwendung und Oberfläche. Was überall gilt, steht in der Wurzel-`CLAUDE.md`.
+Gilt für Rücklagen in Kern, Anwendung und Oberfläche. Was überall gilt, steht in der `CLAUDE.md` des Projekts.
 
 **Rücklagen kennen keine Budgets** (seit 2026-11-16, `src/architektur.test.ts`,
 „Modulgrenzen"): nichts unter `ruecklagen/` bezieht etwas aus `budgets/` — kein Import,
@@ -8,7 +8,7 @@ kein Name über die Fassade, kein Use-Case über `dienste`, kein Schlüssel `bud
 der Oberfläche, auch nicht in einem Baustein, den der Bereich benutzt. Eine Rücklage
 braucht für ihren Stand kein Budget. Wo das Budget doch mitspricht — am selben Knoten
 gewinnt es, darunter nimmt es ihr Buchungen ab —, ist das eine Abwägung zwischen beiden
-und steht in der Wurzel (`core/zustaendigkeit.ts`); dort holt die Rücklage ihre Entnahmen
+und steht bereichsübergreifend in `core/zustaendigkeit.ts`; dort holt die Rücklage ihre Entnahmen
 (`ruecklagenEntnahmenAus`). Gleich lautende Texte bekommen eigene Schlüssel unter
 `ruecklagen.…`.
 

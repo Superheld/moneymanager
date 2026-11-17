@@ -14,7 +14,7 @@ benutzt wird, gehört hierher. Was nur ein Bereich braucht, bleibt in seinem Ber
 Baustein, sondern ein Teil dieses Screens.
 
 **Ein Baustein trägt keinen Bereich in einen anderen** (seit 2026-11-16). Was ein Bereich
-nicht kennen darf (Wurzel-`CLAUDE.md`, „Modulgrenzen"), darf auch kein Baustein, den er
+nicht kennen darf (`CLAUDE.md` des Projekts, „Modulgrenzen"), darf auch kein Baustein, den er
 benutzt: keinen Use-Case jenes Bereichs aufrufen, keinen Schlüssel aus seinem
 Namensraum zeigen. Ein geteilter Baustein bekommt deshalb einen eigenen Namensraum —
 `VerlaufChart` (bis dahin `BudgetVerlaufChart`) zeichnet für Budgets und Rücklagen und

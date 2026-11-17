@@ -1368,7 +1368,7 @@ import {
  * Was nach dem Entsperren einmal laufen muss, bevor ein Screen lädt.
  *
  * Steht hier, damit auch der Einstieg (`App.tsx`) kein Repository in die Hand nimmt —
- * er liegt in der Wurzel von `src/` und damit ausserhalb jeder Schicht, und genau
+ * er liegt direkt in `src/` und damit ausserhalb jeder Schicht, und genau
  * deshalb hatte ihn der Architekturtest bis 2026-11-10 nicht gesehen.
  */
 export function appStarten(): Promise<void> {

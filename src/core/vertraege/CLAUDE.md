@@ -1,6 +1,6 @@
 # Verträge — Zuordnung und Erkennung
 
-Gilt für die Zuordnung von Buchungen zu Verträgen und für die Erkennungsregeln. Was überall gilt, steht in der Wurzel-`CLAUDE.md`.
+Gilt für die Zuordnung von Buchungen zu Verträgen und für die Erkennungsregeln. Was überall gilt, steht in der `CLAUDE.md` des Projekts.
 
 ## Ein Vertrag hat zwei Beträge: was abgeht und was er kostet
 

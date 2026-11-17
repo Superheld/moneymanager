@@ -52,7 +52,7 @@ import type { Cent } from "../basis/geld";
 import { kategorieUnterbaum, type Kategorie } from "../kategorien/kategorie";
 import { addMonate, parseIso, toIso } from "../basis/datum";
 // Wer einen Anteil trägt — dieses Budget, ein anderes, eine Rücklage darunter —, wägt die
-// Zuständigkeit in der Wurzel ab; hier wird nur noch gezählt.
+// Zuständigkeit bereichsübergreifend in `../zustaendigkeit.ts` ab; hier wird nur noch gezählt.
 import { getrageneBuchungen, type Verbrauchsposten, type Zustaendigkeitssicht } from "../zustaendigkeit";
 
 /** Seit Migration 81 die einzige Art; `aufbauend` ist eine Rücklage geworden. */

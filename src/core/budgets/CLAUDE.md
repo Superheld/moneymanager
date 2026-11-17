@@ -1,6 +1,6 @@
 # Budgets
 
-Gilt für Budgets in Kern, Anwendung und Oberfläche. Was überall gilt, steht in der Wurzel-`CLAUDE.md`.
+Gilt für Budgets in Kern, Anwendung und Oberfläche. Was überall gilt, steht in der `CLAUDE.md` des Projekts.
 
 ## Budgets kennen Rücklagen — nicht umgekehrt
 
@@ -9,7 +9,7 @@ Seit 2026-11-16 eine Modulgrenze (`src/architektur.test.ts`, „Modulgrenzen"): 
 in keiner der drei Schichten. Ein Budget zählt „ohne die Rücklage auf seiner
 Unterkategorie" und muss von ihr wissen; eine Rücklage braucht für ihren Stand kein Budget.
 
-Was beide gegeneinander abwägt, steht in der Wurzel und gehört keinem: wer einen Anteil
+Was beide gegeneinander abwägt, steht direkt in `src/core/` bzw. `src/application/` und gehört keinem: wer einen Anteil
 trägt (`core/zustaendigkeit.ts` samt `Zustaendigkeitssicht` und `getrageneBuchungen`), die
 Form eines Monats im Verlauf (`core/fortschreibung.ts`), der alte Merkzettel der
 Vorschläge (`application/ausgabenvorschlaege.ts`). Wer hier etwas baut, das auch eine
@@ -76,8 +76,8 @@ Budgets: ein Vorschlag „Rücklage" öffnete dort den Dialog einer Rücklage, u
 Budget erwartete, fand das Ergebnis in einem anderen Bereich. Drei Dinge daran sind
 Entscheidung:
 
-- **Die Einstufung bleibt eine Rechnung** und liegt deshalb in der Wurzel von Kern und
-  Anwendung (`application/ausgabenvorschlaege.ts` lädt für beide Bereiche). Zwei
+- **Die Einstufung bleibt eine Rechnung** und liegt deshalb direkt in `src/core/` und
+  `src/application/` (`application/ausgabenvorschlaege.ts` lädt für beide Bereiche). Zwei
   Funktionen mit je einer Hälfte der Schwelle könnten auseinanderlaufen, und eine
   Kategorie stünde in beiden Karten oder in keiner.
 - **Die Zahlen sind dieselben wie vorher**: dieselbe Kategorie bekommt denselben Betrag,

@@ -6,7 +6,7 @@
 // Ausgabe unter „Ungeplant". Das ist richtig gerechnet und liest sich wie ein Fehler.
 //
 // Diese Datei beantwortet deshalb die Frage davor: WAS fehlt, in der Reihenfolge, in der
-// man es am besten nachholt. Sie liegt quer in der Wurzel des Kerns, weil sie über fünf
+// man es am besten nachholt. Sie liegt direkt in `src/core/`, weil sie über fünf
 // Bereiche hinwegsieht und zu keinem gehört.
 //
 // Sie schätzt nichts und schlägt nichts vor. Ein Schritt ist erledigt, wenn die Sache da

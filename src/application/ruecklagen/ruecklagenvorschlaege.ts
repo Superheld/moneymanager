@@ -14,8 +14,8 @@
 // (`ruecklagenvorschlag.ignoriert`); gelesen wird dazu der der Budgets: bis zur Trennung
 // verwarf man auch eine Rücklage über „kein Budget", und was dort steht, soll hier nicht
 // wieder auftauchen. Eine Migration braucht es dafür nicht — es ist dieselbe Tabelle,
-// nur ein Schlüssel mehr beim Lesen. Der alte Schlüssel steht in der Wurzel
-// (`../ausgabenvorschlaege.ts`): gelesen wird er hier, ohne die Budgets zu fragen.
+// nur ein Schlüssel mehr beim Lesen. Der alte Schlüssel steht direkt in
+// `src/application/` (`../ausgabenvorschlaege.ts`): gelesen wird er hier, ohne die Budgets zu fragen.
 
 import { ignorierenVermerken, ignorierteLesen } from "../einstellungen";
 import { ruecklagenAnteile, type Ruecklagenvorschlag } from "../../core";

@@ -1,6 +1,6 @@
 # Konten — Belegung, Stilllegen, Vorschau
 
-Gilt für alles, was den Stand eines Kontos verteilt, ein Konto aus dem Verkehr zieht oder vorausrechnet. Was überall gilt, steht in der Wurzel-`CLAUDE.md`.
+Gilt für alles, was den Stand eines Kontos verteilt, ein Konto aus dem Verkehr zieht oder vorausrechnet. Was überall gilt, steht in der `CLAUDE.md` des Projekts.
 
 ## Die Kontobelegung — wem das Geld auf einem Konto gehört
 

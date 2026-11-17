@@ -1,6 +1,6 @@
 # Buchung — Richtung, Einordnung, Umbuchungen
 
-Gilt für alles, was an einer Ist-Buchung Richtung, Charakter oder Paarung berührt — auch in der Maske. Was überall gilt, steht in der Wurzel-`CLAUDE.md`.
+Gilt für alles, was an einer Ist-Buchung Richtung, Charakter oder Paarung berührt — auch in der Maske. Was überall gilt, steht in der `CLAUDE.md` des Projekts.
 
 ## Was eine Buchung kaufmännisch ist, steht nicht hier
 

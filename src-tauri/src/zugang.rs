@@ -710,7 +710,7 @@ mod tests {
     /// Deshalb `#[ignore]` und ein Pfad von aussen. **Gemeint ist eine unverschluesselte
     /// Kopie des SPIELSTANDS** (`npm run seed` schreibt ihn vollstaendig migriert), nicht
     /// der echte Bestand: echte Daten kommen in der Entwicklung nicht vor, auch nicht als
-    /// Probe (Wurzel-`CLAUDE.md`, „Eine Aenderung machen"). Bis 2026-11-10 stand hier ein
+    /// Probe (`CLAUDE.md` des Projekts, „Eine Aenderung machen"). Bis 2026-11-10 stand hier ein
     /// Rezept mit einer Lesekopie des echten Bestands — aelter als die Regel und seit der
     /// Verschluesselung ohnehin nicht mehr ausfuehrbar.
     ///

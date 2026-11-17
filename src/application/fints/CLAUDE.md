@@ -1,6 +1,6 @@
 # Bankabruf — Vormerkungen
 
-Gilt für den Abruf und für alles, was Vormerkungen liest. Die Bibliothek dahinter beschreibt der Skill `lib-fints`. Was überall gilt, steht in der Wurzel-`CLAUDE.md`.
+Gilt für den Abruf und für alles, was Vormerkungen liest. Die Bibliothek dahinter beschreibt der Skill `lib-fints`. Was überall gilt, steht in der `CLAUDE.md` des Projekts.
 
 ## Eine Vormerkung ist eine Beobachtung, keine Buchung
 

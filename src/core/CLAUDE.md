@@ -12,13 +12,13 @@ macht jeden Test von der Laufzeit abhängig. Zeitpunkte kommen als Parameter her
 `zahlungsregel`, `muster`, `fehler`, `region`. Alles Fachliche liegt in seinem Bereich
 (`buchung/`, `konten/`, `budgets/`, `vertraege/`, `kategorien/`, `ruecklagen/`,
 `vermoegen/`, `vorsorge/`, `stammdaten/`, `depot/`, `klassifikator/`, `zugang/`,
-`sicherung/`), und zwischen ihnen gilt die Rangfolge aus der Wurzel-`CLAUDE.md`
-(„Zwischen den Bereichen gibt es eine Rangfolge"). In der Wurzel bleibt nur, was über Bereiche hinweg rechnet
+`sicherung/`), und zwischen ihnen gilt die Rangfolge aus der `CLAUDE.md` des Projekts
+(„Zwischen den Bereichen gibt es eine Rangfolge"). Direkt in `src/core/` bleibt nur, was über Bereiche hinweg rechnet
 (`monatsausblick.ts`, `einordnung.ts`, `ergebnis.ts`, `reichweite.ts`, `bericht.ts`, `einrichtung.ts`,
 `ausgabenvorschlaege.ts` — Budget oder Rücklage, für beide Bereiche in einer Rechnung) und die Fassade `index.ts`.
 
 Dazu zwei Dateien, die **genau zwischen zwei Bereichen stehen**, weil
-Rücklagen keine Budgets kennen (Wurzel-`CLAUDE.md`, „Modulgrenzen"):
+Rücklagen keine Budgets kennen (`CLAUDE.md` des Projekts, „Modulgrenzen"):
 `zustaendigkeit.ts` wägt ab, wer einen Anteil trägt — ein Budget oder eine Rücklage — und
 hält die Sicht dafür (`Zustaendigkeitssicht`, bis 2026-11-16 `BudgetSicht`);
 `fortschreibung.ts` hält die Form eines Monats (`Fortschreibungsmonat`, vorher
@@ -161,7 +161,7 @@ auf" ausführbar macht.
 | `bericht.ts` | Ein abgeschlossener Monat oder ein Jahr auf einem Blatt: summiert Monatsergebnisse und ihre Überleitung, stellt den Zeitraum davor daneben, vergleicht das Nettovermögen an zwei Stichtagen. Rechnet nichts Eigenes — ein Jahr ist die Summe seiner Monate, und deshalb geht auch seine Überleitung exakt auf. |
 | `monatsausblick.ts` | Die Aufrechnung nach AUSZAHLUNG: was gebucht ist und was fällig wird. Sie trägt den Saldo-Ausblick der Analyse und ordnet noch über Betragsnähe zu. |
 
-Beide neuen Dateien liegen in der Wurzel, aus demselben Grund wie `monatsausblick.ts`: sie
+Beide neuen Dateien liegen direkt in `src/core/`, aus demselben Grund wie `monatsausblick.ts`: sie
 rechnen über alle Bereiche.
 
 **Die Einordnung ist abgeleitet, nicht gespeichert.** Sie folgt aus Kategorie, Vertrag,

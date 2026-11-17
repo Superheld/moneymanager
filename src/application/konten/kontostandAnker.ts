@@ -1,7 +1,7 @@
 // Die zwei Handlungen rund um den Kontostands-Anker: einen setzen, und einmal abgleichen.
 //
 // Beides sind Schreibfälle und stehen deshalb hier statt in `kontensichten` — die rechnet
-// nur. Der Abruf setzt seine Anker selbst (siehe `abrufAusfuehren` in der Wurzel); was hier steht,
+// nur. Der Abruf setzt seine Anker selbst (siehe `src/application/abrufAusfuehren.ts`); was hier steht,
 // ist der Weg von Hand.
 
 import {

@@ -1,6 +1,6 @@
 # Der Spielstand
 
-Gilt für `npm run seed` und `src/testwerkzeug/seedDaten.ts`. Was überall gilt, steht in der Wurzel-`CLAUDE.md`.
+Gilt für `npm run seed` und `src/testwerkzeug/seedDaten.ts`. Was überall gilt, steht in der `CLAUDE.md` des Projekts.
 
 ## Wann der Spielstand neu geschrieben wird
 

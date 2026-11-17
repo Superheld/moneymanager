@@ -1,6 +1,6 @@
 # Buchung — GoBD und Journal
 
-Gilt für alles, was eine Buchung protokolliert, zurücksetzt oder löscht. Was überall gilt, steht in der Wurzel-`CLAUDE.md`.
+Gilt für alles, was eine Buchung protokolliert, zurücksetzt oder löscht. Was überall gilt, steht in der `CLAUDE.md` des Projekts.
 
 ## Wie weit die App den GoBD folgt
 

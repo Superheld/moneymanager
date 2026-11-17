@@ -8,7 +8,7 @@
 // Gefragt wird nur für Ausgaben, die keine Umbuchung, keine Umschichtung, kein Ertrag und
 // keine Vertragszahlung sind: diese Schritte bleiben, wie sie sind, und kommen vorher.
 //
-// **Warum in der Wurzel und in keinem der beiden Bereiche:** hier wird ABGEWOGEN — am
+// **Warum direkt in `src/core/` und in keinem der beiden Bereiche:** hier wird ABGEWOGEN — am
 // selben Knoten gewinnt das Budget, darunter nimmt eine Rücklage dem Budget ihre Buchungen
 // ab und umgekehrt. Das ist keine Eigenschaft des Budgets und keine der Rücklage, sondern
 // eine Regel zwischen beiden. Bis 2026-11-16 stand sie in `ruecklagen/`, und die Rücklagen

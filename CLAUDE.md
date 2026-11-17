@@ -78,7 +78,8 @@ Drei Regeln, wohin eine neue Datei gehört:
   Geld, Datum, Währung, Zahlungsregel, Muster, Fehler, Region. Fachliches gehört auch im
   Kern in seinen Bereich.
 
-Was **keinem** Bereich gehört, bleibt in der Wurzel der Schicht: die Fassaden (`index.ts`,
+Was **keinem** Bereich gehört, liegt direkt im Ordner der Schicht (`src/core/`,
+`src/application/`, `src/adapters/ui/`): die Fassaden (`index.ts`,
 `ports.ts`), der Start (`bootstrap.ts`) und die bewusst querliegenden Sichten
 (`uebersicht.ts`, `analysesichten.ts`, `core/monatsausblick.ts`, `core/auswertung.ts`,
 `core/einordnung.ts`, `core/ergebnis.ts`, `core/reichweite.ts`, `core/bericht.ts`,
@@ -118,14 +119,14 @@ vorerst. `klassifikator` gibt es als Ordner bisher nur im Kern; der Teil in
 Bereich" (`basis`, `bausteine`); ein unbekannter Ordner macht den Test rot. Sonst liefe
 ein neuer Bereich still ohne Regel.
 
-**Die Wurzel der Schicht wägt ab, Bereiche dürfen das Ergebnis benutzen.** Was zwei
-Bereiche gegeneinander ABWÄGT, gehört keinem von beiden, sondern in die Wurzel — so die
-Zuständigkeit (`core/zustaendigkeit.ts`: am selben Knoten gewinnt das Budget). Was beide
-nur als FORM teilen, ebenso, wenn es kein Primitiv quer durch alles ist
-(`fortschreibung.ts`). Bezüge Bereich → Wurzel sind deshalb erlaubt und werden nicht
-verfolgt. Das ist eine bewusste Grenze der Regel: ein Weg Bereich → Wurzel → anderer
-Bereich bleibt für den Test unsichtbar. Er ist gewollt, solange die Wurzeldatei wirklich
-abwägt — eine Datei, die nur dorthin zieht, um der Regel zu entgehen, findet die
+**Bereichsübergreifende Dateien wägen ab, Bereiche dürfen das Ergebnis benutzen.** Was zwei
+Bereiche gegeneinander ABWÄGT, gehört keinem von beiden, sondern direkt in den Ordner der
+Schicht — so die Zuständigkeit (`core/zustaendigkeit.ts`: am selben Knoten gewinnt das
+Budget). Was beide nur als FORM teilen, ebenso, wenn es kein Primitiv quer durch alles ist
+(`fortschreibung.ts`). Bezüge eines Bereichs auf eine solche Datei sind deshalb erlaubt und
+werden nicht verfolgt. Das ist eine bewusste Grenze der Regel: ein Weg Bereich →
+bereichsübergreifende Datei → anderer Bereich bleibt für den Test unsichtbar. Er ist
+gewollt, solange diese Datei wirklich abwägt — eine Datei, die nur dorthin zieht, um der Regel zu entgehen, findet die
 Durchsicht, nicht der Test.
 
 **Einzelne Paare gelten strenger.** Rücklagen kennen keine Budgets auch in ihren TEXTEN
@@ -147,7 +148,8 @@ andere schon. **Wer eine Datei umzieht, streicht ihre Einträge** — ein Eintra
 mehr verletzt, macht den Test rot, damit ein abgebauter Bezug nicht still zurückkommt. Der
 Abbau ist fast überall dasselbe: drei Ordner tragen heute zwei Ebenen (`konten` auch den
 Kontoauszug, `kategorien` auch das Training, `buchung` auch den Buchungsdialog), und die
-obere Hälfte zieht in die Wurzel, nach `bausteine/` oder in ihren eigenen Bereich. Neue
+obere Hälfte zieht direkt in den Ordner der Schicht, nach `bausteine/` oder in ihren
+eigenen Bereich. Neue
 Einträge gehören nicht hinein.
 
 Zwei Namen weichen ab, beide weil die OBERFLÄCHE der Navigation folgt und nicht der

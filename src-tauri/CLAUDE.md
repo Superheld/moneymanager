@@ -1,6 +1,6 @@
 # Shell — CSP, Verschlüsselung, Sicherungen
 
-Gilt für die Rust-Shell und ihre Konfiguration. Was überall gilt, steht in der Wurzel-`CLAUDE.md`.
+Gilt für die Rust-Shell und ihre Konfiguration. Was überall gilt, steht in der `CLAUDE.md` des Projekts.
 
 ## Die CSP ist die Sperre, nicht die Absicht
 

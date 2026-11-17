@@ -61,15 +61,15 @@ Die Navigation steht in `bausteine/AppShell.tsx`, die Zuordnung zur Komponente i
 
 Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlich ist es
 `kategorien/` wie in Kern und Anwendung. Die bereichsübergreifenden Tests (`screens`,
-`interaktion`, `formulare`, `leereZustaende`) liegen in der Wurzel.
+`interaktion`, `formulare`, `leereZustaende`) liegen direkt in `src/adapters/ui/`.
 
 Die Inbox liegt in `review/` und nicht bei `import/`, obwohl sie im Menü unter Import
 steht: sie öffnet den Buchungsdialog und fragt Dubletten, Umbuchungen und Verträge — alles
-Bereiche ÜBER dem Beleg (Rangfolge in der Wurzel-`CLAUDE.md`). `review/` steht deshalb auf
+Bereiche ÜBER dem Beleg (Rangfolge in der `CLAUDE.md` des Projekts). `review/` steht deshalb auf
 der Stufe der Sichten. Der Bereich `ImportBereich` geht mit, weil er die Inbox als Reiter
 zeigt: wer zusammensetzt, steht mindestens so hoch wie das Höchste, das er zeigt. Ein
-eigener Ordner statt einer losen Datei in der Wurzel, weil in der Wurzel nur `App.tsx` und
-die bereichsübergreifenden Tests liegen und ein Screen dort von keiner Regel erfasst wäre.
+eigener Ordner statt einer losen Datei direkt in `src/adapters/ui/`, weil dort nur die
+bereichsübergreifenden Tests liegen und ein Screen dort von keiner Regel erfasst wäre.
 
 ## Bausteinkatalog — wofür es schon etwas gibt
 

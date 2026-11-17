@@ -1,7 +1,8 @@
 // Ausgabenvorschläge — lädt zusammen, was die reine Funktion `core/ausgabenvorschlaege`
 // braucht, und liefert ihre beiden Listen: Budgets und Rücklagen.
 //
-// In der Wurzel und nicht in einem Bereich, aus demselben Grund wie im Kern: zwei
+// Direkt in `src/application/` und in keinem Bereichs-Ordner, aus demselben Grund wie im
+// Kern: zwei
 // Bereiche lesen hieraus (`budgets/budgetvorschlaege`, `ruecklagen/ruecklagenvorschlaege`),
 // und beide müssen dieselbe Einstufung über dieselben Buchungen sehen. Läge das Laden
 // zweimal da, könnte eine Kategorie in einem Bereich mit, im anderen ohne Vertragsanteil
@@ -102,7 +103,7 @@ export async function ausgabenvorschlaegeLaden(
  * Bis 2026-11-16 stand jeder Vorschlag im Bereich Budgets, auch der einer Rücklage, und
  * wer ihn verwarf, schrieb ihn hierher. Der Bereich Budgets schreibt und liest ihn weiter;
  * der Bereich Rücklagen liest ihn mit, damit ein damals verworfener Vorschlag nicht
- * wieder auftaucht. Er gehört damit beiden und steht in der Wurzel: Rücklagen kennen
+ * wieder auftaucht. Er gehört damit beiden und steht direkt in `src/application/`: Rücklagen kennen
  * keine Budgets (`src/architektur.test.ts`, „Modulgrenzen").
  */
 export const SCHLUESSEL_BUDGETVORSCHLAG_IGNORIERT = "budgetvorschlag.ignoriert";

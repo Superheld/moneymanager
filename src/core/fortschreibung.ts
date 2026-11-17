@@ -8,8 +8,8 @@
 // „Modulgrenzen"), und läge sie bei den Budgets, holte jede Rücklage ihren Verlauf dort.
 //
 // Warum nicht `basis/`: dort liegen Primitive, die quer durch ALLES gehen (Geld, Datum).
-// Ein Monat einer Fortschreibung betrifft genau zwei Bereiche. Er bleibt in der Wurzel,
-// wo steht, was keinem Bereich gehört. Bis 2026-11-16 hiess der Typ `Budgetmonat` und
+// Ein Monat einer Fortschreibung betrifft genau zwei Bereiche. Er bleibt direkt in
+// `src/core/`, wo steht, was keinem Bereich gehört. Bis 2026-11-16 hiess der Typ `Budgetmonat` und
 // stand in `budgets/budgetverlauf.ts`.
 
 import type { Cent } from "./basis/geld";

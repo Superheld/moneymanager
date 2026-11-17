@@ -1,6 +1,6 @@
 // Die Altlast der Rangfolge: Bezüge, die heute gegen die Rangfolge der Bereiche verstossen
 // und (noch) bleiben dürfen. Die Regel selbst steht in `architektur.test.ts` (`RANG`), ihr
-// Grund in der Wurzel-`CLAUDE.md` unter „Zwischen den Bereichen gibt es eine Rangfolge".
+// Grund in der `CLAUDE.md` des Projekts unter „Zwischen den Bereichen gibt es eine Rangfolge".
 //
 // Warum eine eigene Datei: die Liste ist lang, und im Test verdeckte sie die Regel. Hier
 // steht sie nach Bereichspaar gruppiert, je Gruppe ein Satz, wie der Abbau aussieht — der
@@ -33,10 +33,11 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     von: "konten",
     auf: "buchung",
     abbau:
-      "Der Kontoauszug ist eine Sicht und zieht in die Wurzel (`kontensichten`, " +
+      "Der Kontoauszug ist eine Sicht und zieht bereichsübergreifend direkt in den Ordner " +
+      "seiner Schicht (`kontensichten`, " +
       "`abgleichsicht`, `kontobelegung` der Anwendung, `KontenScreen` und Verwandte); " +
       "`kontostand` und `kontoregister` rechnen über Buchungen je Konto und gehören zu " +
-      "`buchung`; `liquiditaet` wägt Konto gegen Budgetlast ab und gehört in die Wurzel; " +
+      "`buchung`; `liquiditaet` wägt Konto gegen Budgetlast ab und gehört direkt nach `src/core/`; " +
       "der Typ `Klassenstand` gehört zum Konto.",
     eintraege: [
       "adapters/ui/konten/EinordnungsPillen.tsx → application/buchung/einordnungssicht.ts",
@@ -94,7 +95,7 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     auf: "vertraege",
     abbau:
       "Der Buchungsdialog ist eine Sicht über fast alles: `buchungsdetail` und " +
-      "`einordnungssicht` in die Wurzel der Anwendung, `BuchungDetail`, `SammelDialog` und " +
+      "`einordnungssicht` direkt nach `src/application/`, `BuchungDetail`, `SammelDialog` und " +
       "`VertragsBlock` nach `bausteine/` (er wird aus vielen Bereichen geöffnet).",
     eintraege: [
       "adapters/ui/buchung/BuchungDetail.tsx → adapters/ui/vertraege/VertragModal.tsx",
@@ -117,7 +118,9 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     auf: "fints",
     abbau:
       "Die Bankzugangs-Oberfläche (`BankzugaengeScreen`, `Bankprofilkarte`) zieht in einen " +
-      "eigenen Ordner `ui/fints`, die Kontoauszug-Sichten in die Wurzel. Offen: ob die " +
+      "eigenen Ordner `ui/fints`, die Kontoauszug-Sichten direkt nach `src/application/`. " +
+      "Erst nach der offenen Frage: `KontenVerwaltungScreen` zeigt `BankzugaengeScreen` als " +
+      "Reiter und stünde als `konten` unter ihm, solange er selbst dort liegt. Offen: ob die " +
       "Bankzuordnung beim Anlegen eines Kontos (`KontoAnlegenModal`, " +
       "`KontenVerwaltungScreen`) zum Konto gehört oder ein eigener Schritt des Bankzugangs " +
       "wird.",
@@ -139,7 +142,7 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     auf: "ruecklagen",
     abbau:
       "Wie bei den Verträgen: der Buchungsdialog samt `RuecklagenwahlBlock` nach " +
-      "`bausteine/`, `buchungsdetail` und `einordnungssicht` in die Wurzel.",
+      "`bausteine/`, `buchungsdetail` und `einordnungssicht` direkt nach `src/application/`.",
     eintraege: [
       "adapters/ui/buchung/BuchungDetail.tsx → application/ruecklagen/ruecklageZuordnen.ts",
       "adapters/ui/buchung/RuecklagenwahlBlock.tsx → application/ruecklagen/ruecklageZuordnen.ts",
@@ -168,7 +171,7 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     von: "konten",
     auf: "import",
     abbau:
-      "Die Herkunft im Kontoauszug ist eine Sicht und zieht mit ihm in die Wurzel; " +
+      "Die Herkunft im Kontoauszug ist eine Sicht und zieht mit ihm aus dem Bereich; " +
       "`typAusName` (aus `kontoMatch`) leitet einen Kontotyp ab und gehört zu `konten`.",
     eintraege: [
       "adapters/ui/konten/HerkunftBereich.tsx → application/import/umsatz.ts",
@@ -220,7 +223,7 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     von: "konten",
     auf: "ruecklagen",
     abbau:
-      "`kontobelegung` der Anwendung holt Rücklagen UND Budgets und wägt ab: in die Wurzel, " +
+      "`kontobelegung` der Anwendung holt Rücklagen UND Budgets und wägt ab: direkt nach `src/application/`, " +
       "mit ihm `kontensichten`.",
     eintraege: [
       "application/konten/kontensichten.ts → application/ruecklagen/ruecklagenbestand.ts",
@@ -232,7 +235,7 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     von: "konten",
     auf: "vertraege",
     abbau:
-      "Der Kontoauszug zieht in die Wurzel (siehe konten → buchung).",
+      "Der Kontoauszug zieht aus dem Bereich (siehe konten → buchung).",
     eintraege: [
       "adapters/ui/konten/KontenScreen.tsx → core/vertraege/vertrag.ts",
       "application/konten/kontensichten.ts → application/vertraege/vertragszuordnung.ts",
@@ -253,7 +256,7 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     auf: "budgets",
     abbau:
       "`liquiditaet` (Kern) und `kontobelegung` (Anwendung) wägen Konto gegen Budget ab und " +
-      "gehören in die Wurzel.",
+      "gehören direkt nach `src/core/` bzw. `src/application/`.",
     eintraege: [
       "application/konten/kontobelegung.ts → core/budgets/budget.ts",
       "core/konten/liquiditaet.ts → core/budgets/budget.ts",
@@ -263,7 +266,7 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     von: "konten",
     auf: "depot",
     abbau:
-      "Der Depotauszug ist Teil des Kontoauszugs und zieht mit ihm in die Wurzel.",
+      "Der Depotauszug ist Teil des Kontoauszugs und zieht mit ihm aus dem Bereich.",
     eintraege: [
       "adapters/ui/konten/DepotAuszug.tsx → application/depot/depotsichten.ts",
       "application/konten/kontensichten.ts → application/depot/depotsichten.ts",
@@ -273,7 +276,7 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     von: "konten",
     auf: "dubletten",
     abbau:
-      "Der Kontoauszug zieht in die Wurzel (siehe konten → buchung).",
+      "Der Kontoauszug zieht aus dem Bereich (siehe konten → buchung).",
     eintraege: [
       "adapters/ui/konten/KontenScreen.tsx → application/dubletten/dublettensicht.ts",
       "application/konten/kontensichten.ts → application/dubletten/dublettensicht.ts",
@@ -283,7 +286,7 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     von: "buchung",
     auf: "budgets",
     abbau:
-      "`einordnungssicht` in die Wurzel der Anwendung.",
+      "`einordnungssicht` direkt nach `src/application/`.",
     eintraege: [
       "application/buchung/einordnungssicht.ts → core/budgets/budget.ts",
     ],

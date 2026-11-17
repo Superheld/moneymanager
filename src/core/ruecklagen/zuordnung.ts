@@ -2,7 +2,7 @@
 // Blick auf ein Budget.
 //
 // Die Abwägung zwischen beiden („trägt diese Buchung das Budget oder die Rücklage?")
-// steht in der Wurzel (`../zustaendigkeit.ts`), weil sie keinem der beiden Bereiche
+// steht bereichsübergreifend in `../zustaendigkeit.ts`, weil sie keinem der beiden Bereiche
 // gehört. Hier bleibt, was nur die Rücklage betrifft: welche Zuordnungen es gibt, an
 // welchen Tagen sie ihre Kategorie trägt und welche Rücklagen zur Wahl stehen. Rücklagen
 // kennen keine Budgets (`src/architektur.test.ts`, „Modulgrenzen").
