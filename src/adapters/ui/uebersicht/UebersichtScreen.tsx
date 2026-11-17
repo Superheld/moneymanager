@@ -54,7 +54,7 @@ import {
 import { abrufstand, depots, uebersicht } from "../../dienste";
 import { Button, Card, CoverageTrack } from "../bausteine";
 import { AbrufDialog } from "../bausteine/AbrufDialog";
-import { BuchungDetail } from "../buchung/BuchungDetail";
+import { BuchungDetail } from "../bausteine/BuchungDetail";
 import { Buchungsliste } from "../bausteine/Buchungsliste";
 import { AUFKLAPP_ZEILEN_SCHMAL } from "../bausteine/aufklappen";
 import { DepotKarte } from "./DepotKarte";

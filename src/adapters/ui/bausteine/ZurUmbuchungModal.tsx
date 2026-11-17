@@ -9,13 +9,13 @@ import { istAktiv, type IstBuchung, type Zahlungskonto } from "../../../applicat
 import type { Umsatz } from "../../../application/import";
 import { paarungsKandidaten, MAX_VORSCHLAG_TAGE } from "../../../application/buchung/umbuchungAusBuchung";
 import { buchungenPaaren, gegenbeinErzeugen } from "../../dienste";
-import { Auswahl } from "../bausteine/Auswahl";
-import { Button } from "../bausteine";
-import { Modal } from "../bausteine/Modal";
-import { fehlerNachricht, useDatum, useGeld } from "../bausteine/einstellungenKontext";
-import { geldFarbe } from "../bausteine/geldFarbe";
+import { Auswahl } from "./Auswahl";
+import { Button } from ".";
+import { Modal } from "./Modal";
+import { fehlerNachricht, useDatum, useGeld } from "./einstellungenKontext";
+import { geldFarbe } from "./geldFarbe";
 import { Option, Optionsgruppe } from "./Optionsgruppe";
-import { Trenner } from "../bausteine/Anordnung";
+import { Trenner } from "./Anordnung";
 
 /**
  * S-1 — macht aus einer bestehenden Buchung eine Umbuchung. EIN Dialog für beide Fälle:

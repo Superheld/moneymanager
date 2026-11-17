@@ -4,7 +4,7 @@
 // (ADR-0006, Entscheidung 5). Solange zählt sie als ungeplant. Bis Paket 5 stand das nur
 // als Pille im Kontoauszug, und was offen ist, fand man nur durch Durchsehen; hier steht
 // es gesammelt, und gewählt wird direkt in der Zeile — dieselbe Wahl wie im Buchungsdialog
-// (`buchung/RuecklagenwahlBlock`), über denselben Use-Case (`ruecklageZuordnen`).
+// (`bausteine/RuecklagenwahlBlock`), über denselben Use-Case (`ruecklageZuordnen`).
 //
 // Was wartet und was zur Wahl steht, kommt fertig aus der Sicht (`wartend`). Vorbelegt
 // wird nichts: eine Vorbelegung sähe aus wie eine Entscheidung, die niemand getroffen hat.

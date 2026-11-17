@@ -34,7 +34,7 @@ import { VormerkungsBlock } from "./VormerkungsBlock";
 import { UmbuchungModal } from "./UmbuchungModal";
 import { useRegisterfilter } from "./useRegisterfilter";
 import { useSammelauswahl } from "../bausteine/useSammelauswahl";
-import { BuchungDetail } from "../buchung/BuchungDetail";
+import { BuchungDetail } from "../bausteine/BuchungDetail";
 import { DublettenVergleich, type Vergleichsseite } from "../buchung/DublettenVergleich";
 import { SammelDialog } from "../buchung/SammelDialog";
 import { AbrufDialog } from "../bausteine/AbrufDialog";

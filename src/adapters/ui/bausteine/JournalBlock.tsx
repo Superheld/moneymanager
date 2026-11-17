@@ -15,9 +15,9 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Buchungshistorie, IstBuchung, Journaleintrag, Vergleichsfeld } from "../../../application";
-import { fehlerNachricht, useDatum, useGeld } from "../bausteine/einstellungenKontext";
-import { Button } from "../bausteine/Button";
-import { Klappblock } from "../bausteine/Klappblock";
+import { fehlerNachricht, useDatum, useGeld } from "./einstellungenKontext";
+import { Button } from "./Button";
+import { Klappblock } from "./Klappblock";
 
 /** Womit sich ein Feldwert lesbar machen laesst — Namen und Geldformat kennt nur die UI. */
 interface Lesehilfe {

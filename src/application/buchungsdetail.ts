@@ -8,8 +8,12 @@
 //
 // Alles LESENDE steht hier. Die Schreibfälle bleiben eigene Use-Cases (buchungErfassen,
 // buchungSplitten, zuordnungVonHand …) — sie sind schon jeweils an ihrem Ort.
+//
+// Direkt in `src/application/` und nicht in `buchung/`: der Zusammenhang, den der Dialog
+// zeigt, kommt aus Verträgen und Rücklagen, und beide stehen in der Rangfolge über der
+// Buchung. Eine Sicht über mehrere Bereiche gehört keinem von ihnen.
 
-import { belegZuBuchung } from "./belegZuBuchung";
+import { belegZuBuchung } from "./buchung/belegZuBuchung";
 import { einordnungJeBuchung, type Buchungseinordnung } from "./einordnungssicht";
 import type {
   IstBuchung,
@@ -18,14 +22,14 @@ import type {
   Vertragszuordnung,
   Zahlungskonto,
   Zahlungsregel,
-} from "../../core";
-import type { ImportLauf, Umsatz } from "../import";
+} from "../core";
+import type { ImportLauf, Umsatz } from "./import";
 import {
   freigegebenePaare,
   ledgerVerdacht,
   type Dublettenfreigabe,
   type Dublettenverdacht,
-} from "../dubletten/dublettensicht";
+} from "./dubletten/dublettensicht";
 import type {
   BudgetRepository,
   DublettenfreigabeRepository,
@@ -39,9 +43,9 @@ import type {
   ZahlungsregelRepository,
   RuecklagenRepository,
   RuecklagenzuordnungRepository,
-} from "../ports";
-import { ruecklagenbestandLaden } from "../ruecklagen/ruecklagenbestand";
-import { ruecklagenwahlJeBuchung, type Ruecklagenwahl } from "../ruecklagen/ruecklageZuordnen";
+} from "./ports";
+import { ruecklagenbestandLaden } from "./ruecklagen/ruecklagenbestand";
+import { ruecklagenwahlJeBuchung, type Ruecklagenwahl } from "./ruecklagen/ruecklageZuordnen";
 
 export interface BuchungsdetailDeps {
   readonly kontoRepo: ZahlungskontoRepository;

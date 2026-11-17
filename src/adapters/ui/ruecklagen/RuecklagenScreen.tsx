@@ -35,7 +35,7 @@ import {
   ruecklagenvorschlaege,
   ruecklagenvorschlagVerwerfen,
 } from "../../dienste";
-import { BuchungDetail } from "../buchung/BuchungDetail";
+import { BuchungDetail } from "../bausteine/BuchungDetail";
 import { Button, Card, CoverageTrack, KPIStat, Pill } from "../bausteine";
 import { FaustformelTacho } from "./FaustformelTacho";
 import { RuecklageDialog, type RuecklageVorbelegung } from "./RuecklageDialog";

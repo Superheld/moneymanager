@@ -48,7 +48,7 @@ ein Baustein; was einer benutzt, gehört in dessen Ordner** — auch wenn es all
 | `vermoegen/` | Nettovermögen mit Verlauf, Vermögenswerte und Schulden als Werte zum Stichtag |
 | `vertraege/` | Verträge und ihre Erkennung |
 | `konten/` | der Kontoauszug („Buchungen", `ScreenId` `konten`), Kontenverwaltung, Bankzugänge, Abgleich, Depotauszug |
-| `buchung/` | der Buchungsdialog in Teilen (unten) — er wird aus mehreren Bereichen geöffnet |
+| `buchung/` | `SammelDialog` und `DublettenVergleich` — beide öffnet nur der Kontoauszug; der Buchungsdialog selbst liegt in `bausteine/` (unten) |
 | `import/` | Dateiimport (der Beleg) |
 | `review/` | der Navigationsbereich Import (`ImportBereich`, `ScreenId` `import`) und die Review-Inbox, in der Belege verbucht werden |
 | `training/` | Werkbank der Kategorie-Erkennung (Regeln in `training/CLAUDE.md`) |
@@ -93,7 +93,8 @@ bereichsübergreifenden Tests liegen und ein Screen dort von keiner Regel erfass
 | Nebeneinander / untereinander mit Abstand | `Zeile` / `Stapel` (`bausteine/Anordnung`), Abstand aus `--sp-1`…`--sp-5` |
 | Trennlinie, auch mit „oder" | `Trenner` (Base UI `Separator`); Block mit Linie darüber: Klasse `.abschnitt` |
 | Schriftgrösse | nur Tokens (`--fs-*`, neu `--fs-tabelle`, `--fs-ui`) — `schriftgroessen.test.ts` |
-| Eine von mehreren Antworten | `buchung/Optionsgruppe` mit `Option` — bisher nur im Buchungsdialog |
+| Eine Buchung ansehen, anlegen, bearbeiten | `BuchungDetail` (unten, „Der Buchungsdialog liegt in Teilen") |
+| Eine von mehreren Antworten | `Optionsgruppe` mit `Option` — bisher nur im Buchungsdialog |
 | Knopf | `Button` — `primary` Hauptaktion, `link` gedämpfte Nebenaktion („Abbrechen"), `laeuft` sperrt während einer Handlung; Zeilenaktion als Icon: `IconButton` |
 | Dialog | `Modal` (Base UI `Dialog`; `warnung` für Rückfragen); vor dem Löschen: `Loeschfrage` |
 | Fehler, den kein Screen am Ort zeigen kann | `fehlerMelden` aus `Meldungen` (Base UI `Toast`) — nie still `.catch(() => [])` |
@@ -277,7 +278,7 @@ Wo es heute steht:
 | `bausteine/Button` | eigener `<button>` mit Inline-Stil, roher `.linkbtn` | Base UI `Button` |
 | `bausteine/Modal` | Eigenbau mit Nummernstapel plus `Dialog.jsx` | Base UI `Dialog`, mit `warnung` `AlertDialog` |
 | `bausteine/Kaestchen` | `<input type="checkbox">` mit `accentColor` | Base UI `Checkbox` |
-| `buchung/Optionsgruppe`, `buchung/Richtungswahl` | `<input type="radio">`, eigene `role="radiogroup"` | Base UI `RadioGroup`/`Radio` |
+| `bausteine/Optionsgruppe`, `bausteine/Richtungswahl` | `<input type="radio">`, eigene `role="radiogroup"` | Base UI `RadioGroup`/`Radio` |
 | `bausteine/FormField` (um ein natives Feld) | `<label htmlFor>`, Hinweis unverbunden | Base UI `Field` |
 | `bausteine/CoverageTrack` | zwei `div` ohne Rolle | Base UI `Meter` |
 | Seitensteuerung der `DataTable` | `<input type="number">`, rohe Knöpfe | Base UI `NumberField`, `Button` |
@@ -342,7 +343,7 @@ immer.
 
 ## Der Buchungsdialog liegt in Teilen
 
-`buchung/BuchungDetail.tsx` trägt das Formular — alle drei Rollen (anlegen, Entwurf
+`bausteine/BuchungDetail.tsx` trägt das Formular — alle drei Rollen (anlegen, Entwurf
 prüfen, bearbeiten) in EINER Maske, und das bleibt so: jede Erweiterung soll an einer
 Stelle ankommen statt an dreien. Was daneben liegt, braucht den Zustand der Maske nicht
 und wurde deshalb 2026-08-25 herausgezogen:
@@ -374,7 +375,23 @@ Dateien (`einstellungen/VerhaltenKarten`, `StammdatenKarten`).
 seine Daten hereinbekommt und Entscheidungen zurückmeldet. Der Rest gehört zum Formular
 und bleibt dort, auch wenn die Funktion damit die grösste im Bereich ist.
 
-Keins davon ist ein `bausteine/`-Kandidat: alle werden von genau einem Screen benutzt
+**Der Dialog liegt in `bausteine/`, mit allen seinen Teilen** (seit 2026-11-17). Ihn öffnen
+Kontoauszug, Übersicht, Analyse, Budgets, Rücklagen und die Inbox — sechs Bereiche, und
+damit ist er nach der Regel oben ein Baustein. In `buchung/` stand er
+als Bereich auf der Stufe der Buchung und kannte von dort Verträge und Rücklagen, die
+darüber liegen (Rangfolge in der `CLAUDE.md` des Projekts). Die Teile gehen mit, obwohl
+jeder nur vom Dialog benutzt wird: sie sind Teile EINES Bausteins, und in `buchung/`
+zurückgelassen hätten sie dieselben Bezüge behalten. Was er liest, kommt aus
+`application/buchungsdetail.ts` und `application/einordnungssicht.ts`, beide direkt in
+`src/application/`, weil sie Verträge, Rücklagen und Budgets zusammenziehen.
+
+Weil ihn auch der Bereich Rücklagen öffnet, gilt für ihn die Baustein-Prüfung der Grenze
+Rücklagen/Budgets (`bausteine/CLAUDE.md`): kein Use-Case und kein Schlüssel der Budgets.
+Den Typ `Budget` erreicht er nur über `einordnungssicht`, also über eine Datei, die
+bereichsübergreifend abwägt — das ist der Weg, den die Regel ausdrücklich offen lässt.
+
+Die Teile der grossen Screens im Absatz darüber (`RuecklageDialog`, `useRegisterfilter` …)
+sind keine `bausteine/`-Kandidaten: sie werden von genau einem Screen benutzt
 (siehe `bausteine/CLAUDE.md`).
 
 Eine eigene Datei nur für „Tag und Monat" stand hier lange als **Ausnahme von der
@@ -528,12 +545,12 @@ einer Entscheidung.
 Seit 2026-11-15 trägt jede Zeile des Kontoauszugs eine Spalte **Einordnung**
 (`konten/EinordnungsPillen.tsx`): Einnahme, Fixkosten, laufende Kosten, „aus Rücklage …",
 Vorsorge, Umbuchung, ungeplant, wartet auf Zuordnung. Der Buchungsdialog sagt dasselbe als Satz
-mit der Begründung (`buchung/EinordnungsBlock.tsx`) — „zählt als Fixkosten, weil sie dem
+mit der Begründung (`bausteine/EinordnungsBlock.tsx`) — „zählt als Fixkosten, weil sie dem
 Vertrag … zugeordnet ist". Der Satz ist die eigentliche Hilfe: das Wort allein erklärt
 niemandem ohne Rechnungswesen, warum eine grosse Ausgabe den Monat nicht belastet.
 
 **Die Art kommt aus `core/einordnung.ts` und aus nichts sonst.** Der Weg dorthin ist
-`application/buchung/einordnungssicht.ts`: es ruft `einordner` mit `einordnungskontext`
+`application/einordnungssicht.ts`: es ruft `einordner` mit `einordnungskontext`
 — derselbe Kontext, aus dem die Ergebnisrechnung der Übersicht rechnet — und hängt nur
 die NAMEN von Budget und Vertrag an. Beide Oberflächen wählen danach Wort und Farbe, mehr
 nicht. Der Grund für die eine Stelle: der Auszug ist der Ort, an dem man nachsieht, warum
@@ -561,7 +578,7 @@ gezeigt werden die verschiedenen, jede einmal.
 Gerechnet wird ein solcher Anteil als ungeplant; die Pille sagt statt „Ungeplant", dass an
 ihm etwas zu tun ist — mehrere Rücklagen hängen an seiner Kategorie (`wartetAuf` an der
 Einordnung). Sie trägt den gestrichelten Rahmen des Geplanten, keine Warnfarbe. Gewählt
-wird im Buchungsdialog (`buchung/RuecklagenwahlBlock`), mit einer `Auswahl` je Anteil;
+wird im Buchungsdialog (`bausteine/RuecklagenwahlBlock`), mit einer `Auswahl` je Anteil;
 was dort zur Wahl steht und ob überhaupt, sagt die Sicht (`ruecklagenwahl` am
 Buchungsdetail), nicht der Block. Vorbelegt wird nichts. Entnahmen aus einer Rücklage sind EINE
 Art (`ruecklage`), seit Migration 81 auch die aus dem früheren aufbauenden Budget; die

@@ -10,11 +10,11 @@ import { useTranslation } from "react-i18next";
 import { minorZuMajor, type IstBuchung, type Kategorie } from "../../../application";
 import { offenerRest } from "../../../application/buchung/buchungSplitten";
 import { buchungSplitten } from "../../dienste";
-import { Button } from "../bausteine";
-import { CategoryPicker } from "../bausteine/CategoryPicker";
-import { Modal } from "../bausteine/Modal";
-import { fehlerNachricht, useGeld } from "../bausteine/einstellungenKontext";
-import { geldFarbe } from "../bausteine/geldFarbe";
+import { Button } from ".";
+import { CategoryPicker } from "./CategoryPicker";
+import { Modal } from "./Modal";
+import { fehlerNachricht, useGeld } from "./einstellungenKontext";
+import { geldFarbe } from "./geldFarbe";
 
 /**
  * S-7 — Buchung auf mehrere Kategorien aufteilen. Der Betrag der Buchung bleibt, was er

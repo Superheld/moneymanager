@@ -10,10 +10,10 @@
 import { useTranslation } from "react-i18next";
 import type { Dublettenverdacht } from "../../../application";
 import type { Umsatz } from "../../../application/import";
-import { Pill, Button } from "../bausteine";
-import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
-import { geldFarbe } from "../bausteine/geldFarbe";
-import { IconButton } from "../bausteine/IconButton";
+import { Pill, Button } from ".";
+import { useDatum, useGeld } from "./einstellungenKontext";
+import { geldFarbe } from "./geldFarbe";
+import { IconButton } from "./IconButton";
 
 /** Was die Dublettenprüfung zu dieser Buchung sagt — samt der Zeile, die sie meint. */
 export interface Dublettenbefund {

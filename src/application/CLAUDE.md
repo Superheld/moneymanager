@@ -48,7 +48,10 @@ das Ergebnis durch Import, Buchung, Verträge und Depot. `fints/` steht in der R
 unter allen vieren und darf sie nicht kennen — die Orchestrierung über sie gehört deshalb
 keinem von ihnen, sondern hierher. Ebenso `stammdatensichten.ts`: es lädt Personen, Konten
 und den Kategorienbaum in einem Zug und rechnet die Kontostände über den Buchungsbestand —
-eine Sicht über vier Bereiche. Angelegt wird dagegen je Bereich (`kontoAnlegen` in
+eine Sicht über vier Bereiche. Ebenso `buchungsdetail.ts` und `einordnungssicht.ts`: was
+der Buchungsdialog und die Spalte „Einordnung" des Kontoauszugs zeigen, zieht Verträge,
+Rücklagen und Budgets zusammen, die alle über der Buchung liegen — in `buchung/` kannte
+ein Bereich seine höheren, gegen die Rangfolge. Angelegt wird dagegen je Bereich (`kontoAnlegen` in
 `konten/`, `kategorieAnlegen` in `kategorien/`, `personAnlegen` in `stammdaten/`).
 
 ## Ports

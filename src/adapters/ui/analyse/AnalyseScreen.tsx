@@ -42,7 +42,7 @@ import { analyse, depots } from "../../dienste";
 import { Button, Card } from "../bausteine";
 import type { ScreenId } from "../bausteine/AppShell";
 import { LeererZustand } from "../bausteine/LeererZustand";
-import { BuchungDetail } from "../buchung/BuchungDetail";
+import { BuchungDetail } from "../bausteine/BuchungDetail";
 import { AusblickKarte } from "./AusblickKarte";
 import { BefundeBereich } from "./BefundeBereich";
 import { DepotAnsicht } from "./DepotAnsicht";

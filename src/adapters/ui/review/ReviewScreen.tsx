@@ -44,7 +44,7 @@ import {
   type Umsatz,
   type Vorschlagskontext,
 } from "../../../application/import";
-import { BuchungDetail } from "../buchung/BuchungDetail";
+import { BuchungDetail } from "../bausteine/BuchungDetail";
 import { Button, Card, Pill } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";

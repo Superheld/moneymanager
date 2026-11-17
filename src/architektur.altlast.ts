@@ -40,8 +40,6 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
       "`buchung`; `liquiditaet` wägt Konto gegen Budgetlast ab und gehört direkt nach `src/core/`; " +
       "der Typ `Klassenstand` gehört zum Konto.",
     eintraege: [
-      "adapters/ui/konten/EinordnungsPillen.tsx → application/buchung/einordnungssicht.ts",
-      "adapters/ui/konten/KontenScreen.tsx → adapters/ui/buchung/BuchungDetail.tsx",
       "adapters/ui/konten/KontenScreen.tsx → adapters/ui/buchung/DublettenVergleich.tsx",
       "adapters/ui/konten/KontenScreen.tsx → adapters/ui/buchung/SammelDialog.tsx",
       "adapters/ui/konten/KontenScreen.tsx → application/buchung/buchungenSammelbearbeiten.ts",
@@ -51,7 +49,6 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
       "application/konten/abgleichsicht.ts → core/buchung/istbuchung.ts",
       "application/konten/kontensichten.ts → application/buchung/belegZuBuchung.ts",
       "application/konten/kontensichten.ts → application/buchung/buchungszeile.ts",
-      "application/konten/kontensichten.ts → application/buchung/einordnungssicht.ts",
       "application/konten/kontensichten.ts → core/buchung/istbuchung.ts",
       "application/konten/kontobelegung.ts → core/buchung/istbuchung.ts",
       "core/konten/kontobelegung.ts → core/buchung/istbuchung.ts",
@@ -94,23 +91,13 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     von: "buchung",
     auf: "vertraege",
     abbau:
-      "Der Buchungsdialog ist eine Sicht über fast alles: `buchungsdetail` und " +
-      "`einordnungssicht` direkt nach `src/application/`, `BuchungDetail`, `SammelDialog` und " +
-      "`VertragsBlock` nach `bausteine/` (er wird aus vielen Bereichen geöffnet).",
+      "Der Buchungsdialog ist abgebaut (`bausteine/BuchungDetail`, `buchungsdetail` und " +
+      "`einordnungssicht` direkt in `src/application/`). Übrig ist `SammelDialog`: ihn " +
+      "öffnet nur der Kontoauszug, er ist also kein Baustein, und in `konten/` stünde er " +
+      "unter den Verträgen. Er zieht mit dem Kontoauszug aus dem Bereich (siehe konten → buchung).",
     eintraege: [
-      "adapters/ui/buchung/BuchungDetail.tsx → adapters/ui/vertraege/VertragModal.tsx",
-      "adapters/ui/buchung/BuchungDetail.tsx → adapters/ui/vertraege/vertragFormular.ts",
-      "adapters/ui/buchung/BuchungDetail.tsx → application/vertraege/vertragszuordnung.ts",
-      "adapters/ui/buchung/BuchungDetail.tsx → core/vertraege/vertrag.ts",
-      "adapters/ui/buchung/BuchungDetail.tsx → core/vertraege/vertragZuordnung.ts",
       "adapters/ui/buchung/SammelDialog.tsx → application/vertraege/vertragszuordnung.ts",
       "adapters/ui/buchung/SammelDialog.tsx → core/vertraege/vertrag.ts",
-      "adapters/ui/buchung/VertragsBlock.tsx → core/vertraege/vertrag.ts",
-      "adapters/ui/buchung/VertragsBlock.tsx → core/vertraege/vertragZuordnung.ts",
-      "application/buchung/buchungsdetail.ts → core/vertraege/vertrag.ts",
-      "application/buchung/buchungsdetail.ts → core/vertraege/vertragZuordnung.ts",
-      "application/buchung/einordnungssicht.ts → core/vertraege/vertrag.ts",
-      "application/buchung/einordnungssicht.ts → core/vertraege/vertragZuordnung.ts",
     ],
   },
   {
@@ -135,21 +122,6 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
       "adapters/ui/konten/KontoAnlegenModal.tsx → application/fints/bankzugangPort.ts",
       "application/konten/abgleichsicht.ts → application/fints/bankzugangPort.ts",
       "application/konten/kontensichten.ts → application/fints/bankzugangPort.ts",
-    ],
-  },
-  {
-    von: "buchung",
-    auf: "ruecklagen",
-    abbau:
-      "Wie bei den Verträgen: der Buchungsdialog samt `RuecklagenwahlBlock` nach " +
-      "`bausteine/`, `buchungsdetail` und `einordnungssicht` direkt nach `src/application/`.",
-    eintraege: [
-      "adapters/ui/buchung/BuchungDetail.tsx → application/ruecklagen/ruecklageZuordnen.ts",
-      "adapters/ui/buchung/RuecklagenwahlBlock.tsx → application/ruecklagen/ruecklageZuordnen.ts",
-      "application/buchung/buchungsdetail.ts → application/ruecklagen/ruecklageZuordnen.ts",
-      "application/buchung/buchungsdetail.ts → application/ruecklagen/ruecklagenbestand.ts",
-      "application/buchung/einordnungssicht.ts → core/ruecklagen/ruecklage.ts",
-      "application/buchung/einordnungssicht.ts → core/ruecklagen/zuordnung.ts",
     ],
   },
   {
@@ -280,15 +252,6 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     eintraege: [
       "adapters/ui/konten/KontenScreen.tsx → application/dubletten/dublettensicht.ts",
       "application/konten/kontensichten.ts → application/dubletten/dublettensicht.ts",
-    ],
-  },
-  {
-    von: "buchung",
-    auf: "budgets",
-    abbau:
-      "`einordnungssicht` direkt nach `src/application/`.",
-    eintraege: [
-      "application/buchung/einordnungssicht.ts → core/budgets/budget.ts",
     ],
   },
 ];

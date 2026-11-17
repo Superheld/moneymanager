@@ -20,7 +20,7 @@
 
 import { useState } from "react";
 import type { Charakter } from "../../../application";
-import type { Geld } from "../bausteine/einstellungenKontext";
+import type { Geld } from "./einstellungenKontext";
 import { betragsHoehe, richtungVon, vorzeichenAbspalten, type Richtung } from "./Richtungswahl";
 
 export function useBetragUndRichtung(startBetrag: number | undefined, geld: Geld) {

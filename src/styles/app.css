@@ -1048,7 +1048,7 @@ select.field.tabellenfilter {
   color: var(--ink-3);
 }
 
-/* --- Kaestchen und Optionsfelder (bausteine/Kaestchen.tsx, buchung/Optionsgruppe.tsx) ---
+/* --- Kaestchen und Optionsfelder (bausteine/Kaestchen.tsx, bausteine/Optionsgruppe.tsx) ---
    Base UI rendert beide als `span` mit Rolle und haengt ein verstecktes `input` daneben;
    das Aussehen haengt deshalb an den Datenattributen (`data-checked`, `data-disabled`),
    nicht an `:checked`. Vorher das native Feld, eingefaerbt per `accentColor` — an manchen
