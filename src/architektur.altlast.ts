@@ -313,34 +313,6 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     ],
   },
   {
-    von: "fints",
-    auf: "buchung",
-    abbau:
-      "`abrufAusfuehren` in die Wurzel der Anwendung.",
-    eintraege: [
-      "application/fints/abrufAusfuehren.ts → application/buchung/umbuchungenErkennen.ts",
-    ],
-  },
-  {
-    von: "fints",
-    auf: "depot",
-    abbau:
-      "`abrufAusfuehren` orchestriert Import, Buchung, Verträge und Depot und gehört in die " +
-      "Wurzel der Anwendung.",
-    eintraege: [
-      "application/fints/abrufAusfuehren.ts → application/depot/depotUebernehmen.ts",
-    ],
-  },
-  {
-    von: "fints",
-    auf: "vertraege",
-    abbau:
-      "`abrufAusfuehren` in die Wurzel der Anwendung.",
-    eintraege: [
-      "application/fints/abrufAusfuehren.ts → application/vertraege/vertragszuordnung.ts",
-    ],
-  },
-  {
     von: "import",
     auf: "dubletten",
     abbau:

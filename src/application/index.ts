@@ -380,7 +380,7 @@ export type {
   Zugangsart,
 } from "./fints/abrufPort";
 export type { Formatwahl, Kontozuordnung } from "./fints/bankzugangPort";
-export type { AbrufBefund, Abrufergebnis, DepotBefund } from "./fints/abrufAusfuehren";
+export type { AbrufBefund, Abrufergebnis, DepotBefund } from "./abrufAusfuehren";
 export type { Abrufstand, Zugangsstand } from "./fints/abrufstand";
 export type { Belegungssicht } from "./konten/kontobelegung";
 export type { GeldAufKonto, GeldJeKonto, RuecklageOhneKonto } from "./ruecklagen/geldJeKonto";

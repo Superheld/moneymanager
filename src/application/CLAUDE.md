@@ -43,6 +43,10 @@ querliegenden Sichten `uebersicht.ts` und `analysesichten.ts` — die rechnen ab
 mehrere Bereiche. Dazu `ausgabenvorschlaege.ts`: es lädt die Vorschläge für Budgets UND
 Rücklagen in einem Zug, damit beide Bereiche dieselbe Einstufung sehen; was je Bereich
 verworfen ist, filtern `budgets/budgetvorschlaege.ts` und `ruecklagen/ruecklagenvorschlaege.ts`.
+Und `abrufAusfuehren.ts`, die Klammer um einen Bankabruf: es holt über `fints/` und schickt
+das Ergebnis durch Import, Buchung, Verträge und Depot. `fints/` steht in der Rangfolge
+unter allen vieren und darf sie nicht kennen — die Orchestrierung über sie gehört deshalb
+keinem von ihnen, sondern hierher.
 
 ## Ports
 

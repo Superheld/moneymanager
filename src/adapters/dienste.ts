@@ -32,7 +32,7 @@ import { budgetvorschlagIgnorieren } from "../application/budgets/budgetvorschla
 import {
   abrufAusfuehren,
   type Abrufergebnis,
-} from "../application/fints/abrufAusfuehren";
+} from "../application/abrufAusfuehren";
 import type { TanFrager } from "../application/fints/abrufPort";
 import { fintsAbruf } from "./fints";
 import { hanseaticAbruf } from "./hanseatic";
