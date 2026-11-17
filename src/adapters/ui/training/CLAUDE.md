@@ -1,6 +1,6 @@
 # Training
 
-Gilt für den Bereich Training und das Messen der Kategorie-Erkennung. Was überall gilt, steht in der Wurzel-`CLAUDE.md`.
+Gilt für den Bereich Training und das Messen der Kategorie-Erkennung. Was überall gilt, steht in der `CLAUDE.md` des Projekts.
 
 ## Das Training ist eine Werkbank, kein Bereich
 

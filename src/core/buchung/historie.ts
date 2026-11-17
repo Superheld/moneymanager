@@ -243,7 +243,7 @@ export function nachHauptgruppe(
  *
  * Bis 2026-08-29 gab es einen zweiten Weg: „Umschichtung ohne Kategorie". Er fing
  * einseitige Umschichtungen, die der Import damals noch erzeugte. Beides ist weg — der
- * Import erzeugt sie nicht mehr (`application/import/umsatzVerbuchen`, Schritt 2), und
+ * Import erzeugt sie nicht mehr (`application/buchung/umsatzVerbuchen`, Schritt 2), und
  * Migration 63 hat die vorhandenen auf ihre Richtung umgestellt.
  *
  * Was der zweite Weg nebenbei kostete: er unterschied „ungepaart" von „gewollt" allein an

@@ -3,10 +3,14 @@
 // Hier liegt, was aus einer DATEI kommt, und die Inbox, in der alles Eingelesene auf die
 // Durchsicht wartet. Der Bankabruf ist bewusst NICHT hier: er hängt an einem Konto und
 // steht deshalb unter Konten — beim Konto der Knopf, unter „Bankzugänge" die Verbindung.
+//
+// Die Datei liegt in `review/` und nicht in `import/`: sie zeigt die Inbox als Reiter, und
+// die steht in der Rangfolge über dem Beleg. Wer zusammensetzt, steht so hoch wie das
+// Höchste, das er zeigt (`adapters/ui/CLAUDE.md`, „Gliederung").
 
 import { useTranslation } from "react-i18next";
 import { Bereich } from "../bausteine/Bereich";
-import { ImportScreen } from "./ImportScreen";
+import { ImportScreen } from "../import/ImportScreen";
 import { ReviewScreen } from "./ReviewScreen";
 import type { ScreenId } from "../bausteine/AppShell";
 

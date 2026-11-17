@@ -15,13 +15,13 @@ import {
   type Kategorie,
   type Person,
   type Zahlungskonto,
-} from "../../core";
+} from "../core";
 import type {
   KategorieRepository,
   LedgerPort,
   PersonRepository,
   ZahlungskontoRepository,
-} from "../ports";
+} from "./ports";
 
 export interface StammdatenDeps {
   readonly personRepo: PersonRepository;

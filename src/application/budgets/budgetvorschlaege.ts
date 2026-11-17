@@ -9,8 +9,8 @@
 //
 // Der Merkzettel `budgetvorschlag.ignoriert` ist älter als die Trennung. Was darin
 // steht, wurde womöglich als Rücklage verworfen; der Bereich Rücklagen liest ihn deshalb
-// mit, schreibt aber nur seinen eigenen. Der Schlüssel steht darum in der Wurzel
-// (`../ausgabenvorschlaege.ts`), nicht hier.
+// mit, schreibt aber nur seinen eigenen. Der Schlüssel steht darum direkt in
+// `src/application/` (`../ausgabenvorschlaege.ts`), nicht hier.
 
 import { ignorierenVermerken, ignorierteLesen } from "../einstellungen";
 import type { Budgetvorschlag, Ruecklage } from "../../core";

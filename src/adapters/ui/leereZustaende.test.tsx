@@ -42,7 +42,7 @@ import { KontenScreen } from "./konten/KontenScreen";
 import { KontenVerwaltungScreen } from "./konten/KontenVerwaltungScreen";
 import { AnalyseScreen } from "./analyse/AnalyseScreen";
 import { UebersichtScreen } from "./uebersicht/UebersichtScreen";
-import { ReviewScreen } from "./import/ReviewScreen";
+import { ReviewScreen } from "./review/ReviewScreen";
 
 let db: Database;
 beforeAll(sqlLaden);

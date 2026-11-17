@@ -1,24 +1,12 @@
-// Use-Cases für Stammdaten — anlegen mit Validierung (Supporting Domain, bewusst
+// Use-Case für eine Person — anlegen mit Validierung (Supporting Domain, bewusst
 // einfach). ID-Erzeugung lebt hier (nicht im Core, der pure bleibt).
+//
+// Bis 2026-11-17 standen hier auch Konto und Kategorie. Sie liegen jetzt in ihren Bereichen
+// (`konten/kontoAnlegen.ts`, `kategorien/kategorieAnlegen.ts`): die Stammdaten stehen in
+// der Rangfolge zuunterst und dürfen weder das Konto noch den Kategorienbaum kennen.
 
-import {
-  FachlicherFehler,
-  ibanGueltig,
-  klasseVorschlag,
-  wuerdeZyklusErzeugen,
-  type Cent,
-  type Charakter,
-  type Kategorie,
-  type Kontoklasse,
-  type Kontotyp,
-  type Person,
-  type Zahlungskonto,
-} from "../../core";
-import type {
-  KategorieRepository,
-  PersonRepository,
-  ZahlungskontoRepository,
-} from "../ports";
+import { FachlicherFehler, type Person } from "../../core";
+import type { PersonRepository } from "../ports";
 
 export interface PersonEingabe {
   name: string;
@@ -41,72 +29,4 @@ export async function personAnlegen(
   };
   await repo.speichern(person);
   return person;
-}
-
-export interface KontoEingabe {
-  bezeichnung: string;
-  typ: Kontotyp;
-  /** Fehlt sie, wird sie aus dem Typ vorgeschlagen — änderbar bleibt sie immer. */
-  klasse?: Kontoklasse;
-  iban?: string;
-  inhaberIds?: string[];
-  saldo?: Cent; // Minor Units (die UI parst währungsgerecht)
-}
-
-export async function kontoAnlegen(
-  repo: ZahlungskontoRepository,
-  eingabe: KontoEingabe,
-  id?: string,
-): Promise<Zahlungskonto> {
-  const bezeichnung = eingabe.bezeichnung.trim();
-  if (!bezeichnung) throw new FachlicherFehler("bezeichnung.fehlt");
-  const iban = eingabe.iban?.trim();
-  if (iban && !ibanGueltig(iban)) throw new FachlicherFehler("iban.ungueltig");
-  const konto: Zahlungskonto = {
-    id: id ?? crypto.randomUUID(),
-    bezeichnung,
-    typ: eingabe.typ,
-    klasse: eingabe.klasse ?? klasseVorschlag(eingabe.typ),
-    iban: iban || undefined,
-    inhaberIds: eingabe.inhaberIds ?? [],
-    saldo: eingabe.saldo ?? 0,
-  };
-  await repo.speichern(konto);
-  return konto;
-}
-
-export interface KategorieEingabe {
-  name: string;
-  elternId?: string;
-  defaultCharakter: Charakter;
-}
-
-export async function kategorieAnlegen(
-  repo: KategorieRepository,
-  eingabe: KategorieEingabe,
-  id?: string,
-): Promise<Kategorie> {
-  const name = eingabe.name.trim();
-  if (!name) throw new FachlicherFehler("name.fehlt");
-
-  const kid = id ?? crypto.randomUUID();
-  if (eingabe.elternId) {
-    const bestehende = await repo.alle();
-    // Beim Bearbeiten existiert der Knoten schon; sonst für die Prüfung ergänzen.
-    const mitNeu = bestehende.some((k) => k.id === kid)
-      ? bestehende
-      : [...bestehende, { id: kid, name, defaultCharakter: eingabe.defaultCharakter }];
-    if (wuerdeZyklusErzeugen(mitNeu, kid, eingabe.elternId)) {
-      throw new FachlicherFehler("kategorie.zyklus");
-    }
-  }
-
-  const kategorie: Kategorie = {
-    id: kid,
-    name,
-    elternId: eingabe.elternId || undefined,
-    defaultCharakter: eingabe.defaultCharakter,
-  };
-  await repo.speichern(kategorie);
-  return kategorie;
 }

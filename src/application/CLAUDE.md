@@ -37,12 +37,19 @@ die Stelle, an der geprüft wird:
 Bereiche wie im Kern (`buchung/`, `konten/`, `budgets/`, `vertraege/`, `kategorien/`,
 `ruecklagen/`, `dubletten/`, `stammdaten/`) plus die eigenen Kontexte `import/` und `fints/`.
 
-In der Wurzel bleibt, was keinem Bereich gehört: `index.ts` (Fassade zur UI), `ports.ts`
+Direkt in `src/application/` bleibt, was keinem Bereich gehört: `index.ts` (Fassade zur UI), `ports.ts`
 (die Interfaces, von 76 Stellen benutzt), `bootstrap.ts`, `einstellungen.ts` und die
 querliegenden Sichten `uebersicht.ts` und `analysesichten.ts` — die rechnen absichtlich über
 mehrere Bereiche. Dazu `ausgabenvorschlaege.ts`: es lädt die Vorschläge für Budgets UND
 Rücklagen in einem Zug, damit beide Bereiche dieselbe Einstufung sehen; was je Bereich
 verworfen ist, filtern `budgets/budgetvorschlaege.ts` und `ruecklagen/ruecklagenvorschlaege.ts`.
+Und `abrufAusfuehren.ts`, die Klammer um einen Bankabruf: es holt über `fints/` und schickt
+das Ergebnis durch Import, Buchung, Verträge und Depot. `fints/` steht in der Rangfolge
+unter allen vieren und darf sie nicht kennen — die Orchestrierung über sie gehört deshalb
+keinem von ihnen, sondern hierher. Ebenso `stammdatensichten.ts`: es lädt Personen, Konten
+und den Kategorienbaum in einem Zug und rechnet die Kontostände über den Buchungsbestand —
+eine Sicht über vier Bereiche. Angelegt wird dagegen je Bereich (`kontoAnlegen` in
+`konten/`, `kategorieAnlegen` in `kategorien/`, `personAnlegen` in `stammdaten/`).
 
 ## Ports
 

@@ -38,20 +38,20 @@ import type {
   VormerkungRepository,
   UmsatzRepository, VertragserkennungRepository, VertragszuordnungRepository,
   ZahlungskontoRepository,
-} from "../ports";
-import { depotUebernehmen, type DepotUebernahme } from "../depot/depotUebernehmen";
-import { zuordnungenAbgleichen } from "../vertraege/vertragszuordnung";
-import type { Vorschlagskontext } from "../import/vorschlag";
-import { quelleKeyFuer } from "../import/kontoMatch";
-import { umsaetzeUebernehmen, type UebernahmeErgebnis } from "../import/umsaetzeUebernehmen";
-import { umbuchungenErkennen } from "../buchung/umbuchungenErkennen";
-import { umsaetzeVerbuchen } from "../import/umsatzVerbuchen";
-import { bankAnker, istAktiv } from "../../core";
+} from "./ports";
+import { depotUebernehmen, type DepotUebernahme } from "./depot/depotUebernehmen";
+import { zuordnungenAbgleichen } from "./vertraege/vertragszuordnung";
+import type { Vorschlagskontext } from "./import/vorschlag";
+import { quelleKeyFuer } from "./import/kontoMatch";
+import { umsaetzeUebernehmen, type UebernahmeErgebnis } from "./import/umsaetzeUebernehmen";
+import { umbuchungenErkennen } from "./buchung/umbuchungenErkennen";
+import { umsaetzeVerbuchen } from "./buchung/umsatzVerbuchen";
+import { bankAnker, istAktiv } from "../core";
 import type { Abrufadapter, Auszugsstand, Bankprofil, Bankzugang, TanFrager, Vormerkungszeile,
-} from "./abrufPort";
-import { abruffenster, erstabrufTage } from "./bankprofil";
-import type { Kontozuordnung, KontozuordnungRepository } from "./bankzugangPort";
-import type { BankzugangRepository } from "./bankzugangPort";
+} from "./fints/abrufPort";
+import { abruffenster, erstabrufTage } from "./fints/bankprofil";
+import type { Kontozuordnung, KontozuordnungRepository } from "./fints/bankzugangPort";
+import type { BankzugangRepository } from "./fints/bankzugangPort";
 
 /** Tage, die vor dem zuletzt abgerufenen Stand nochmals mitgeholt werden. Siehe Kopf. */
 export const RUECKGRIFF_TAGE = 7;

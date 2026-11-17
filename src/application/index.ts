@@ -231,6 +231,7 @@ export {
 } from "./konten/kontostandAnker";
 export { buchungErfassen, type BuchungEingabe } from "./buchung/buchungErfassen";
 export { umbuchungErfassen } from "./buchung/umbuchungErfassen";
+export { passtAlsGegenbein, type VerbuchenErgebnis } from "./buchung/umsatzVerbuchen";
 export {
   buchungenSammelbearbeiten,
   buchungenLoeschen,
@@ -359,15 +360,10 @@ export {
   type Stammdaten,
   type StammdatenDeps,
   type Kontostand,
-} from "./stammdaten/stammdatensichten";
-export {
-  personAnlegen,
-  kontoAnlegen,
-  kategorieAnlegen,
-  type PersonEingabe,
-  type KontoEingabe,
-  type KategorieEingabe,
-} from "./stammdaten/stammdatenAnlegen";
+} from "./stammdatensichten";
+export { personAnlegen, type PersonEingabe } from "./stammdaten/stammdatenAnlegen";
+export { kontoAnlegen, type KontoEingabe } from "./konten/kontoAnlegen";
+export { kategorieAnlegen, type KategorieEingabe } from "./kategorien/kategorieAnlegen";
 export { standardkategorienAnlegen } from "./kategorien/standardkategorien";
 export type {
   Bankkonto,
@@ -380,7 +376,7 @@ export type {
   Zugangsart,
 } from "./fints/abrufPort";
 export type { Formatwahl, Kontozuordnung } from "./fints/bankzugangPort";
-export type { AbrufBefund, Abrufergebnis, DepotBefund } from "./fints/abrufAusfuehren";
+export type { AbrufBefund, Abrufergebnis, DepotBefund } from "./abrufAusfuehren";
 export type { Abrufstand, Zugangsstand } from "./fints/abrufstand";
 export type { Belegungssicht } from "./konten/kontobelegung";
 export type { GeldAufKonto, GeldJeKonto, RuecklageOhneKonto } from "./ruecklagen/geldJeKonto";

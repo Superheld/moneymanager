@@ -4,7 +4,7 @@
 // Konto, das Fortschreiben des Stands und der Umgang mit einem Konto, das ausfällt.
 
 import { describe, expect, it } from "vitest";
-import type { Zahlungskonto } from "../../core";
+import type { Zahlungskonto } from "../core";
 import type {
   Abrufadapter,
   Abrufsitzung,
@@ -12,10 +12,10 @@ import type {
   Bankzugang,
   Formatvorgabe,
   Vormerkungszeile,
-} from "./abrufPort";
-import type { Kontozuordnung } from "./bankzugangPort";
-import type { DepotRepository } from "../ports";
-import type { Bankprofil } from "./abrufPort";
+} from "./fints/abrufPort";
+import type { Kontozuordnung } from "./fints/bankzugangPort";
+import type { DepotRepository } from "./ports";
+import type { Bankprofil } from "./fints/abrufPort";
 import { ERSTABRUF_TAGE, RUECKGRIFF_TAGE, abrufAusfuehren, abrufZeitraum } from "./abrufAusfuehren";
 
 const HEUTE = "2026-08-18";

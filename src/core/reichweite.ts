@@ -12,7 +12,7 @@
 //     dem er abgeht, sondern jeden mit seinem Zwölftel; ein Durchschnitt über Auszahlungen
 //     hinge davon ab, ob die grosse Zahlung zufällig im Fenster liegt.
 //
-// Die Datei liegt in der Wurzel des Kerns, weil sie über zwei Bereiche rechnet (Konten und
+// Die Datei liegt direkt in `src/core/`, weil sie über zwei Bereiche rechnet (Konten und
 // die Ergebnisrechnung) — aus demselben Grund wie `ergebnis.ts`. Sie steht NEBEN
 // `ergebnis.ts` und nicht darin: sie liest dessen Zeilen nur und fügt ihnen nichts hinzu.
 //

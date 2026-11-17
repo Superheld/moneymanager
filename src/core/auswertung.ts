@@ -1,7 +1,7 @@
 /**
  * Auswertungen über einen Zeitraum — die Fragen, die man einem Haushalt stellt.
  *
- * Sie liegen in der WURZEL des Kerns und nicht in einem Bereichsordner, weil jede von
+ * Sie liegen DIREKT in `src/core/` und nicht in einem Bereichsordner, weil jede von
  * ihnen über mehrere Bereiche rechnet: Buchungen gegen Verträge, Kategorien gegen
  * Budgets, Konten gegen Ausgaben. Dieselbe Begründung wie bei `monatsausblick.ts`.
  *

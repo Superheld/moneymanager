@@ -12,7 +12,7 @@ export const APP_VERSION: string = pkg.version;
  * App noch nicht stabil ist, sagt die 0 vorne in der Version, nach SemVer genau dafür da;
  * ein Wort daneben wiederholte das nur — und warb, sobald es „Beta" hiess, mit demselben
  * Wort wie die Vorabversionen, die bis dahin `-beta.N` hiessen. Was am Stadium wirklich
- * hing, die Regel für Migrationen, steht in der Wurzel-`CLAUDE.md` unter „Stadium".
+ * hing, die Regel für Migrationen, steht in der `CLAUDE.md` des Projekts unter „Stadium".
  *
  * Ein anderes Suffix (`rc.1`, ein altes `beta.2`) ist keine Vorabversion im Sinne des
  * Kanals: es bekommt kein Abzeichen, statt eines aus einem Wort zu raten.

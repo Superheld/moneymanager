@@ -3,7 +3,7 @@
 //
 // Er stand bis 2026-11-15 in `uebersicht/EinrichtungKarte.tsx` und ist hierher gezogen,
 // weil ihn ein zweiter Bereich braucht: das Ende des Imports zeigt den nächsten offenen
-// Schritt (`import/NaechsterSchritt.tsx`). Zwei Fassungen derselben Zeile hätten bald zwei
+// Schritt (`review/NaechsterSchritt.tsx`). Zwei Fassungen derselben Zeile hätten bald zwei
 // Ziele für denselben Schritt gehabt.
 //
 // Er RECHNET NICHTS und entscheidet nur, wohin ein Schritt führt — das ist Navigation und

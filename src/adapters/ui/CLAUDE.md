@@ -49,7 +49,8 @@ ein Baustein; was einer benutzt, gehört in dessen Ordner** — auch wenn es all
 | `vertraege/` | Verträge und ihre Erkennung |
 | `konten/` | der Kontoauszug („Buchungen", `ScreenId` `konten`), Kontenverwaltung, Bankzugänge, Abgleich, Depotauszug |
 | `buchung/` | der Buchungsdialog in Teilen (unten) — er wird aus mehreren Bereichen geöffnet |
-| `import/` | Dateiimport und Review-Inbox |
+| `import/` | Dateiimport (der Beleg) |
+| `review/` | der Navigationsbereich Import (`ImportBereich`, `ScreenId` `import`) und die Review-Inbox, in der Belege verbucht werden |
 | `training/` | Werkbank der Kategorie-Erkennung (Regeln in `training/CLAUDE.md`) |
 | `einstellungen/` | Einstellungen, Exporte, Konfigurationsimport |
 | `zugang/` | Sperrbildschirm, Verschlüsselung |
@@ -60,7 +61,15 @@ Die Navigation steht in `bausteine/AppShell.tsx`, die Zuordnung zur Komponente i
 
 Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlich ist es
 `kategorien/` wie in Kern und Anwendung. Die bereichsübergreifenden Tests (`screens`,
-`interaktion`, `formulare`, `leereZustaende`) liegen in der Wurzel.
+`interaktion`, `formulare`, `leereZustaende`) liegen direkt in `src/adapters/ui/`.
+
+Die Inbox liegt in `review/` und nicht bei `import/`, obwohl sie im Menü unter Import
+steht: sie öffnet den Buchungsdialog und fragt Dubletten, Umbuchungen und Verträge — alles
+Bereiche ÜBER dem Beleg (Rangfolge in der `CLAUDE.md` des Projekts). `review/` steht deshalb auf
+der Stufe der Sichten. Der Bereich `ImportBereich` geht mit, weil er die Inbox als Reiter
+zeigt: wer zusammensetzt, steht mindestens so hoch wie das Höchste, das er zeigt. Ein
+eigener Ordner statt einer losen Datei direkt in `src/adapters/ui/`, weil dort nur die
+bereichsübergreifenden Tests liegen und ein Screen dort von keiner Regel erfasst wäre.
 
 ## Bausteinkatalog — wofür es schon etwas gibt
 
@@ -163,7 +172,7 @@ Vier Regeln dazu:
   Kontoauszug: ohne Shell (Tests) steht kein Knopf da, der nichts tun kann.
 
 **Am Ende des Imports steht der nächste offene Schritt der Einrichtung**
-(`import/NaechsterSchritt.tsx`), nach dem Verbuchen in der Inbox. Er kommt aus derselben
+(`review/NaechsterSchritt.tsx`), nach dem Verbuchen in der Inbox. Er kommt aus derselben
 Kernfunktion wie die Karte der Übersicht (`einrichtungsstand`, Feld `naechster`, geholt
 über `einrichtungLaden`), und dieselbe Zeile zeichnet ihn (`bausteine/Einrichtungsschritt`).
 Ist die Einrichtung fertig, steht dort nichts — auch kein „alles erledigt".

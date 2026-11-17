@@ -21,6 +21,7 @@ import {
   toIso,
   type Dublettenverdacht,
   type Einrichtungsstand,
+  type VerbuchenErgebnis,
   type Kategorie,
   type Zahlungskonto,
 } from "../../../application";
@@ -41,7 +42,6 @@ import {
   verwerfen,
   zurueckholen,
   type Umsatz,
-  type VerbuchenErgebnis,
   type Vorschlagskontext,
 } from "../../../application/import";
 import { BuchungDetail } from "../buchung/BuchungDetail";

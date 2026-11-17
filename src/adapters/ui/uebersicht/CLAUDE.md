@@ -1,6 +1,6 @@
 # Übersicht — was sie rechnet
 
-Gilt für die Übersicht. Die Grenze zur Analyse steht in der Wurzel-`CLAUDE.md` unter „Die App in zehn Bereichen“. Was überall gilt, steht in der Wurzel-`CLAUDE.md`.
+Gilt für die Übersicht. Die Grenze zur Analyse steht in der `CLAUDE.md` des Projekts unter „Die App in zehn Bereichen“. Was überall gilt, steht in der `CLAUDE.md` des Projekts.
 
 **Ganz oben steht „Damit die Zahlen stimmen"** (`EinrichtungKarte.tsx` auf
 `core/einrichtung.ts`), und nur, solange etwas fehlt. Die Karten darunter rechnen auch

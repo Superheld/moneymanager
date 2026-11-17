@@ -46,7 +46,7 @@ export class Fehlergrenze extends Component<Props, Zustand> {
 
   componentDidCatch(fehler: Error, info: ErrorInfo): void {
     // In die Konsole und nirgends sonst hin: die App spricht nicht nach draussen
-    // (Wurzel-`CLAUDE.md`), also gibt es auch keinen Absturzbericht, der es täte.
+    // (`CLAUDE.md` des Projekts), also gibt es auch keinen Absturzbericht, der es täte.
     console.error("Fehler beim Zeichnen:", fehler, info.componentStack);
   }
 

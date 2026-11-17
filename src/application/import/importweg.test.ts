@@ -21,7 +21,7 @@ import type {
 import type { RohUmsatz } from "./rohUmsatz";
 import type { Umsatz } from "./umsatz";
 import { umsaetzeUebernehmen } from "./umsaetzeUebernehmen";
-import { umsaetzeVerbuchen } from "./umsatzVerbuchen";
+import { umsaetzeVerbuchen } from "../buchung/umsatzVerbuchen";
 
 function roh(over: Partial<RohUmsatz>): RohUmsatz {
   return {

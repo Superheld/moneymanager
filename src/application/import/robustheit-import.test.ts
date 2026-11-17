@@ -24,7 +24,7 @@ import type { RohUmsatz } from "./rohUmsatz";
 import type { Beleg } from "./belege";
 import type { Umsatz } from "./umsatz";
 import { umsaetzeUebernehmen, type UebernahmeDeps, type UebernahmeEingabe } from "./umsaetzeUebernehmen";
-import { paareUmbuchungen } from "./umsatzVerbuchen";
+import { paareUmbuchungen } from "../buchung/umsatzVerbuchen";
 
 // ── Testdaten-Werkzeug ────────────────────────────────────────────────────────────
 

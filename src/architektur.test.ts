@@ -22,7 +22,8 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve, dirname } from "node:path";
 import { RANG_ALTLAST } from "./architektur.altlast";
 
-const WURZEL = resolve(__dirname);
+/** Das Verzeichnis `src/`; alle Pfade dieser Prüfung sind relativ dazu. */
+const SRC = resolve(__dirname);
 
 /**
  * UI-Dateien, die noch direkt auf `core` oder `adapters/persistence` zugreifen.
@@ -38,7 +39,7 @@ const WURZEL = resolve(__dirname);
 const ALTLAST: readonly string[] = [];
 
 /** Alle Produktivdateien unter `src/` — Tests zählen nicht (sie dürfen schichtübergreifend prüfen). */
-function produktivDateien(verzeichnis = WURZEL): string[] {
+function produktivDateien(verzeichnis = SRC): string[] {
   const raus: string[] = [];
   for (const eintrag of readdirSync(verzeichnis)) {
     if (eintrag === "node_modules") continue;
@@ -60,7 +61,7 @@ function schicht(datei: string): string {
   // liefen damit nicht rot, sondern GRÜN über eine leere Menge — der Wächter hätte auf
   // Windows nichts mehr geprüft und es nicht gesagt. Der Test „sieht überhaupt etwas"
   // weiter unten ist die zweite Hälfte derselben Absicherung.
-  const teile = relative(WURZEL, datei).split(/[\\/]/);
+  const teile = relative(SRC, datei).split(/[\\/]/);
   if (teile[0] === "adapters") return `adapters/${teile[1]}`;
   return teile[0];
 }
@@ -75,14 +76,14 @@ function importierteSchichten(datei: string): Set<string> {
   for (const [, pfad] of quelle.matchAll(/from\s*"([^"]+)"/g)) {
     if (!pfad.startsWith(".")) continue;
     const aufgeloest = resolve(dirname(datei), pfad);
-    if (!aufgeloest.startsWith(WURZEL)) continue;
+    if (!aufgeloest.startsWith(SRC)) continue;
     ziele.add(schicht(aufgeloest));
   }
   return ziele;
 }
 
 const DATEIEN = produktivDateien();
-const kurz = (d: string) => relative(WURZEL, d);
+const kurz = (d: string) => relative(SRC, d);
 
 describe("Schichtgrenzen", () => {
   /**
@@ -148,15 +149,15 @@ describe("Schichtgrenzen", () => {
     expect(verstoesse).toEqual([]);
   });
 
-  // Der Einstieg (`App.tsx`, `main.tsx`) liegt in der Wurzel und gehört damit zu keiner
+  // Der Einstieg (`App.tsx`, `main.tsx`) liegt direkt in `src/` und gehört damit zu keiner
   // der Schichten oben — `schicht()` liefert für ihn seinen eigenen Dateinamen, und kein
   // Filter trifft ihn. Bis 2026-11-10 holte sich `App.tsx` dort unbemerkt ein Repository.
   // Für ihn gilt dieselbe Regel wie für die Oberfläche, deren Teil er ist.
-  it("der Einstieg in der Wurzel greift weder auf core noch auf die Persistenz durch", () => {
+  it("der Einstieg direkt in src/ greift weder auf core noch auf die Persistenz durch", () => {
     const verboten = new Set(["core", "adapters/persistence"]);
-    const wurzel = DATEIEN.filter((d) => dirname(d) === WURZEL);
-    expect(wurzel.map(kurz), "der Einstieg wurde nicht gefunden").toContain("App.tsx");
-    const verstoesse = wurzel
+    const direktInSrc = DATEIEN.filter((d) => dirname(d) === SRC);
+    expect(direktInSrc.map(kurz), "der Einstieg wurde nicht gefunden").toContain("App.tsx");
+    const verstoesse = direktInSrc
       .map((d) => ({ datei: kurz(d), zieht: [...importierteSchichten(d)].filter((z) => verboten.has(z)) }))
       .filter((v) => v.zieht.length > 0);
     expect(verstoesse).toEqual([]);
@@ -168,7 +169,7 @@ describe("Schichtgrenzen", () => {
   it("die Altlast-Liste enthält nur, was wirklich noch verletzt", () => {
     const verboten = new Set(["core", "adapters/persistence"]);
     const ueberfluessig = ALTLAST.filter((eintrag) => {
-      const datei = join(WURZEL, eintrag);
+      const datei = join(SRC, eintrag);
       if (!DATEIEN.includes(datei)) return true; // Datei gibt es nicht mehr
       return [...importierteSchichten(datei)].every((z) => !verboten.has(z));
     });
@@ -192,15 +193,15 @@ describe("Schichtgrenzen", () => {
 //   die Grenze ist die strengere Fassung desselben.
 //
 // Beides gilt in Kern, Anwendung und Oberfläche zugleich, mit denselben Bereichsnamen —
-// sie heissen in allen drei Schichten gleich, und genau dafür (Wurzel-`CLAUDE.md`, „Wie die
+// sie heissen in allen drei Schichten gleich, und genau dafür (`CLAUDE.md` des Projekts, „Wie die
 // Schichten innen gegliedert sind").
 //
-// Was ZWEI Bereiche gegeneinander abwägt, gehört keinem von beiden, sondern in die Wurzel
-// der Schicht (`core/zustaendigkeit.ts`). Die Wurzel ist deshalb von jeder Regel
-// ausgenommen, in BEIDE Richtungen: sie kennt alle Bereiche, und ein Bereich darf benutzen,
-// was sie abgewogen hat. Das ist eine bewusste Grenze dieser Prüfung — ein Weg Bereich →
-// Wurzel → anderer Bereich bleibt unsichtbar. Er ist gewollt, solange die Wurzeldatei
-// wirklich abwägt; eine Datei, die nur dorthin zieht, um der Regel zu entgehen, sieht der
+// Was ZWEI Bereiche gegeneinander abwägt, gehört keinem von beiden, sondern direkt in den
+// Ordner der Schicht (`core/zustaendigkeit.ts`). Was dort liegt, ist deshalb von jeder Regel
+// ausgenommen, in BEIDE Richtungen: es kennt alle Bereiche, und ein Bereich darf benutzen,
+// was es abgewogen hat. Das ist eine bewusste Grenze dieser Prüfung — ein Weg Bereich →
+// bereichsübergreifende Datei → anderer Bereich bleibt unsichtbar. Er ist gewollt, solange
+// diese Datei wirklich abwägt; eine Datei, die nur dorthin zieht, um der Regel zu entgehen, sieht der
 // Test nicht, die Durchsicht schon.
 
 interface Modulgrenze {
@@ -218,14 +219,15 @@ interface Modulgrenze {
  * - **Rücklagen kennen keine Budgets** (2026-11-16). Ein Budget zählt „ohne die Rücklage
  *   auf seiner Unterkategorie" und muss deshalb von ihr wissen; eine Rücklage braucht für
  *   ihren Stand kein Budget. Wo das Budget doch mitspricht — am selben Knoten gewinnt es —,
- *   ist das eine Abwägung zwischen beiden und steht in der Zuständigkeit in der Wurzel.
+ *   ist das eine Abwägung zwischen beiden und steht bereichsübergreifend in
+ *   `core/zustaendigkeit.ts`.
  */
 const MODULGRENZEN: readonly Modulgrenze[] = [{ bereich: "ruecklagen", kenntNicht: "budgets" }];
 
 /**
  * Die Rangfolge der Fachbereiche, unten → oben (2026-11-17). Ein Bereich kennt nur Bereiche
  * mit KLEINERER Zahl; gleichrangige kennen sich nicht. Der Grund je Stufe steht in der
- * Wurzel-`CLAUDE.md`; hier nur, was beim Lesen der Tabelle sonst stolpern lässt.
+ * `CLAUDE.md` des Projekts; hier nur, was beim Lesen der Tabelle sonst stolpern lässt.
  *
  * Jeder Ordner direkt unter `core/`, `application/` und `adapters/ui/` braucht hier einen
  * Eintrag (oder einen in `ABBILDUNG` bzw. `KEIN_BEREICH`) — ein unbekannter Ordner macht
@@ -255,6 +257,10 @@ const RANG: Readonly<Record<string, number>> = {
   analyse: 10,
   uebersicht: 10,
   einstellungen: 10,
+  // Die Review-Inbox: Belege prüfen, zuordnen und verbuchen. Sie öffnet den Buchungsdialog
+  // und fragt Dubletten, Umbuchungen und Verträge — eine Sicht über den Beleg, nicht der Beleg.
+  // Nur in der Oberfläche; die Use-Cases dahinter gehören ihren Bereichen.
+  review: 10,
 };
 
 /**
@@ -276,11 +282,11 @@ const SCHICHTEN_MIT_BEREICHEN: readonly string[] = ["core", "application", "adap
 /** Pfad relativ zu `src/`, immer mit `/` — damit die Altlast auf jeder Plattform gleich aussieht. */
 const pfadname = (d: string) => kurz(d).split(/[\\/]/).join("/");
 
-/** Der Bereich einer Datei innerhalb ihrer Schicht — `undefined` für die Wurzel der Schicht. */
+/** Der Bereich einer Datei innerhalb ihrer Schicht — `undefined` für Dateien direkt im Ordner der Schicht. */
 function bereich(datei: string): string | undefined {
   const s = schicht(datei);
   if (!SCHICHTEN_MIT_BEREICHEN.includes(s)) return undefined;
-  const teile = relative(join(WURZEL, s), datei).split(/[\\/]/);
+  const teile = relative(join(SRC, s), datei).split(/[\\/]/);
   return teile.length > 1 ? teile[0] : undefined;
 }
 
@@ -373,7 +379,7 @@ function exportHerkunft(datei: string, unterwegs = new Set<string>()): Map<strin
   return raus;
 }
 
-const DIENSTE = join(WURZEL, "adapters", "dienste.ts");
+const DIENSTE = join(SRC, "adapters", "dienste.ts");
 
 /**
  * Was eine Funktion aus `adapters/dienste.ts` aufruft: die Dateien, aus denen die Namen in
@@ -433,7 +439,7 @@ function schluesselAus(datei: string, namensraum: string): string[] {
   return [...quelle.matchAll(new RegExp(`["'\`](${namensraum}\\.[\\w.]+)`, "g"))].map((m) => m[1]);
 }
 
-const UI_BAUSTEINE = join(WURZEL, "adapters", "ui", "bausteine");
+const UI_BAUSTEINE = join(SRC, "adapters", "ui", "bausteine");
 
 /** Die Bereiche der Oberfläche, die eine Datei aus `bausteine/` direkt importieren — gemessen. */
 function nutzerBereiche(baustein: string): Set<string> {
@@ -459,7 +465,7 @@ describe("Modulgrenzen", () => {
           if (!DATEIEN.some((d) => schicht(d) === s && bereich(d) === b)) blind.push(`keine Datei in ${s}/${b}`);
         }
       }
-      for (const fassade of [join(WURZEL, "core", "index.ts"), join(WURZEL, "application", "index.ts")]) {
+      for (const fassade of [join(SRC, "core", "index.ts"), join(SRC, "application", "index.ts")]) {
         if (![...exportHerkunft(fassade).values()].some((h) => bereich(h) === g.kenntNicht)) {
           blind.push(`${pfadname(fassade)} führt keinen Namen auf ${g.kenntNicht} zurück`);
         }
@@ -551,8 +557,8 @@ function rangverstoesse(): Bereichsbezug[] {
 /** Die Ordner direkt unter den Schichten mit Bereichen, als `schicht/ordner`. */
 function bereichsordner(): string[] {
   return SCHICHTEN_MIT_BEREICHEN.flatMap((s) =>
-    readdirSync(join(WURZEL, s))
-      .filter((e) => statSync(join(WURZEL, s, e)).isDirectory())
+    readdirSync(join(SRC, s))
+      .filter((e) => statSync(join(SRC, s, e)).isDirectory())
       .map((e) => `${s}/${e}`),
   );
 }

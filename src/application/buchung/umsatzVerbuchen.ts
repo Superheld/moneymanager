@@ -9,7 +9,7 @@
 
 import { tageBis, type IstBuchung } from "../../core";
 import type { LedgerPort, UmsatzRepository } from "../ports";
-import { verbuchen, type Umsatz } from "./umsatz";
+import { verbuchen, type Umsatz } from "../import/umsatz";
 
 /** Toleranz für die Datums-Differenz beim Paaren — die zwei Beine eines Übertrags zwischen
  *  zwei Banken werden oft an leicht verschiedenen Tagen gebucht. */

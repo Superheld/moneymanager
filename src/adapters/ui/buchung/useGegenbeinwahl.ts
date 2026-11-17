@@ -17,7 +17,8 @@
 
 import { useMemo, useState } from "react";
 import { istAktiv, type IstBuchung, type Zahlungskonto } from "../../../application";
-import { passtAlsGegenbein, type Umsatz } from "../../../application/import";
+import { passtAlsGegenbein } from "../../../application";
+import type { Umsatz } from "../../../application/import";
 import { paarungsKandidaten } from "../../../application/buchung/umbuchungAusBuchung";
 
 /** Auswahlwerte: `e:<id>` Entwurf, `b:<id>` gebucht, `__neu` erzeugen, `__einseitig`. */

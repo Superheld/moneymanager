@@ -27,9 +27,9 @@
 // Monate mit Ausgaben zusammenkamen und `minMonate` sie verwarf. Genau diese Schwelle
 // trennt jetzt die beiden, statt die eine zu verschlucken.
 //
-// WARUM IN DER WURZEL des Kerns und nicht in `budgets/` (seit 2026-11-16): die Einstufung
+// WARUM DIREKT IN `src/core/` und nicht in `budgets/` (seit 2026-11-16): die Einstufung
 // beantwortet für ZWEI Bereiche dieselbe Frage — Budget oder Rücklage? —, und das ist nach
-// der Gliederungsregel der Wurzel-`CLAUDE.md` die Aufgabe einer querliegenden Datei.
+// der Gliederungsregel der `CLAUDE.md` des Projekts die Aufgabe einer querliegenden Datei.
 // Bis dahin lag sie als `budgets/budgetVorschlag.ts` dort und lieferte EINE Liste mit
 // einem Feld `art`; der Bereich Budgets zeigte deshalb auch die Rücklagen-Vorschläge
 // und öffnete für sie den Dialog einer Rücklage — ein Rest des aufbauenden Budgets, das

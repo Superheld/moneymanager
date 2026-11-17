@@ -32,7 +32,7 @@ import { budgetvorschlagIgnorieren } from "../application/budgets/budgetvorschla
 import {
   abrufAusfuehren,
   type Abrufergebnis,
-} from "../application/fints/abrufAusfuehren";
+} from "../application/abrufAusfuehren";
 import type { TanFrager } from "../application/fints/abrufPort";
 import { fintsAbruf } from "./fints";
 import { hanseaticAbruf } from "./hanseatic";
@@ -46,7 +46,7 @@ import { zuordnungenAbgleichen } from "../application/vertraege/vertragszuordnun
 import { zahlungsspuren } from "../application/buchung/zahlungsspuren";
 import { umbuchungenErkennen } from "../application/buchung/umbuchungenErkennen";
 import { kategorisierungsquellen } from "../application/kategorien/kategorisierungsquellen";
-import { umsaetzeVerbuchen } from "../application/import";
+import { umsaetzeVerbuchen } from "../application/buchung/umsatzVerbuchen";
 import type { Kategorie } from "../core";
 import {
   umsaetzeKategorisieren as umsaetzeKategorisierenUseCase,
@@ -92,7 +92,7 @@ import {
   type Importplan,
 } from "../application/konfigurationsimport";
 import { bestandExportieren } from "../application/bestandsexport";
-import { stammdatenLaden, type Stammdaten } from "../application/stammdaten/stammdatensichten";
+import { stammdatenLaden, type Stammdaten } from "../application/stammdatensichten";
 import { ruecklagenLaden, type Ruecklagensicht } from "../application/ruecklagen/ruecklagensichten";
 import { kontobelegungLaden, type Belegungssicht } from "../application/konten/kontobelegung";
 import { geldJeKontoLaden, type GeldJeKonto } from "../application/ruecklagen/geldJeKonto";
@@ -208,13 +208,17 @@ import {
   type AbschliessenEingabe,
 } from "../application/ruecklagen/ruecklageAbschliessen";
 import {
-  kategorieAnlegen as kategorieAnlegenUseCase,
-  kontoAnlegen as kontoAnlegenUseCase,
   personAnlegen as personAnlegenUseCase,
-  type KategorieEingabe,
-  type KontoEingabe,
   type PersonEingabe,
 } from "../application/stammdaten/stammdatenAnlegen";
+import {
+  kontoAnlegen as kontoAnlegenUseCase,
+  type KontoEingabe,
+} from "../application/konten/kontoAnlegen";
+import {
+  kategorieAnlegen as kategorieAnlegenUseCase,
+  type KategorieEingabe,
+} from "../application/kategorien/kategorieAnlegen";
 import {
   kontoloeschungPruefen as kontoloeschungPruefenUseCase,
   kontoVollstaendigLoeschen as kontoVollstaendigLoeschenUseCase,
@@ -1364,7 +1368,7 @@ import {
  * Was nach dem Entsperren einmal laufen muss, bevor ein Screen lädt.
  *
  * Steht hier, damit auch der Einstieg (`App.tsx`) kein Repository in die Hand nimmt —
- * er liegt in der Wurzel von `src/` und damit ausserhalb jeder Schicht, und genau
+ * er liegt direkt in `src/` und damit ausserhalb jeder Schicht, und genau
  * deshalb hatte ihn der Architekturtest bis 2026-11-10 nicht gesehen.
  */
 export function appStarten(): Promise<void> {

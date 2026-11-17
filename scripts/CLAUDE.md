@@ -1,6 +1,6 @@
 # Der Muster-Guard
 
-Gilt für `scripts/privacy-guard.mjs` und die Wächter um ihn. Die Regel selbst — kein Wert aus dem echten Bestand ins Repo — steht in der Wurzel-`CLAUDE.md`. Was überall gilt, steht in der Wurzel-`CLAUDE.md`.
+Gilt für `scripts/privacy-guard.mjs` und die Wächter um ihn. Die Regel selbst — kein Wert aus dem echten Bestand ins Repo — steht, wie alles, was überall gilt, in der `CLAUDE.md` des Projekts.
 
 ## Was der Muster-Guard findet
 

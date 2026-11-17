@@ -1,7 +1,7 @@
 // Ergebnisrechnung — was ein Monat KOSTET, nicht was in ihm vom Konto ging.
 //
 // Die Begriffe und Regeln stehen in `core/CLAUDE.md` unter „Auszahlung und Kosten"; hier
-// steht ihre Umsetzung. Die Rechnung liegt in der Wurzel des Kerns, weil sie über alle
+// steht ihre Umsetzung. Die Rechnung liegt direkt in `src/core/`, weil sie über alle
 // Bereiche rechnet — Buchungen, Verträge, Budgets, Rücklagen, Konten.
 //
 // Sie baut auf der Einordnung (`einordnung.ts`) und sortiert selbst nichts. Was sie
