@@ -85,8 +85,9 @@ Was **keinem** Bereich gehört, liegt direkt im Ordner der Schicht (`src/core/`,
 `core/einordnung.ts`, `core/ergebnis.ts`, `core/reichweite.ts`, `core/bericht.ts`,
 `core/einrichtung.ts`, `ausgabenvorschlaege.ts` in Kern und Anwendung — die eine
 Einstufung „Budget oder Rücklage?" für zwei Bereiche —, `core/zustaendigkeit.ts` — wer
-einen Anteil trägt, Budget oder Rücklage — und `core/fortschreibung.ts`, die Form eines
-Monats, die Budget und Rücklage beide schreiben) —
+einen Anteil trägt, Budget oder Rücklage —, `core/fortschreibung.ts`, die Form eines
+Monats, die Budget und Rücklage beide schreiben, und `buchungsdetail.ts` mit
+`einordnungssicht.ts`, was der Buchungsdialog über Verträge, Rücklagen und Budgets liest) —
 sie rechnen über mehrere Bereiche hinweg, und das ist ihre Aufgabe, kein Fehler. In `ui/` liegen aus demselben Grund
 die bereichsübergreifenden Tests oben (`screens`, `interaktion`, `formulare`).
 

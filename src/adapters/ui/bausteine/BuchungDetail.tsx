@@ -82,17 +82,17 @@ import {
   vertragZuordnenVonHand,
   vertragZuordnungZuruecksetzen,
 } from "../../dienste";
-import { Button, FormField, Pill } from "../bausteine";
+import { Button, FormField, Pill } from ".";
 import { VertragModal } from "../vertraege/VertragModal";
 import { formularAusBuchung } from "../vertraege/vertragFormular";
-import { useLoeschfrage } from "../bausteine/Loeschfrage";
-import { Auswahl } from "../bausteine/Auswahl";
-import { CategoryPicker } from "../bausteine/CategoryPicker";
-import { Datumsfeld } from "../bausteine/Datumsfeld";
+import { useLoeschfrage } from "./Loeschfrage";
+import { Auswahl } from "./Auswahl";
+import { CategoryPicker } from "./CategoryPicker";
+import { Datumsfeld } from "./Datumsfeld";
 import { MerkmaleBlock } from "../training/MerkmaleBlock";
-import { Modal } from "../bausteine/Modal";
-import { useDatum, useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
-import { geldFarbe } from "../bausteine/geldFarbe";
+import { Modal } from "./Modal";
+import { useDatum, useGeld, fehlerNachricht } from "./einstellungenKontext";
+import { geldFarbe } from "./geldFarbe";
 import { BuchungsHerkunft } from "./BuchungsHerkunft";
 import { EinordnungsBlock } from "./EinordnungsBlock";
 import { RuecklagenwahlBlock } from "./RuecklagenwahlBlock";
@@ -100,7 +100,7 @@ import { JournalBlock } from "./JournalBlock";
 import { Richtungswahl } from "./Richtungswahl";
 import { DublettenBlock, FreigabeHinweis, type Dublettenbefund } from "./DublettenBlock";
 import { VertragsBlock, type VertragsBindung } from "./VertragsBlock";
-import { Kaestchen } from "../bausteine/Kaestchen";
+import { Kaestchen } from "./Kaestchen";
 
 /** Stabile Leerwerte — als Literal im useState-Aufruf wäre jeder Render ein neues Objekt. */
 const LEERE_KARTE: ReadonlyMap<string, Dublettenverdacht> = new Map();

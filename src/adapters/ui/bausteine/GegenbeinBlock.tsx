@@ -7,9 +7,9 @@
 // nicht, nur das, was über die Gegenseite feststeht.
 
 import { useTranslation } from "react-i18next";
-import { Auswahl } from "../bausteine/Auswahl";
-import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
-import { geldFarbe } from "../bausteine/geldFarbe";
+import { Auswahl } from "./Auswahl";
+import { useDatum, useGeld } from "./einstellungenKontext";
+import { geldFarbe } from "./geldFarbe";
 import { Option, Optionsgruppe } from "./Optionsgruppe";
 import type { useGegenbeinwahl } from "./useGegenbeinwahl";
 

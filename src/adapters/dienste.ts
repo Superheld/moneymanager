@@ -132,7 +132,7 @@ import {
 import { analyseLaden, type Analysebasis } from "../application/analysesichten";
 import { vertraegeLaden, type Vertragssicht } from "../application/vertraege/vertragssichten";
 import { kontenLaden, type Kontensicht } from "../application/konten/kontensichten";
-import { buchungsdetailLaden, type Buchungsdetaildaten } from "../application/buchung/buchungsdetail";
+import { buchungsdetailLaden, type Buchungsdetaildaten } from "../application/buchungsdetail";
 import {
   dublettenFreigabeAufheben as dublettenFreigabeAufhebenUseCase,
   dublettenFreigeben as dublettenFreigebenUseCase,

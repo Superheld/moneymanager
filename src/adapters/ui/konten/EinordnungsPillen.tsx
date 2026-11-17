@@ -7,7 +7,7 @@
 // Sortierlogik, gegen die es die eine Stelle im Kern gibt.
 //
 // Liegt in `konten/` und nicht in `bausteine/`: benutzt wird sie nur vom Kontoauszug. Der
-// Buchungsdialog sagt dasselbe als Satz (`buchung/EinordnungsBlock`), nicht als Pille.
+// Buchungsdialog sagt dasselbe als Satz (`bausteine/EinordnungsBlock`), nicht als Pille.
 
 import { useTranslation } from "react-i18next";
 import type { Buchungseinordnung, Einordnungsart } from "../../../application";

@@ -17,7 +17,7 @@ import {
   einordnungJeBuchung,
   einordnungVon,
   type Buchungseinordnung,
-} from "../buchung/einordnungssicht";
+} from "../einordnungssicht";
 import {
   abweichungsfenster,
   anfangsbestandAusAnker,

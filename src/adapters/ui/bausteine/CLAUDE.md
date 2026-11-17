@@ -13,6 +13,12 @@ benutzt wird, gehört hierher. Was nur ein Bereich braucht, bleibt in seinem Ber
 — auch wenn es „allgemein" aussieht. Ein Baustein, den nur ein Screen benutzt, ist kein
 Baustein, sondern ein Teil dieses Screens.
 
+**Die Teile eines Bausteins liegen bei ihm**, auch wenn nur er sie benutzt: der
+Buchungsdialog (`BuchungDetail`) samt `VertragsBlock`, `RuecklagenwahlBlock`,
+`Optionsgruppe` und den übrigen Teilen. In `buchung/` zurückgelassen, hätten sie dort
+weiter Verträge und Rücklagen gekannt, die über der Buchung liegen; Grund und Teileliste
+in `../CLAUDE.md` unter „Der Buchungsdialog liegt in Teilen".
+
 **Ein Baustein trägt keinen Bereich in einen anderen** (seit 2026-11-16). Was ein Bereich
 nicht kennen darf (`CLAUDE.md` des Projekts, „Modulgrenzen"), darf auch kein Baustein, den er
 benutzt: keinen Use-Case jenes Bereichs aufrufen, keinen Schlüssel aus seinem

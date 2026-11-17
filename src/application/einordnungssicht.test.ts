@@ -13,7 +13,7 @@ import type {
   Vertrag,
   Vertragszuordnung,
   Zahlungskonto,
-} from "../../core";
+} from "../core";
 import { einordnungJeBuchung, einordnungVon, type EinordnungssichtEingabe } from "./einordnungssicht";
 
 const KONTEN: Zahlungskonto[] = [

@@ -11,8 +11,8 @@ import { useTranslation } from "react-i18next";
 import { useState, type ReactNode } from "react";
 import type { IstBuchung } from "../../../application";
 import { nachRang, type ImportLauf, type Umsatz } from "../../../application/import";
-import { Pill } from "../bausteine";
-import { Klappblock } from "../bausteine/Klappblock";
+import { Pill } from ".";
+import { Klappblock } from "./Klappblock";
 
 /** Ein Label/Wert-Paar im Herkunfts-Abschnitt. Lange Werte (Hash, Zweck) dürfen umbrechen. */
 function Infozeile({ label, children, mono }: { label: string; children: ReactNode; mono?: boolean }) {

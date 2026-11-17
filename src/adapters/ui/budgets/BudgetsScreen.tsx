@@ -26,7 +26,7 @@ import {
 } from "../../../application";
 import { budgetbereich, budgetLoeschen, budgetvorschlagVerwerfen } from "../../dienste";
 import { Button, Card, DataTable, KPIStat, Pill } from "../bausteine";
-import { BuchungDetail } from "../buchung/BuchungDetail";
+import { BuchungDetail } from "../bausteine/BuchungDetail";
 import { BudgetVerlauf } from "./BudgetVerlauf";
 import { BudgetDialog, type BudgetVorbelegung } from "./BudgetDialog";
 import { BudgetTabelle } from "./BudgetTabelle";

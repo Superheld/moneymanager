@@ -9,7 +9,7 @@ Topf oder Rücklage, Vorsorge, Umbuchung, ungeplant), steht nicht hier, sondern 
 `../einordnung.ts` — an EINER Stelle für die ganze App. Die Ergebnisrechnung der Übersicht
 liest sie von dort, und seit 2026-11-15 auch der Kontoauszug (Spalte „Einordnung") und der
 Buchungsdialog (der Satz mit dem Warum), beide über
-`application/buchung/einordnungssicht.ts`. Der Grund für die eine Stelle: vorher
+`application/einordnungssicht.ts`. Der Grund für die eine Stelle: vorher
 beantwortete jede Sicht die Frage selbst, und dieselbe Buchung zählte an drei Stellen als
 drei verschiedene Dinge. Vorzeichen und Charakter unten sind die EINGABEN dieser
 Einordnung, nicht eine zweite Fassung davon.

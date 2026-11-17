@@ -7,8 +7,8 @@
 
 import { useTranslation } from "react-i18next";
 import type { Vertrag, Vertragszuordnung } from "../../../application";
-import { Auswahl } from "../bausteine/Auswahl";
-import { Button, Pill } from "../bausteine";
+import { Auswahl } from "./Auswahl";
+import { Button, Pill } from ".";
 
 /**
  * Alles, was diese Buchung mit einem Vertrag verbindet — und die Wege, das zu ändern.

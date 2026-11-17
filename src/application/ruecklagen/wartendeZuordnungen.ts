@@ -14,7 +14,7 @@
 import { kategorieAnteile, type Cent } from "../../core";
 import { belegZuBuchung } from "../buchung/belegZuBuchung";
 import { buchungsname } from "../buchung/buchungszeile";
-import { einordnungJeBuchung, type EinordnungssichtEingabe } from "../buchung/einordnungssicht";
+import { einordnungJeBuchung, type EinordnungssichtEingabe } from "../einordnungssicht";
 import type { Umsatz } from "../import/umsatz";
 import { ruecklagenwahlJeBuchung } from "./ruecklageZuordnen";
 

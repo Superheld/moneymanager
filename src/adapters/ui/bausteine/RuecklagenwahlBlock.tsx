@@ -14,10 +14,10 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Ruecklagenwahl } from "../../../application";
 import { ruecklageZuordnen } from "../../dienste";
-import { Button, FormField } from "../bausteine";
-import { Auswahl } from "../bausteine/Auswahl";
-import { Feldzeile } from "../bausteine/Feldzeile";
-import { fehlerNachricht } from "../bausteine/einstellungenKontext";
+import { Button, FormField } from ".";
+import { Auswahl } from "./Auswahl";
+import { Feldzeile } from "./Feldzeile";
+import { fehlerNachricht } from "./einstellungenKontext";
 
 /** Der Wert der Auswahl für „ausdrücklich keine Rücklage" — keine ID kann so heissen. */
 const KEINE = "\u0000keine";

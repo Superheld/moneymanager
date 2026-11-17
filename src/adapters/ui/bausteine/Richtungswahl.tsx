@@ -9,7 +9,7 @@
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
 import { useTranslation } from "react-i18next";
-import type { Geld } from "../bausteine/einstellungenKontext";
+import type { Geld } from "./einstellungenKontext";
 
 /**
  * Der Text fürs Betragsfeld — die HÖHE, ohne Vorzeichen.

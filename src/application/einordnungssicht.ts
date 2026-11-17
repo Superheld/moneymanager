@@ -14,6 +14,11 @@
 // mehrere Einordnungen tragen; heraus kommen die VERSCHIEDENEN, in der Reihenfolge der
 // Anteile. Zwei Anteile, die beide aus demselben Budget kommen, sind eine Aussage und
 // stehen einmal da.
+//
+// Direkt in `src/application/`: die Namen kommen aus Budgets, Rücklagen und Verträgen, und
+// die Datei wird von Kontoauszug, Buchungsdialog und Rücklagen gelesen. Der Dialog
+// bekommt von hier nur fertige Namen; der Typ `Budget` bleibt in dieser Datei, und der
+// Bereich Rücklagen, der den Dialog öffnet, kennt dadurch keine Budgets.
 
 import {
   einordner,
@@ -28,7 +33,7 @@ import {
   type Vertrag,
   type Vertragszuordnung,
   type Zahlungskonto,
-} from "../../core";
+} from "../core";
 
 /** Eine Einordnung, wie sie angezeigt wird — je Buchung eine oder (geteilt) mehrere. */
 export interface Buchungseinordnung {

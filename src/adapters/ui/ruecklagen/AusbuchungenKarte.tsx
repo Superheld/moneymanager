@@ -24,7 +24,7 @@ import { useTranslation } from "react-i18next";
 import type { Ausbuchungszeile, IstBuchung } from "../../../application";
 import { Card, DataTable, Pill } from "../bausteine";
 import type { DataColumn } from "../bausteine/DataTable";
-import { BuchungDetail } from "../buchung/BuchungDetail";
+import { BuchungDetail } from "../bausteine/BuchungDetail";
 import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { warnFarbe } from "../bausteine/geldFarbe";
 
