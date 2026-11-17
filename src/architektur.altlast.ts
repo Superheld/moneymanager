@@ -278,52 +278,12 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     ],
   },
   {
-    von: "stammdaten",
-    auf: "kategorien",
-    abbau:
-      "`stammdatenAnlegen` nach Entität teilen (`kategorieAnlegen` nach `kategorien`), " +
-      "`stammdatensichten` in die Wurzel.",
-    eintraege: [
-      "application/stammdaten/stammdatenAnlegen.ts → core/kategorien/kategorie.ts",
-      "application/stammdaten/stammdatensichten.ts → core/kategorien/kategorie.ts",
-    ],
-  },
-  {
-    von: "stammdaten",
-    auf: "konten",
-    abbau:
-      "`stammdatenAnlegen` nach Entität teilen (`kontoAnlegen` nach `konten`), " +
-      "`stammdatensichten` in die Wurzel.",
-    eintraege: [
-      "application/stammdaten/stammdatenAnlegen.ts → core/konten/konto.ts",
-      "application/stammdaten/stammdatensichten.ts → core/konten/konto.ts",
-    ],
-  },
-  {
     von: "buchung",
     auf: "budgets",
     abbau:
       "`einordnungssicht` in die Wurzel der Anwendung.",
     eintraege: [
       "application/buchung/einordnungssicht.ts → core/budgets/budget.ts",
-    ],
-  },
-  {
-    von: "kategorien",
-    auf: "stammdaten",
-    abbau:
-      "Erledigt sich, wenn `stammdatensichten` in die Wurzel zieht.",
-    eintraege: [
-      "adapters/ui/training/TrainingBereich.tsx → application/stammdaten/stammdatensichten.ts",
-    ],
-  },
-  {
-    von: "stammdaten",
-    auf: "buchung",
-    abbau:
-      "`stammdatensichten` rechnet Kontostände und gehört in die Wurzel.",
-    eintraege: [
-      "application/stammdaten/stammdatensichten.ts → core/buchung/istbuchung.ts",
     ],
   },
 ];

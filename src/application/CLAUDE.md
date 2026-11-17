@@ -46,7 +46,10 @@ verworfen ist, filtern `budgets/budgetvorschlaege.ts` und `ruecklagen/ruecklagen
 Und `abrufAusfuehren.ts`, die Klammer um einen Bankabruf: es holt über `fints/` und schickt
 das Ergebnis durch Import, Buchung, Verträge und Depot. `fints/` steht in der Rangfolge
 unter allen vieren und darf sie nicht kennen — die Orchestrierung über sie gehört deshalb
-keinem von ihnen, sondern hierher.
+keinem von ihnen, sondern hierher. Ebenso `stammdatensichten.ts`: es lädt Personen, Konten
+und den Kategorienbaum in einem Zug und rechnet die Kontostände über den Buchungsbestand —
+eine Sicht über vier Bereiche. Angelegt wird dagegen je Bereich (`kontoAnlegen` in
+`konten/`, `kategorieAnlegen` in `kategorien/`, `personAnlegen` in `stammdaten/`).
 
 ## Ports
 

@@ -359,15 +359,10 @@ export {
   type Stammdaten,
   type StammdatenDeps,
   type Kontostand,
-} from "./stammdaten/stammdatensichten";
-export {
-  personAnlegen,
-  kontoAnlegen,
-  kategorieAnlegen,
-  type PersonEingabe,
-  type KontoEingabe,
-  type KategorieEingabe,
-} from "./stammdaten/stammdatenAnlegen";
+} from "./stammdatensichten";
+export { personAnlegen, type PersonEingabe } from "./stammdaten/stammdatenAnlegen";
+export { kontoAnlegen, type KontoEingabe } from "./konten/kontoAnlegen";
+export { kategorieAnlegen, type KategorieEingabe } from "./kategorien/kategorieAnlegen";
 export { standardkategorienAnlegen } from "./kategorien/standardkategorien";
 export type {
   Bankkonto,

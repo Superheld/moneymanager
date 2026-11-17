@@ -92,7 +92,7 @@ import {
   type Importplan,
 } from "../application/konfigurationsimport";
 import { bestandExportieren } from "../application/bestandsexport";
-import { stammdatenLaden, type Stammdaten } from "../application/stammdaten/stammdatensichten";
+import { stammdatenLaden, type Stammdaten } from "../application/stammdatensichten";
 import { ruecklagenLaden, type Ruecklagensicht } from "../application/ruecklagen/ruecklagensichten";
 import { kontobelegungLaden, type Belegungssicht } from "../application/konten/kontobelegung";
 import { geldJeKontoLaden, type GeldJeKonto } from "../application/ruecklagen/geldJeKonto";
@@ -208,13 +208,17 @@ import {
   type AbschliessenEingabe,
 } from "../application/ruecklagen/ruecklageAbschliessen";
 import {
-  kategorieAnlegen as kategorieAnlegenUseCase,
-  kontoAnlegen as kontoAnlegenUseCase,
   personAnlegen as personAnlegenUseCase,
-  type KategorieEingabe,
-  type KontoEingabe,
   type PersonEingabe,
 } from "../application/stammdaten/stammdatenAnlegen";
+import {
+  kontoAnlegen as kontoAnlegenUseCase,
+  type KontoEingabe,
+} from "../application/konten/kontoAnlegen";
+import {
+  kategorieAnlegen as kategorieAnlegenUseCase,
+  type KategorieEingabe,
+} from "../application/kategorien/kategorieAnlegen";
 import {
   kontoloeschungPruefen as kontoloeschungPruefenUseCase,
   kontoVollstaendigLoeschen as kontoVollstaendigLoeschenUseCase,
