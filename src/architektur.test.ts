@@ -255,6 +255,10 @@ const RANG: Readonly<Record<string, number>> = {
   analyse: 10,
   uebersicht: 10,
   einstellungen: 10,
+  // Die Review-Inbox: Belege prüfen, zuordnen und verbuchen. Sie öffnet den Buchungsdialog
+  // und fragt Dubletten, Umbuchungen und Verträge — eine Sicht über den Beleg, nicht der Beleg.
+  // Nur in der Oberfläche; die Use-Cases dahinter gehören ihren Bereichen.
+  review: 10,
 };
 
 /**

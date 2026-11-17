@@ -184,11 +184,8 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     auf: "buchung",
     abbau:
       "Verbuchen macht aus einem Beleg eine Buchung: `umsatzVerbuchen` nach `buchung`, " +
-      "`vorschlag` (die Kategorisierungskette) nach `klassifikator`, `ReviewScreen` in die " +
-      "Wurzel der Oberfläche.",
+      "`vorschlag` (die Kategorisierungskette) nach `klassifikator`.",
     eintraege: [
-      "adapters/ui/import/ReviewScreen.tsx → adapters/ui/buchung/BuchungDetail.tsx",
-      "adapters/ui/import/ReviewScreen.tsx → application/buchung/umbuchungenErkennen.ts",
       "application/import/umsatzVerbuchen.ts → core/buchung/istbuchung.ts",
       "application/import/vorschlag.ts → core/buchung/zahlungsspur.ts",
     ],
@@ -244,9 +241,8 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     von: "import",
     auf: "vertraege",
     abbau:
-      "`vorschlag` nach `klassifikator`, `ReviewScreen` in die Wurzel der Oberfläche.",
+      "`vorschlag` nach `klassifikator`.",
     eintraege: [
-      "adapters/ui/import/ReviewScreen.tsx → application/vertraege/vertragszuordnung.ts",
       "application/import/vorschlag.ts → core/vertraege/vertragZuordnung.ts",
     ],
   },
@@ -310,15 +306,6 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
       "`einordnungssicht` in die Wurzel der Anwendung.",
     eintraege: [
       "application/buchung/einordnungssicht.ts → core/budgets/budget.ts",
-    ],
-  },
-  {
-    von: "import",
-    auf: "dubletten",
-    abbau:
-      "`ReviewScreen` in die Wurzel der Oberfläche.",
-    eintraege: [
-      "adapters/ui/import/ReviewScreen.tsx → application/dubletten/dublettensicht.ts",
     ],
   },
   {

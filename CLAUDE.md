@@ -106,7 +106,7 @@ Paaren: so ist auch jedes Paar geregelt, zwischen dem es heute keinen Bezug gibt
 | 7 | `ruecklagen` | eine Rücklage braucht Konto, Buchung und Vertrag (die Umbuchungsregel) |
 | 8 | `budgets` | ein Budget zählt „ohne die Rücklage auf seiner Unterkategorie" und muss von ihr wissen |
 | 9 | `vermoegen` (mit `vorsorge`) | sammelt Konten und Depots; Vorsorge rechnet mit dem Nettovermögen |
-| 10 | `analyse` · `uebersicht` · `einstellungen` | Sichten ziehen zusammen, was darunter liegt, und niemand braucht sie |
+| 10 | `analyse` · `uebersicht` · `einstellungen` · `review` (nur `ui/`) | Sichten ziehen zusammen, was darunter liegt, und niemand braucht sie |
 
 Zwei Ordner zählen unter anderem Namen: `ui/training` ist `kategorien` (siehe unten), und
 `vorsorge` ist ein Teil von `vermoegen` — ein Bereich für die Regel, die Ordner bleiben

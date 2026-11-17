@@ -29,7 +29,7 @@ import { UebersichtScreen } from "./uebersicht/UebersichtScreen";
 import { ImportScreen } from "./import/ImportScreen";
 import { RuecklagenScreen } from "./ruecklagen/RuecklagenScreen";
 import { KontenScreen } from "./konten/KontenScreen";
-import { ReviewScreen } from "./import/ReviewScreen";
+import { ReviewScreen } from "./review/ReviewScreen";
 import { sqliteKlassifikatorRepository } from "../persistence/sqliteKlassifikatorRepository";
 import { trainieren } from "../../core";
 import { VertraegeScreen } from "./vertraege/VertraegeScreen";

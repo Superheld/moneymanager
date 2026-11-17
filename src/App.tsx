@@ -9,7 +9,7 @@ import { VertraegeScreen } from "./adapters/ui/vertraege/VertraegeScreen";
 import { BudgetsScreen } from "./adapters/ui/budgets/BudgetsScreen";
 import { RuecklagenScreen } from "./adapters/ui/ruecklagen/RuecklagenScreen";
 import { VermoegenScreen } from "./adapters/ui/vermoegen/VermoegenScreen";
-import { ImportBereich } from "./adapters/ui/import/ImportBereich";
+import { ImportBereich } from "./adapters/ui/review/ImportBereich";
 import { TrainingBereich } from "./adapters/ui/training/TrainingBereich";
 import { EinstellungenProvider } from "./adapters/ui/bausteine/EinstellungenProvider";
 import { useExperimente } from "./adapters/ui/bausteine/einstellungenKontext";
