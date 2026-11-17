@@ -231,6 +231,7 @@ export {
 } from "./konten/kontostandAnker";
 export { buchungErfassen, type BuchungEingabe } from "./buchung/buchungErfassen";
 export { umbuchungErfassen } from "./buchung/umbuchungErfassen";
+export { passtAlsGegenbein, type VerbuchenErgebnis } from "./buchung/umsatzVerbuchen";
 export {
   buchungenSammelbearbeiten,
   buchungenLoeschen,

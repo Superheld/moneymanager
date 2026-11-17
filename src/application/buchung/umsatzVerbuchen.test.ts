@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { IstBuchung } from "../../core";
 import type { LedgerPort, UmsatzRepository } from "../ports";
-import type { Umsatz } from "./umsatz";
+import type { Umsatz } from "../import/umsatz";
 import { gegenbeinFuer, paareUmbuchungen, umsaetzeVerbuchen } from "./umsatzVerbuchen";
 
 function umsatz(over: Partial<Umsatz>): Umsatz {

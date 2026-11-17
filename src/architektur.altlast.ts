@@ -183,10 +183,11 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     von: "import",
     auf: "buchung",
     abbau:
-      "Verbuchen macht aus einem Beleg eine Buchung: `umsatzVerbuchen` nach `buchung`, " +
-      "`vorschlag` (die Kategorisierungskette) nach `klassifikator`.",
+      "`vorschlag` (die Kategorisierungskette) nach `klassifikator`. Allein umziehen geht " +
+      "nicht: `umsaetzeUebernehmen` ruft die Kette beim Übernehmen jeder Zeile auf und " +
+      "stünde dann als Beleg über ihr. Erst muss der Vorschlag aus dem Übernehmen heraus " +
+      "(hereingereicht oder danach gesetzt).",
     eintraege: [
-      "application/import/umsatzVerbuchen.ts → core/buchung/istbuchung.ts",
       "application/import/vorschlag.ts → core/buchung/zahlungsspur.ts",
     ],
   },
@@ -207,7 +208,8 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     auf: "klassifikator",
     abbau:
       "`vorschlag` ist die Kategorisierungskette (Umbuchung → Vertrag → Quelle → Modell) " +
-      "und zieht nach `klassifikator`.",
+      "und zieht nach `klassifikator` — erst, wenn `umsaetzeUebernehmen` sie nicht mehr selbst " +
+      "aufruft (siehe import → buchung).",
     eintraege: [
       "application/import/vorschlag.ts → core/klassifikator/erklaerung.ts",
       "application/import/vorschlag.ts → core/klassifikator/merkmale.ts",

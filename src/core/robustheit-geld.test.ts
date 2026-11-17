@@ -355,7 +355,7 @@ describe("budgetVerbrauch — Erstattungen", () => {
   //   Erstattung geht verloren. Fehler = 2× Erstattungsbetrag.
   // Warum reachable: Der Import verbucht `betrag: u.betrag` (Vorzeichen aus der CSV)
   //   zusammen mit `charakter: kategorie.defaultCharakter`
-  //   (application/import/umsatzVerbuchen.ts/122). Eine Rücküberweisung eines
+  //   (application/buchung/umsatzVerbuchen.ts/122). Eine Rücküberweisung eines
   //   Händlers in Kategorie „Lebensmittel" landet damit als positiver Aufwand im Ledger.
   // Warum falsch: Historie rechnet vorzeichenrichtig (historie.ts), Budget nicht —
   //   zwei Screens zeigen für dieselben Daten verschiedene Zahlen, und der Budget-Rest

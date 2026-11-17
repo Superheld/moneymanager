@@ -4,7 +4,7 @@
 //  • S-1a  Gegenbein fehlt (typisch: Bargeld, wird nicht importiert) → wird erzeugt.
 //  • S-1b  beide Beine existieren (zwei importierte Buchungen) → werden gepaart.
 //
-// Die automatische Paarung beim Import (`import/umsatzVerbuchen.ts`) macht dasselbe eine
+// Die automatische Paarung beim Import (`umsatzVerbuchen.ts`) macht dasselbe eine
 // Ebene höher, auf UMSÄTZEN vor dem Verbuchen. Hier arbeiten wir auf IstBuchungen, also
 // nach dem Verbuchen — deshalb eigene Logik statt Wiederverwendung.
 //

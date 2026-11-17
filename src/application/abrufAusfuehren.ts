@@ -45,7 +45,7 @@ import type { Vorschlagskontext } from "./import/vorschlag";
 import { quelleKeyFuer } from "./import/kontoMatch";
 import { umsaetzeUebernehmen, type UebernahmeErgebnis } from "./import/umsaetzeUebernehmen";
 import { umbuchungenErkennen } from "./buchung/umbuchungenErkennen";
-import { umsaetzeVerbuchen } from "./import/umsatzVerbuchen";
+import { umsaetzeVerbuchen } from "./buchung/umsatzVerbuchen";
 import { bankAnker, istAktiv } from "../core";
 import type { Abrufadapter, Auszugsstand, Bankprofil, Bankzugang, TanFrager, Vormerkungszeile,
 } from "./fints/abrufPort";

@@ -46,7 +46,7 @@ import { zuordnungenAbgleichen } from "../application/vertraege/vertragszuordnun
 import { zahlungsspuren } from "../application/buchung/zahlungsspuren";
 import { umbuchungenErkennen } from "../application/buchung/umbuchungenErkennen";
 import { kategorisierungsquellen } from "../application/kategorien/kategorisierungsquellen";
-import { umsaetzeVerbuchen } from "../application/import";
+import { umsaetzeVerbuchen } from "../application/buchung/umsatzVerbuchen";
 import type { Kategorie } from "../core";
 import {
   umsaetzeKategorisieren as umsaetzeKategorisierenUseCase,

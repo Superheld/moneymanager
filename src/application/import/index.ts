@@ -11,5 +11,4 @@ export * from "./vorschlag";
 export * from "./fremdkategorien";
 export * from "./umsaetzeUebernehmen";
 export * from "./umsaetzeSammelbearbeiten";
-export * from "./umsatzVerbuchen";
 export * from "./bankzeileVerwerfen";
