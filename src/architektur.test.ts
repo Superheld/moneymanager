@@ -20,6 +20,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve, dirname } from "node:path";
+import { RANG_ALTLAST } from "./architektur.altlast";
 
 const WURZEL = resolve(__dirname);
 
@@ -176,19 +177,31 @@ describe("Schichtgrenzen", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Modulgrenzen — welcher Bereich welchen anderen nicht kennt
+// Modulgrenzen — welcher Bereich welchen anderen kennen darf
 // ---------------------------------------------------------------------------
 //
 // Die Schichtgrenzen oben sagen, in welche RICHTUNG eine Schicht blickt. Innerhalb einer
 // Schicht liegen die Bereiche nebeneinander (`core/budgets/`, `core/ruecklagen/` …), und
 // zwischen ihnen gibt es Richtungen, die gelten sollen, ohne dass der Compiler sie kennt.
-// Hier stehen sie als Daten: ein Eintrag „A kennt B nicht" gilt in Kern, Anwendung und
-// Oberfläche zugleich, mit denselben Bereichsnamen — sie heissen in allen drei Schichten
-// gleich, und genau dafür (Wurzel-`CLAUDE.md`, „Wie die Schichten innen gegliedert sind").
+// Hier stehen sie als Daten, in zwei Formen:
 //
-// Was BEIDE gegeneinander abwägt, gehört keinem von beiden, sondern in die Wurzel der
-// Schicht (`core/zustaendigkeit.ts`). Die Wurzel ist deshalb von jeder Grenze ausgenommen:
-// sie kennt beide Seiten, und das ist ihre Aufgabe.
+// - die RANGFOLGE (`RANG`): jeder Bereich hat eine Stufe und kennt nur Bereiche UNTER sich.
+//   Sie gilt für Code — Importe, Namen über die Fassaden, Aufrufe über `dienste`.
+// - einzelne GRENZEN (`MODULGRENZEN`): ein Paar „A kennt B nicht", das zusätzlich die
+//   Texte und die Bausteine einschliesst. Was dort steht, muss die Rangfolge schon sagen;
+//   die Grenze ist die strengere Fassung desselben.
+//
+// Beides gilt in Kern, Anwendung und Oberfläche zugleich, mit denselben Bereichsnamen —
+// sie heissen in allen drei Schichten gleich, und genau dafür (Wurzel-`CLAUDE.md`, „Wie die
+// Schichten innen gegliedert sind").
+//
+// Was ZWEI Bereiche gegeneinander abwägt, gehört keinem von beiden, sondern in die Wurzel
+// der Schicht (`core/zustaendigkeit.ts`). Die Wurzel ist deshalb von jeder Regel
+// ausgenommen, in BEIDE Richtungen: sie kennt alle Bereiche, und ein Bereich darf benutzen,
+// was sie abgewogen hat. Das ist eine bewusste Grenze dieser Prüfung — ein Weg Bereich →
+// Wurzel → anderer Bereich bleibt unsichtbar. Er ist gewollt, solange die Wurzeldatei
+// wirklich abwägt; eine Datei, die nur dorthin zieht, um der Regel zu entgehen, sieht der
+// Test nicht, die Durchsicht schon.
 
 interface Modulgrenze {
   /** Der Bereich, für den die Regel gilt. */
@@ -198,7 +211,9 @@ interface Modulgrenze {
 }
 
 /**
- * Die Grenzen, die gelten. Eine neue Richtung ist eine Zeile hier.
+ * Die Grenzen, die STRENGER gelten als die Rangfolge: auch für i18n-Schlüssel und für die
+ * Bausteine, die der Bereich benutzt. Ob er den Code des anderen kennt, prüft die
+ * Rangfolge; der Test „jede Grenze steht auch in der Rangfolge" hält beide beisammen.
  *
  * - **Rücklagen kennen keine Budgets** (2026-11-16). Ein Budget zählt „ohne die Rücklage
  *   auf seiner Unterkategorie" und muss deshalb von ihr wissen; eine Rücklage braucht für
@@ -207,16 +222,56 @@ interface Modulgrenze {
  */
 const MODULGRENZEN: readonly Modulgrenze[] = [{ bereich: "ruecklagen", kenntNicht: "budgets" }];
 
-/** Die Schichten, die nach Bereichen gegliedert sind. */
-const SCHICHTEN_MIT_BEREICHEN: readonly string[] = ["core", "application", "adapters/ui"];
+/**
+ * Die Rangfolge der Fachbereiche, unten → oben (2026-11-17). Ein Bereich kennt nur Bereiche
+ * mit KLEINERER Zahl; gleichrangige kennen sich nicht. Der Grund je Stufe steht in der
+ * Wurzel-`CLAUDE.md`; hier nur, was beim Lesen der Tabelle sonst stolpern lässt.
+ *
+ * Jeder Ordner direkt unter `core/`, `application/` und `adapters/ui/` braucht hier einen
+ * Eintrag (oder einen in `ABBILDUNG` bzw. `KEIN_BEREICH`) — ein unbekannter Ordner macht
+ * den Test rot. Sonst liefe ein neuer Bereich still ohne Regel.
+ */
+const RANG: Readonly<Record<string, number>> = {
+  stammdaten: 0,
+  kategorien: 0, // der Baum; das Training darüber ist `klassifikator`
+  zugang: 0,
+  sicherung: 0, // nur die Rotation der Sicherungen, kennt nichts als `basis`
+  konten: 1,
+  import: 2, // der Beleg — die Buchung verweist auf ihn, nicht umgekehrt
+  dubletten: 3,
+  fints: 3,
+  buchung: 4,
+  depot: 4,
+  vertraege: 5,
+  // Das Training und die Kategorisierung. Im Kern gibt es den Ordner schon (Modell,
+  // Merkmale, Messung); der Teil in `application/kategorien` und `ui/training` zieht erst
+  // in einem späteren Paket hierher und zählt bis dahin als `kategorien` — daher ein guter
+  // Teil der Altlast `kategorien → klassifikator`.
+  klassifikator: 6,
+  ruecklagen: 7,
+  budgets: 8,
+  vermoegen: 9,
+  // Die Sichten: sie ziehen zusammen, was darunter liegt, und niemand braucht sie.
+  analyse: 10,
+  uebersicht: 10,
+  einstellungen: 10,
+};
 
 /**
- * Verstösse gegen eine Modulgrenze, die (noch) bleiben dürfen — als `datei → ziel`.
+ * Ordner, die unter anderem Namen ein Bereich der Rangfolge SIND.
  *
- * **Sie ist leer**, und es gilt dasselbe wie bei der ALTLAST oben: ein Eintrag braucht einen
- * Grund daneben, und ein Eintrag, der nichts mehr verletzt, macht den Test unten rot.
+ * - `training` heisst in der Oberfläche so, weil die Navigation den Bereich so nennt.
+ * - `vorsorge` ist ein Teil von Vermögen: das Vorsorgevermögen ist das Nettovermögen, die
+ *   Regeln stehen in `core/vermoegen/CLAUDE.md`, die Oberfläche im Vermögen-Screen. Die
+ *   Ordner bleiben vorerst; für die Regel ist es ein Bereich, Bezüge untereinander sind frei.
  */
-const MODUL_ALTLAST: readonly string[] = [];
+const ABBILDUNG: Readonly<Record<string, string>> = { training: "kategorien", vorsorge: "vermoegen" };
+
+/** Ordner, die bewusst KEIN Bereich sind: Primitive quer durch alles, geteilte Bausteine. */
+const KEIN_BEREICH: readonly string[] = ["basis", "bausteine"];
+
+/** Die Schichten, die nach Bereichen gegliedert sind. */
+const SCHICHTEN_MIT_BEREICHEN: readonly string[] = ["core", "application", "adapters/ui"];
 
 /** Pfad relativ zu `src/`, immer mit `/` — damit die Altlast auf jeder Plattform gleich aussieht. */
 const pfadname = (d: string) => kurz(d).split(/[\\/]/).join("/");
@@ -392,15 +447,6 @@ function nutzerBereiche(baustein: string): Set<string> {
   return raus;
 }
 
-function modulverstoesse(g: Modulgrenze): string[] {
-  const raus = new Set<string>();
-  for (const d of DATEIEN) {
-    if (bereich(d) !== g.bereich) continue;
-    for (const z of bezuege(d)) if (bereich(z) === g.kenntNicht) raus.add(`${pfadname(d)} → ${pfadname(z)}`);
-  }
-  return [...raus].sort();
-}
-
 describe("Modulgrenzen", () => {
   // Wie oben: eine Regel, die nichts sieht, ist grün. Hier gibt es mehr Stellen, an denen
   // sie blind werden kann — die Bereichsordner, die Fassaden, `dienste`, die Bausteine,
@@ -430,14 +476,6 @@ describe("Modulgrenzen", () => {
     expect(blind).toEqual([]);
   });
 
-  // Geprüft wird jeder Bezug einer Produktivdatei des Bereichs — über alle Schichten
-  // hinweg: auch eine Rücklage der Anwendung, die einen Typ aus `core/budgets/` über die
-  // Fassade holt, kennt Budgets.
-  it("ein Bereich bezieht nichts aus einem Bereich, den er nicht kennen darf", () => {
-    const verstoesse = MODULGRENZEN.flatMap(modulverstoesse).filter((v) => !MODUL_ALTLAST.includes(v));
-    expect(verstoesse).toEqual([]);
-  });
-
   // Die Oberfläche eines Bereichs benutzt keine Texte aus dem Namensraum des anderen —
   // auch nicht, wo sie gleich lauten. Ein geteilter Schlüssel ändert sich sonst im einen
   // Bereich und mit ihm still im anderen.
@@ -464,9 +502,126 @@ describe("Modulgrenzen", () => {
     }
     expect(verstoesse).toEqual([]);
   });
+});
 
-  it("die Altlast der Modulgrenzen enthält nur, was wirklich noch verletzt", () => {
-    const alle = new Set(MODULGRENZEN.flatMap(modulverstoesse));
-    expect(MODUL_ALTLAST.filter((v) => !alle.has(v))).toEqual([]);
+// ---------------------------------------------------------------------------
+// Die Rangfolge, ausführbar
+// ---------------------------------------------------------------------------
+
+/** Der Bereich einer Datei im Sinn der Rangfolge — nach `ABBILDUNG`; `undefined` ohne Rang. */
+function rangBereich(datei: string): string | undefined {
+  const b = bereich(datei);
+  if (b === undefined) return undefined;
+  const name = ABBILDUNG[b] ?? b;
+  return name in RANG ? name : undefined;
+}
+
+interface Bereichsbezug {
+  readonly von: string;
+  readonly auf: string;
+  /** `quelldatei → zieldatei`, Pfade relativ zu `src/` — die Einheit der Altlast. */
+  readonly eintrag: string;
+}
+
+let bezuegeZwischenBereichen: Bereichsbezug[] | undefined;
+
+/** Jeder Bezug einer Produktivdatei auf eine Datei eines ANDEREN Bereichs mit Rang. */
+function bereichsbezuege(): Bereichsbezug[] {
+  if (bezuegeZwischenBereichen) return bezuegeZwischenBereichen;
+  const raus = new Map<string, Bereichsbezug>();
+  for (const d of DATEIEN) {
+    const von = rangBereich(d);
+    if (von === undefined) continue;
+    for (const z of bezuege(d)) {
+      const auf = rangBereich(z);
+      if (auf === undefined || auf === von) continue;
+      const eintrag = `${pfadname(d)} → ${pfadname(z)}`;
+      raus.set(eintrag, { von, auf, eintrag });
+    }
+  }
+  bezuegeZwischenBereichen = [...raus.values()];
+  return bezuegeZwischenBereichen;
+}
+
+/** Bezüge auf einen gleich- oder höherrangigen Bereich — die, die die Rangfolge verbietet. */
+function rangverstoesse(): Bereichsbezug[] {
+  return bereichsbezuege().filter((b) => RANG[b.auf] >= RANG[b.von]);
+}
+
+/** Die Ordner direkt unter den Schichten mit Bereichen, als `schicht/ordner`. */
+function bereichsordner(): string[] {
+  return SCHICHTEN_MIT_BEREICHEN.flatMap((s) =>
+    readdirSync(join(WURZEL, s))
+      .filter((e) => statSync(join(WURZEL, s, e)).isDirectory())
+      .map((e) => `${s}/${e}`),
+  );
+}
+
+describe("Rangfolge der Bereiche", () => {
+  // Ein neuer Ordner ohne Rang wäre ein Bereich ohne Regel: `rangBereich` liefert für ihn
+  // `undefined`, und jeder Bezug von ihm und auf ihn fiele lautlos aus der Prüfung.
+  it("jeder Bereichsordner hat einen Rang oder ist ausdrücklich kein Bereich", () => {
+    const unbekannt = bereichsordner().filter((o) => {
+      const name = o.split("/").pop() ?? o;
+      return !(name in RANG) && !(name in ABBILDUNG) && !KEIN_BEREICH.includes(name);
+    });
+    expect(unbekannt, "diese Ordner brauchen einen Eintrag in RANG, ABBILDUNG oder KEIN_BEREICH").toEqual([]);
+    const ohneZiel = Object.entries(ABBILDUNG).filter(([, ziel]) => !(ziel in RANG));
+    expect(ohneZiel, "ABBILDUNG zeigt auf einen Bereich ohne Rang").toEqual([]);
+  });
+
+  // Wie oben: eine Regel, die nichts sieht, ist grün. Drei Stellen, an denen sie blind
+  // werden kann — die Zuordnung der Dateien zu Bereichen, das Sammeln der Bezüge, der
+  // Vergleich der Ränge —, und jede hat hier ihren eigenen Beleg.
+  it("sieht überhaupt etwas — Bereiche mit Dateien, Bezüge, erlaubte Abwärtsbezüge", () => {
+    const ohneDateien = Object.keys(RANG).filter((b) => !DATEIEN.some((d) => rangBereich(d) === b));
+    expect(ohneDateien, "diese Bereiche tragen keine einzige Produktivdatei").toEqual([]);
+    const alle = bereichsbezuege();
+    expect(alle.length, "kein einziger Bezug zwischen Bereichen gefunden").toBeGreaterThan(0);
+    // Ein Bezug, der erlaubt sein MUSS und über die Fassade läuft: Rücklagen kennen Konten.
+    // Fehlt er, ist die Erkennung blind — und „keine Verstösse" hiesse „nicht hingesehen".
+    expect(alle.some((b) => b.von === "ruecklagen" && b.auf === "konten"), "ruecklagen → konten nicht erkannt").toBe(true);
+    expect(alle.some((b) => RANG[b.auf] < RANG[b.von]), "kein erlaubter Abwärtsbezug erkannt").toBe(true);
+  });
+
+  // Die einzelnen Grenzen prüfen Texte und Bausteine, die Rangfolge den Code. Sagte eine
+  // Grenze etwas, das die Rangfolge erlaubt, prüfte niemand mehr den Code dieses Paares.
+  it("jede einzelne Grenze steht auch in der Rangfolge", () => {
+    const fehlt = MODULGRENZEN.filter((g) => !(RANG[g.kenntNicht] >= RANG[g.bereich])).map(
+      (g) => `${g.bereich} ↛ ${g.kenntNicht}`,
+    );
+    expect(fehlt).toEqual([]);
+  });
+
+  // Geprüft wird jeder Bezug einer Produktivdatei des Bereichs — über alle Schichten
+  // hinweg: auch eine Rücklage der Anwendung, die einen Typ aus `core/budgets/` über die
+  // Fassade holt, kennt Budgets.
+  it("ein Bereich bezieht nichts aus einem gleich- oder höherrangigen", () => {
+    const geduldet = new Set(RANG_ALTLAST.flatMap((g) => g.eintraege));
+    const neu = rangverstoesse()
+      .filter((v) => !geduldet.has(v.eintrag))
+      .map((v) => `${v.von} (${RANG[v.von]}) → ${v.auf} (${RANG[v.auf]}): ${v.eintrag}`)
+      .sort();
+    expect(neu).toEqual([]);
+  });
+
+  // Die Altlast muss mit jedem Umzug kürzer werden. Ohne diese Prüfung bliebe ein
+  // abgebauter Eintrag stehen, und derselbe Bezug könnte später unbemerkt zurückkommen.
+  // Und jeder Eintrag steht in der Gruppe seines Paares — sonst stimmt der Satz zum Abbau
+  // darüber nicht mehr.
+  it("die Altlast der Rangfolge enthält nur, was wirklich noch verletzt, und jeden Eintrag einmal", () => {
+    const jetzt = new Map(rangverstoesse().map((v) => [v.eintrag, v]));
+    const falsch: string[] = [];
+    const gesehen = new Set<string>();
+    for (const g of RANG_ALTLAST) {
+      for (const e of g.eintraege) {
+        if (gesehen.has(e)) falsch.push(`doppelt: ${e}`);
+        gesehen.add(e);
+        const v = jetzt.get(e);
+        if (!v) falsch.push(`verletzt nichts mehr: ${e}`);
+        else if (v.von !== g.von || v.auf !== g.auf) falsch.push(`steht unter ${g.von} → ${g.auf}, ist ${v.von} → ${v.auf}: ${e}`);
+      }
+    }
+    expect(falsch).toEqual([]);
   });
 });
