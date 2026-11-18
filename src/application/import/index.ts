@@ -7,7 +7,6 @@ export * from "./importLauf";
 export * from "./rohHash";
 export * from "./dublette";
 export * from "./kontoMatch";
-export * from "./vorschlag";
 export * from "./fremdkategorien";
 export * from "./umsaetzeUebernehmen";
 export * from "./umsaetzeSammelbearbeiten";

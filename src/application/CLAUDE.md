@@ -35,7 +35,12 @@ die Stelle, an der geprüft wird:
 ## Gliederung
 
 Bereiche wie im Kern (`buchung/`, `konten/`, `budgets/`, `vertraege/`, `kategorien/`,
-`ruecklagen/`, `dubletten/`, `stammdaten/`) plus die eigenen Kontexte `import/` und `fints/`.
+`klassifikator/`, `ruecklagen/`, `dubletten/`, `stammdaten/`) plus die eigenen Kontexte
+`import/` und `fints/`. In `kategorien/` liegt nur der Baum (Standardkategorien,
+`kategorieAnlegen`); was mit dem Erkennen zu tun hat — Training, Merkmale, Trainingsmaterial,
+der Abgleich und die Kategorisierungskette (`vorschlag.ts`: Umbuchung → Vertrag → Quelle →
+Modell) —, liegt in `klassifikator/`. Der Baum braucht nichts Fachliches, das Erkennen liest
+Zahlungsspuren und Verträge; in einem Ordner stünde der Baum mit über der Buchung.
 
 Direkt in `src/application/` bleibt, was keinem Bereich gehört: `index.ts` (Fassade zur UI), `ports.ts`
 (die Interfaces, von 76 Stellen benutzt), `bootstrap.ts`, `einstellungen.ts` und die
@@ -46,7 +51,9 @@ verworfen ist, filtern `budgets/budgetvorschlaege.ts` und `ruecklagen/ruecklagen
 Und `abrufAusfuehren.ts`, die Klammer um einen Bankabruf: es holt über `fints/` und schickt
 das Ergebnis durch Import, Buchung, Verträge und Depot. `fints/` steht in der Rangfolge
 unter allen vieren und darf sie nicht kennen — die Orchestrierung über sie gehört deshalb
-keinem von ihnen, sondern hierher. Ebenso `stammdatensichten.ts`: es lädt Personen, Konten
+keinem von ihnen, sondern hierher. Ebenso `importUebernehmen.ts`, dasselbe für eine
+Datei: es lädt die Quellen der Kategorisierungskette und reicht sie dem Import herein, der
+sie selbst nicht kennen darf (`UebernahmeDeps.vorschlag`). Ebenso `stammdatensichten.ts`: es lädt Personen, Konten
 und den Kategorienbaum in einem Zug und rechnet die Kontostände über den Buchungsbestand —
 eine Sicht über vier Bereiche. Ebenso `buchungsdetail.ts` und `einordnungssicht.ts`: was
 der Buchungsdialog und die Spalte „Einordnung" des Kontoauszugs zeigen, zieht Verträge,

@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { standardErkennung, trainieren, type Kategorie } from "../../core";
-import type { RohUmsatz } from "./rohUmsatz";
+import { katalogNachId, katalogNachName, standardErkennung, trainieren, type Kategorie } from "../../core";
+import type { RohUmsatz } from "../import/rohUmsatz";
 import {
-  katalogNachId,
-  katalogNachName,
   vorschlagFuer,
   vorschlagsbefundFuer,
   type Vorschlagseingabe,

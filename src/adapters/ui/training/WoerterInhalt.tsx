@@ -10,8 +10,8 @@ import {
   merkmalsbestand,
   type Wortzeile,
   type Wortzustand,
-} from "../../../application/kategorien/merkmalsbestand";
-import type { Wirkung } from "../../../application/kategorien/merkmalskonfiguration";
+} from "../../../application/klassifikator/merkmalsbestand";
+import type { Wirkung } from "../../../application/klassifikator/merkmalskonfiguration";
 import {
   Button,
   DataTable,

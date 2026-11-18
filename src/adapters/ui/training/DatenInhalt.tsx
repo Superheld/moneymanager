@@ -1,7 +1,7 @@
 // Die erste Karte der Kategorisierung: die Daten sichten. Der Rahmen, der sie lädt und
 // zusammenhält, steht in `KategorisierungCards.tsx`.
 
-import { type Ausschlussgrund } from "../../../application/kategorien/trainingsmaterial";
+import { type Ausschlussgrund } from "../../../application/klassifikator/trainingsmaterial";
 import { KPIStat, Pill } from "../bausteine";
 import { Abschnitt, type Hilfe } from "./kartenteile";
 

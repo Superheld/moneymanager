@@ -12,7 +12,7 @@ import { verwerfen, type Umsatz } from "./umsatz";
 import { umsaetzeUebernehmen, type UebernahmeDeps } from "./umsaetzeUebernehmen";
 import { quelleKeyFuer } from "./kontoMatch";
 import { zusammenfuehren, type Beleg } from "./belege";
-import type { Vorschlagskontext } from "./vorschlag";
+import { vorschlagMitKatalog, type Vorschlagskontext } from "../klassifikator/vorschlag";
 
 function roh(over: Partial<RohUmsatz>): RohUmsatz {
   return {
@@ -76,7 +76,9 @@ function fakes() {
     speichern: async (l) => { laeufe.push(l); },
     loeschen: async () => {},
   };
-  const deps: UebernahmeDeps = { kontoRepo, kategorieRepo, umsatzRepo, laufRepo, id: () => `id${n++}` };
+  const deps: UebernahmeDeps = {
+    kontoRepo, kategorieRepo, umsatzRepo, laufRepo, id: () => `id${n++}`, vorschlag: vorschlagMitKatalog(),
+  };
   return { deps, konten, umsaetze, laeufe };
 }
 
@@ -211,7 +213,7 @@ describe("Kategorisierungs-Kette beim Import", () => {
         rohUmsaetze: [roh({ gegenpartei: "REWE Markt", verwendungszweck: "Einkauf", kontoIban: "DE1" })],
         konten: [{ quelleKey: quelleKeyFuer("DE1"), neu: { bezeichnung: "Giro", typ: "Giro" } }],
       },
-      { ...deps, kategorisierung: mitModell() },
+      { ...deps, vorschlag: vorschlagMitKatalog(mitModell()) },
     );
 
     expect(umsaetze[0].vorschlag).toEqual({ kategorieId: "k-le", charakter: "Aufwand", quelle: "ki" });
@@ -244,11 +246,11 @@ describe("Kategorisierungs-Kette beim Import", () => {
       },
       {
         ...deps,
-        kategorisierung: {
+        vorschlag: vorschlagMitKatalog({
           kategorieNachId: new Map(),
           erkennungen: [standardErkennung("v1", "Irgendwer", 655)],
           vertragsKategorie: new Map([["v1", "k-le"]]),
-        },
+        }),
       },
     );
 

@@ -22,7 +22,7 @@ import {
   type IstBuchung,
   type Merkmalsherkunft,
 } from "../../../application";
-import type { Merkmalsansicht } from "../../../application/kategorien/merkmalskonfiguration";
+import type { Merkmalsansicht } from "../../../application/klassifikator/merkmalskonfiguration";
 import type { Umsatz } from "../../../application/import";
 import { merkmaleZuBuchung, wortFreigeben, wortSperren } from "../../dienste";
 import { Pill, Button } from "../bausteine";

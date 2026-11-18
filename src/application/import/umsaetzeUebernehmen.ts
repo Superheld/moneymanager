@@ -1,24 +1,23 @@
 // Use-Case „Übernehmen": aus geparsten RohUmsätzen + Konto-Auflösung wird der reversible
-// Entwurfs-Stapel (TAKTIK-IMPORT). Legt fehlende Konten an, baut Kategorie-Vorschläge,
+// Entwurfs-Stapel (TAKTIK-IMPORT). Legt fehlende Konten an, holt Kategorie-Vorschläge (hereingereicht),
 // dedupliziert gegen den Bestand und persistiert neue Umsätze + den ImportLauf. Berührt
 // KEINE Salden — das passiert erst beim Verbuchen (Slice 4). Duplikate werden NICHT
 // gespeichert, nur gezählt. Seiteneffekte laufen über injizierte Repos + id().
 
 import { klasseVorschlag, normalisiereIban } from "../../core";
-import type { Zahlungskonto } from "../../core";
+import type { Kategorie, Zahlungskonto } from "../../core";
 import type {
   ImportLaufRepository,
   KategorieRepository,
   UmsatzRepository,
   ZahlungskontoRepository,
 } from "../ports";
-import { katalogNachId, katalogNachName, vorschlagFuer, type Vorschlagskontext } from "./vorschlag";
 import { quelleKeyFuer } from "./kontoMatch";
 import { belegSchluessel, neueBelege, rohHash } from "./rohHash";
 import { traegtNeues } from "./belege";
 import { ordneZu } from "./dublette";
 import type { RohUmsatz } from "./rohUmsatz";
-import type { Umsatz } from "./umsatz";
+import type { Kategorisierungsvorschlag, Umsatz } from "./umsatz";
 
 /** Auflösung eines Quell-Kontos: entweder bestehendes wählen ODER neues anlegen. */
 export interface UebernahmeKonto {
@@ -83,14 +82,27 @@ export interface UebernahmeDeps {
   readonly laufRepo: ImportLaufRepository;
   readonly id: () => string;
   /**
-   * Die weiteren Quellen der Kategorisierungs-Kette (Verträge, Modell,
-   * Merkmalskonfiguration) — geladen über `kategorisierungsquellen`.
+   * Der Kategorie-Vorschlag je Zeile — hereingereicht, nicht selbst gerechnet.
    *
-   * Optional, damit dieser Use-Case nicht von vier Repositories abhängt, die er selbst
-   * nie befragt. Fehlt der Kontext, bleiben Umbuchungs-Erkennung und Remapping übrig —
-   * genau das Verhalten von vor der Kette.
+   * Die Kette dahinter (Umbuchung → Vertrag → Quelle → Modell) fragt Verträge und das
+   * trainierte Modell, und die stehen in der Rangfolge über dem Beleg: der Import darf sie
+   * nicht kennen. Er legt deshalb nur die FORM fest, in der er fragt, und bekommt die Kette
+   * von aussen (`vorschlagMitKatalog` in `application/klassifikator/vorschlag.ts`).
+   *
+   * Hereingereicht und nicht nach dem Übernehmen gesetzt, weil der Ablauf so bleibt, wie
+   * er war: der Vorschlag steht in derselben Schreibung wie die Zeile, ein zweiter
+   * Schreibgang danach könnte allein scheitern und Zeilen ohne Vorschlag zurücklassen. Und
+   * nach dem Übernehmen wäre `istUmbuchung` nicht mehr da — es steht nur an der Rohzeile.
+   *
+   * Zweistufig, weil der Katalog aus DIESEM Lauf gilt: der Import lädt ihn selbst und
+   * reicht ihn einmal hinein, die zweite Stufe fragt je Zeile.
    */
-  readonly kategorisierung?: Vorschlagskontext;
+  readonly vorschlag: (
+    kategorien: readonly Kategorie[],
+  ) => (
+    zeile: RohUmsatz & { readonly kategorieVorschlagId?: string },
+    zahlungskontoId: string,
+  ) => Kategorisierungsvorschlag | undefined;
 }
 
 /**
@@ -162,14 +174,11 @@ async function uebernahmeIntern(
     }
   }
 
-  // 2. Katalog + Bestand laden. Der Kategorie-Katalog wird auch dann gebraucht, wenn ein
-  // Kontext mitkam — dessen Indizes könnten aus einem älteren Stand stammen.
+  // 2. Katalog + Bestand laden. Der Kategorie-Katalog geht an den Vorschlag, auch wenn
+  // dessen übrige Quellen schon vorher geladen wurden — sie könnten einen älteren Stand
+  // der Kategorien tragen.
   const kategorien = await kategorieRepo.alle();
-  const kontext: Vorschlagskontext = {
-    ...deps.kategorisierung,
-    kategorieNachId: katalogNachId(kategorien),
-    kategorieNachName: katalogNachName(kategorien),
-  };
+  const vorschlagFuer = deps.vorschlag(kategorien);
   const laufId = id();
 
   // Die Zuordnung aus der Import-Ansicht. Getrimmt wird hier UND beim Zählen in
@@ -376,7 +385,6 @@ async function uebernahmeIntern(
     ...zeileAus(k),
     vorschlag: vorschlagFuer(
       { ...k.roh, kategorieVorschlagId: zugeordnet(k.roh.kategorieHinweis) },
-      kontext,
       k.zahlungskontoId,
     ),
   }));

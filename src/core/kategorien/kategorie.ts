@@ -94,3 +94,28 @@ export function wuerdeZyklusErzeugen(
   }
   return false;
 }
+
+// Die beiden Nachschlagekarten über den Katalog. Sie gehören zum Kategorienbaum und nicht zur
+// Kategorisierungskette (`application/klassifikator/vorschlag.ts`), obwohl die sie am meisten
+// benutzt: auch der Import braucht sie (`application/import/fremdkategorien.ts`), und der
+// steht in der Rangfolge unter der Kette.
+
+/** Hilfsindex: Kategorien nach Id. */
+export function katalogNachId(kategorien: readonly Kategorie[]): Map<string, Kategorie> {
+  return new Map(kategorien.map((k) => [k.id, k]));
+}
+
+/**
+ * Der Katalog nach NAME — für den Vorschlag, den eine Quelle mitbringt.
+ *
+ * **Bei gleichem Namen gewinnt der erste.** Namen sind im Katalog nicht eindeutig: nichts
+ * hindert daran, unter zwei Gruppen je eine „Sonstiges" anzulegen. Für diese Stufe ist das
+ * hinnehmbar — sie liefert einen VORSCHLAG, den die Durchsicht überschreibt, und die
+ * Alternative (bei Mehrdeutigkeit gar nichts vorschlagen) wäre für den Nutzer schlechter:
+ * er sähe eine leere Kategorie und nicht, warum.
+ */
+export function katalogNachName(kategorien: readonly Kategorie[]): Map<string, Kategorie> {
+  const karte = new Map<string, Kategorie>();
+  for (const k of kategorien) if (!karte.has(k.name)) karte.set(k.name, k);
+  return karte;
+}

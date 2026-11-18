@@ -87,7 +87,9 @@ Was **keinem** Bereich gehört, liegt direkt im Ordner der Schicht (`src/core/`,
 Einstufung „Budget oder Rücklage?" für zwei Bereiche —, `core/zustaendigkeit.ts` — wer
 einen Anteil trägt, Budget oder Rücklage —, `core/fortschreibung.ts`, die Form eines
 Monats, die Budget und Rücklage beide schreiben, und `buchungsdetail.ts` mit
-`einordnungssicht.ts`, was der Buchungsdialog über Verträge, Rücklagen und Budgets liest) —
+`einordnungssicht.ts`, was der Buchungsdialog über Verträge, Rücklagen und Budgets liest,
+und `importUebernehmen.ts`, das einen Dateiimport übernimmt und ihm dafür die
+Kategorisierungskette hereinreicht) —
 sie rechnen über mehrere Bereiche hinweg, und das ist ihre Aufgabe, kein Fehler. In `ui/` liegen aus demselben Grund
 die bereichsübergreifenden Tests oben (`screens`, `interaktion`, `formulare`).
 
@@ -110,10 +112,21 @@ Paaren: so ist auch jedes Paar geregelt, zwischen dem es heute keinen Bezug gibt
 | 9 | `vermoegen` (mit `vorsorge`) | sammelt Konten und Depots; Vorsorge rechnet mit dem Nettovermögen |
 | 10 | `analyse` · `uebersicht` · `einstellungen` · `review` (nur `ui/`) | Sichten ziehen zusammen, was darunter liegt, und niemand braucht sie |
 
-Zwei Ordner zählen unter anderem Namen: `ui/training` ist `kategorien` (siehe unten), und
-`vorsorge` ist ein Teil von `vermoegen` — ein Bereich für die Regel, die Ordner bleiben
-vorerst. `klassifikator` gibt es als Ordner bisher nur im Kern; der Teil in
-`application/kategorien` und `ui/training` zählt bis zu seinem Umzug als `kategorien`.
+Zwei Ordner zählen unter anderem Namen: `ui/training` ist `klassifikator` (siehe unten),
+und `vorsorge` ist ein Teil von `vermoegen` — ein Bereich für die Regel, die Ordner bleiben
+vorerst. **Das Training ist nicht der Kategorienbaum:** `kategorien` hält nur den Baum
+(Standardkategorien, `kategorieAnlegen`, die Nachschlagekarten in
+`core/kategorien/kategorie.ts`) und steht ganz unten; Training, Merkmale und die
+Kategorisierungskette liegen in `klassifikator` und stehen über Buchung und Verträgen,
+deren Zahlungsspuren sie lesen.
+
+**Der Import kennt die Kategorisierungskette nicht, er bekommt sie hereingereicht.** Die
+Kette fragt Verträge und das Modell, beide über dem Beleg. `umsaetzeUebernehmen` legt
+deshalb nur die Form fest, in der es nach einem Vorschlag fragt (`UebernahmeDeps.vorschlag`),
+und `vorschlagMitKatalog` baut daraus die Kette — zusammengesteckt direkt in
+`src/application/` (`importUebernehmen.ts` für die Datei, `abrufAusfuehren.ts` für die
+Bank). Hereingereicht und nicht nachträglich gesetzt, weil `istUmbuchung` nur an der
+Rohzeile steht und weil ein zweiter Schreibgang allein scheitern könnte.
 
 **Ein neuer Bereichsordner braucht einen Rang.** Jeder Ordner direkt unter `core/`,
 `application/` und `adapters/ui/` steht in der Tabelle oder ausdrücklich als „kein
@@ -147,17 +160,17 @@ Bereichspaar mit einem Satz, wie der Abbau aussieht. Ein Eintrag ist eine Quelld
 ihrer Zieldatei: ein weiterer Name aus derselben Datei bricht nichts, ein Bezug auf eine
 andere schon. **Wer eine Datei umzieht, streicht ihre Einträge** — ein Eintrag, der nichts
 mehr verletzt, macht den Test rot, damit ein abgebauter Bezug nicht still zurückkommt. Der
-Abbau ist fast überall dasselbe: drei Ordner tragen heute zwei Ebenen (`konten` auch den
-Kontoauszug, `kategorien` auch das Training, `buchung` auch den Buchungsdialog), und die
-obere Hälfte zieht direkt in den Ordner der Schicht, nach `bausteine/` oder in ihren
-eigenen Bereich. Neue
+Abbau ist fast überall dasselbe: ein Ordner trägt zwei Ebenen (`konten` auch den
+Kontoauszug), und die obere Hälfte zieht direkt in den Ordner der Schicht, nach
+`bausteine/` oder in ihren eigenen Bereich — so wie der Buchungsdialog nach `bausteine/`
+und das Training nach `klassifikator`. Neue
 Einträge gehören nicht hinein.
 
 Zwei Namen weichen ab, beide weil die OBERFLÄCHE der Navigation folgt und nicht der
 Fachgliederung:
 
 - Der UI-Ordner heißt `training/`, weil die Navigation den Bereich so nennt (`ScreenId`);
-  fachlich ist es dieselbe Sache wie `kategorien/` in Kern und Anwendung.
+  fachlich ist es dieselbe Sache wie `klassifikator/` in Kern und Anwendung.
 - **`depot/` gibt es in `ui/` gar nicht.** Ein Depot ist kein Bereich, sondern etwas, das
   in zweien vorkommt: der Stand in der Übersicht (`ui/uebersicht/DepotKarte.tsx`), die
   Entwicklung in der Analyse (`ui/analyse/DepotAnsicht.tsx`). Kern und Anwendung haben
@@ -203,7 +216,7 @@ und `vertrag_zuordnung`, aufgegangen in zwei Spalten der Buchung (siehe `src/cor
 Handkorrektur ist über `kategorie_herkunft` ohnehin sicher —, sondern eine
 VERALLGEMEINERUNG, und die soll das Modell leisten, über alle Merkmale statt über den
 Empfänger allein. Die Begründung samt dem, was beim Wiedereinbau zu bedenken wäre, steht
-im Kopf von `application/import/vorschlag.ts`. Und seit Migration 74 `kontogruppe` +
+im Kopf von `application/klassifikator/vorschlag.ts`. Und seit Migration 74 `kontogruppe` +
 `kontogruppe_konto` — aufgegangen in der Kontoklasse (siehe unten).
 
 **Diese Liste stand bis zum 09.09.2026 selbst falsch da** — `kategorie_festlegung` war seit

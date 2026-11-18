@@ -17,8 +17,7 @@
 // Einträge; eine Monatsdatei benutzt eine Handvoll davon. Alle zu zeigen hiesse, die
 // Entscheidung zwischen Zeilen zu verstecken, die niemanden betreffen.
 
-import type { Kategorie } from "../../core";
-import { katalogNachName } from "./vorschlag";
+import { katalogNachName, type Kategorie } from "../../core";
 import type { RohUmsatz } from "./rohUmsatz";
 
 /** Ein fremder Kategoriename aus der Datei, mit dem, was heute daraus würde. */

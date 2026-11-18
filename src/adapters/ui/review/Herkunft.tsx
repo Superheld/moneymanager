@@ -7,11 +7,8 @@ import { useTranslation } from "react-i18next";
 import {
   type Kategorie,
 } from "../../../application";
-import {
-  vorschlagsbefundFuer,
-  type Umsatz,
-  type Vorschlagskontext,
-} from "../../../application/import";
+import type { Umsatz } from "../../../application/import";
+import { vorschlagsbefundFuer, type Vorschlagskontext } from "../../../application/klassifikator/vorschlag";
 import {  Pill } from "../bausteine";
 
 /**

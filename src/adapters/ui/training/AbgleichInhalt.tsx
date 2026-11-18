@@ -5,7 +5,7 @@ import {
   charakterWechsel,
   uebergaenge,
   type Abgleichsplan,
-} from "../../../application/kategorien/kategorieAbgleich";
+} from "../../../application/klassifikator/kategorieAbgleich";
 import { Button, KPIStat, Pill } from "../bausteine";
 import { Abschnitt, type Hilfe } from "./kartenteile";
 import { Zeile } from "../bausteine/Anordnung";
