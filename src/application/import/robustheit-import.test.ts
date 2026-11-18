@@ -24,6 +24,7 @@ import type { RohUmsatz } from "./rohUmsatz";
 import type { Beleg } from "./belege";
 import type { Umsatz } from "./umsatz";
 import { umsaetzeUebernehmen, type UebernahmeDeps, type UebernahmeEingabe } from "./umsaetzeUebernehmen";
+import { vorschlagMitKatalog } from "../klassifikator/vorschlag";
 import { paareUmbuchungen } from "../buchung/umsatzVerbuchen";
 
 // ── Testdaten-Werkzeug ────────────────────────────────────────────────────────────
@@ -129,6 +130,7 @@ function fakes() {
       loeschen: async () => {},
     } as UebernahmeDeps["laufRepo"],
     id: () => `id-${++n}`,
+    vorschlag: vorschlagMitKatalog(),
   };
   return { deps, umsaetze, konten, laeufe };
 }

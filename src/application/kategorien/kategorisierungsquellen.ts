@@ -1,6 +1,6 @@
 // Lädt zusammen, woraus ein Kategorie-Vorschlag entstehen kann.
 //
-// Die Kette selbst (`import/vorschlag`) ist rein und kennt keine Repositories; hier
+// Die Kette selbst (`klassifikator/vorschlag`) ist rein und kennt keine Repositories; hier
 // werden ihre Zutaten geholt. Eine eigene Stelle dafür, weil sie an zwei Wegen gebraucht
 // werden: beim Import und bei der Vorschau in der Review-Inbox — und zwei Ladefunktionen
 // wären zwei Gelegenheiten, eine Quelle zu vergessen.
@@ -9,8 +9,8 @@
 // und die Kette überspringt sie. Das ist kein Fehler, sondern der normale Zustand einer
 // frisch aufgesetzten App.
 
-import { STANDARD_KONFIGURATION, type Kategorie } from "../../core";
-import { katalogNachId, katalogNachName, type Vorschlagskontext } from "../import/vorschlag";
+import { STANDARD_KONFIGURATION, katalogNachId, katalogNachName, type Kategorie } from "../../core";
+import type { Vorschlagskontext } from "../klassifikator/vorschlag";
 import { konfigurationLaden } from "./merkmalskonfiguration";
 import type {
   KategorieRepository,

@@ -7,7 +7,7 @@ import {
   type Vertragserkennung,
 } from "../../core";
 import { kategorisierungsquellen } from "./kategorisierungsquellen";
-import { vorschlagFuer } from "../import/vorschlag";
+import { vorschlagFuer } from "../klassifikator/vorschlag";
 import type {
   GespeicherterAusschluss,
   KategorieRepository,

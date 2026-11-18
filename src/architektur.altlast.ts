@@ -75,7 +75,9 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
       "adapters/ui/training/WoerterInhalt.tsx → core/klassifikator/merkmale.ts",
       "adapters/ui/training/kartenteile.tsx → core/klassifikator/laeufe.ts",
       "adapters/ui/training/kartenteile.tsx → core/klassifikator/merkmale.ts",
+      "application/kategorien/kategorieAbgleich.ts → application/klassifikator/vorschlag.ts",
       "application/kategorien/kategorisierungsquellen.ts → core/klassifikator/merkmale.ts",
+      "application/kategorien/kategorisierungsquellen.ts → application/klassifikator/vorschlag.ts",
       "application/kategorien/klassifikatorTraining.ts → core/klassifikator/laeufe.ts",
       "application/kategorien/klassifikatorTraining.ts → core/klassifikator/merkmale.ts",
       "application/kategorien/klassifikatorTraining.ts → core/klassifikator/messung.ts",
@@ -155,18 +157,6 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     ],
   },
   {
-    von: "import",
-    auf: "buchung",
-    abbau:
-      "`vorschlag` (die Kategorisierungskette) nach `klassifikator`. Allein umziehen geht " +
-      "nicht: `umsaetzeUebernehmen` ruft die Kette beim Übernehmen jeder Zeile auf und " +
-      "stünde dann als Beleg über ihr. Erst muss der Vorschlag aus dem Übernehmen heraus " +
-      "(hereingereicht oder danach gesetzt).",
-    eintraege: [
-      "application/import/vorschlag.ts → core/buchung/zahlungsspur.ts",
-    ],
-  },
-  {
     von: "kategorien",
     auf: "import",
     abbau:
@@ -174,21 +164,6 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     eintraege: [
       "adapters/ui/training/MerkmaleBlock.tsx → application/import/umsatz.ts",
       "application/kategorien/kategorieAbgleich.ts → application/import/umsatz.ts",
-      "application/kategorien/kategorieAbgleich.ts → application/import/vorschlag.ts",
-      "application/kategorien/kategorisierungsquellen.ts → application/import/vorschlag.ts",
-    ],
-  },
-  {
-    von: "import",
-    auf: "klassifikator",
-    abbau:
-      "`vorschlag` ist die Kategorisierungskette (Umbuchung → Vertrag → Quelle → Modell) " +
-      "und zieht nach `klassifikator` — erst, wenn `umsaetzeUebernehmen` sie nicht mehr selbst " +
-      "aufruft (siehe import → buchung).",
-    eintraege: [
-      "application/import/vorschlag.ts → core/klassifikator/erklaerung.ts",
-      "application/import/vorschlag.ts → core/klassifikator/merkmale.ts",
-      "application/import/vorschlag.ts → core/klassifikator/modell.ts",
     ],
   },
   {
@@ -212,15 +187,6 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
       "adapters/ui/konten/KontenScreen.tsx → core/vertraege/vertrag.ts",
       "application/konten/kontensichten.ts → application/vertraege/vertragszuordnung.ts",
       "application/konten/kontobelegung.ts → application/vertraege/vertragszuordnung.ts",
-    ],
-  },
-  {
-    von: "import",
-    auf: "vertraege",
-    abbau:
-      "`vorschlag` nach `klassifikator`.",
-    eintraege: [
-      "application/import/vorschlag.ts → core/vertraege/vertragZuordnung.ts",
     ],
   },
   {

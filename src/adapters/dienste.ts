@@ -46,11 +46,11 @@ import { zuordnungenAbgleichen } from "../application/vertraege/vertragszuordnun
 import { zahlungsspuren } from "../application/buchung/zahlungsspuren";
 import { umbuchungenErkennen } from "../application/buchung/umbuchungenErkennen";
 import { kategorisierungsquellen } from "../application/kategorien/kategorisierungsquellen";
+import { importUebernehmen as importUebernehmenUseCase } from "../application/importUebernehmen";
 import { umsaetzeVerbuchen } from "../application/buchung/umsatzVerbuchen";
 import type { Kategorie } from "../core";
 import {
   umsaetzeKategorisieren as umsaetzeKategorisierenUseCase,
-  umsaetzeUebernehmen,
   umsaetzeVerwerfen as umsaetzeVerwerfenUseCase,
   type UebernahmeEingabe,
   type UebernahmeErgebnis,
@@ -900,14 +900,14 @@ export function kategorisierung() {
 }
 
 /** Einen Dateiimport übernehmen — mit Dedup, Kategorie-Vorschlag und Review-Inbox. */
-export async function importUebernehmen(auftrag: UebernahmeEingabe): Promise<UebernahmeErgebnis> {
-  return umsaetzeUebernehmen(auftrag, {
+export function importUebernehmen(auftrag: UebernahmeEingabe): Promise<UebernahmeErgebnis> {
+  return importUebernehmenUseCase(auftrag, {
+    // Die Quellen der Kategorisierungs-Kette, dieselben wie beim Training (unten).
+    ...KETTE,
     kontoRepo: sqliteZahlungskontoRepository,
-    kategorieRepo: sqliteKategorieRepository,
     umsatzRepo: sqliteUmsatzRepository,
     laufRepo: sqliteImportLaufRepository,
     id: () => crypto.randomUUID(),
-    kategorisierung: await kategorisierung(),
   });
 }
 

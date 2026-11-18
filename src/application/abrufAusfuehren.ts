@@ -41,7 +41,7 @@ import type {
 } from "./ports";
 import { depotUebernehmen, type DepotUebernahme } from "./depot/depotUebernehmen";
 import { zuordnungenAbgleichen } from "./vertraege/vertragszuordnung";
-import type { Vorschlagskontext } from "./import/vorschlag";
+import { vorschlagMitKatalog, type Vorschlagskontext } from "./klassifikator/vorschlag";
 import { quelleKeyFuer } from "./import/kontoMatch";
 import { umsaetzeUebernehmen, type UebernahmeErgebnis } from "./import/umsaetzeUebernehmen";
 import { umbuchungenErkennen } from "./buchung/umbuchungenErkennen";
@@ -432,7 +432,7 @@ export async function abrufAusfuehren(
           umsatzRepo: deps.umsatzRepo,
           laufRepo: deps.laufRepo,
           id: deps.id,
-          kategorisierung: deps.kategorisierung,
+          vorschlag: vorschlagMitKatalog(deps.kategorisierung),
         },
       );
 

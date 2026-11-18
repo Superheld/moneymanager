@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { standardErkennung, trainieren, type IstBuchung, type Kategorie, type Zahlungsspur } from "../../core";
 import { charakterWechsel, kategorieAbgleich, planAnwenden, uebergaenge } from "./kategorieAbgleich";
-import { katalogNachId, type Vorschlagskontext } from "../import/vorschlag";
+import { katalogNachId } from "../../core";
+import type { Vorschlagskontext } from "../klassifikator/vorschlag";
 import type { LedgerPort } from "../ports";
 
 const KATEGORIEN: Kategorie[] = [

@@ -42,8 +42,8 @@ import {
   verwerfen,
   zurueckholen,
   type Umsatz,
-  type Vorschlagskontext,
 } from "../../../application/import";
+import type { Vorschlagskontext } from "../../../application/klassifikator/vorschlag";
 import { BuchungDetail } from "../bausteine/BuchungDetail";
 import { Button, Card, Pill } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";

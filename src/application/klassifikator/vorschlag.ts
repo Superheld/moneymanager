@@ -46,6 +46,8 @@
 
 import {
   erklaeren,
+  katalogNachId,
+  katalogNachName,
   klassifizieren,
   merkmalsbefund,
   vertragFuer,
@@ -57,7 +59,8 @@ import {
   type Vertragserkennung,
   type Zahlungsspur,
 } from "../../core";
-import type { Kategorisierungsvorschlag } from "./umsatz";
+import type { Kategorisierungsvorschlag } from "../import/umsatz";
+import type { UebernahmeDeps } from "../import/umsaetzeUebernehmen";
 
 /**
  * Was die Kette über eine Zahlung wissen muss.
@@ -249,22 +252,28 @@ export function vorschlagFuer(
   return vorschlagsbefundFuer(roh, kontext, zahlungskontoId).vorschlag;
 }
 
-/** Hilfsindex: Kategorien nach Id. */
-export function katalogNachId(kategorien: readonly Kategorie[]): Map<string, Kategorie> {
-  return new Map(kategorien.map((k) => [k.id, k]));
-}
-
 /**
- * Der Katalog nach NAME — für den Vorschlag, den eine Quelle mitbringt.
+ * Die Kette, wie der Import sie hereingereicht bekommt (`UebernahmeDeps.vorschlag`).
  *
- * **Bei gleichem Namen gewinnt der erste.** Namen sind im Katalog nicht eindeutig: nichts
- * hindert daran, unter zwei Gruppen je eine „Sonstiges" anzulegen. Für diese Stufe ist das
- * hinnehmbar — sie liefert einen VORSCHLAG, den die Durchsicht überschreibt, und die
- * Alternative (bei Mehrdeutigkeit gar nichts vorschlagen) wäre für den Nutzer schlechter:
- * er sähe eine leere Kategorie und nicht, warum.
+ * Der Import kennt die Kette nicht: sie fragt Verträge und das Modell, und die stehen in
+ * der Rangfolge über dem Beleg. Er bekommt deshalb nur eine Funktion, und deren Form legt
+ * er selbst fest. Zusammengesteckt wird hier, wo beide Seiten bekannt sind.
+ *
+ * **Warum zweistufig:** der Import reicht den Katalog nach, den er selbst geladen hat —
+ * an derselben Stelle seines Ablaufs wie vorher. Ein mitgereichter Kontext könnte einen
+ * älteren Stand der Kategorien tragen; der Katalog aus dem Lauf gilt, und seine
+ * Nachschlagekarten entstehen einmal je Lauf, nicht je Zeile.
+ *
+ * Fehlt der Kontext, bleiben die Stufen, die nur den Katalog brauchen: Umbuchung und
+ * die Kategorie der Quelle.
  */
-export function katalogNachName(kategorien: readonly Kategorie[]): Map<string, Kategorie> {
-  const karte = new Map<string, Kategorie>();
-  for (const k of kategorien) if (!karte.has(k.name)) karte.set(k.name, k);
-  return karte;
+export function vorschlagMitKatalog(kontext?: Vorschlagskontext): UebernahmeDeps["vorschlag"] {
+  return (kategorien) => {
+    const mitKatalog: Vorschlagskontext = {
+      ...kontext,
+      kategorieNachId: katalogNachId(kategorien),
+      kategorieNachName: katalogNachName(kategorien),
+    };
+    return (zeile, zahlungskontoId) => vorschlagFuer(zeile, mitKatalog, zahlungskontoId);
+  };
 }

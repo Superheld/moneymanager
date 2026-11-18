@@ -21,6 +21,7 @@ import type {
 import type { RohUmsatz } from "./rohUmsatz";
 import type { Umsatz } from "./umsatz";
 import { umsaetzeUebernehmen } from "./umsaetzeUebernehmen";
+import { vorschlagMitKatalog } from "../klassifikator/vorschlag";
 import { umsaetzeVerbuchen } from "../buchung/umsatzVerbuchen";
 
 function roh(over: Partial<RohUmsatz>): RohUmsatz {
@@ -72,7 +73,7 @@ function welt() {
   const id = () => `id${n++}`;
   return {
     ledger, umsaetze, konten,
-    uebernahme: { kontoRepo, kategorieRepo, umsatzRepo, laufRepo, id },
+    uebernahme: { kontoRepo, kategorieRepo, umsatzRepo, laufRepo, id, vorschlag: vorschlagMitKatalog() },
     verbuchung: { ledgerRepo, umsatzRepo, id },
   };
 }
