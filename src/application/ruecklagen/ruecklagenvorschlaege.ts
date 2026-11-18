@@ -20,7 +20,7 @@
 import { ignorierenVermerken, ignorierteLesen } from "../einstellungen";
 import { ruecklagenAnteile, type Ruecklagenvorschlag } from "../../core";
 import { ausgabenvorschlaegeLaden, ohneVerworfene, SCHLUESSEL_BUDGETVORSCHLAG_IGNORIERT } from "../ausgabenvorschlaege";
-import { anspruchsbestandLaden, type BudgetanspruchDeps } from "../konten/kontobelegung";
+import { anspruchsbestandLaden, type BudgetanspruchDeps } from "../kontobelegung";
 import type { EinstellungenRepository, UmsatzRepository } from "../ports";
 
 const SCHLUESSEL_IGNORIERT = "ruecklagenvorschlag.ignoriert";

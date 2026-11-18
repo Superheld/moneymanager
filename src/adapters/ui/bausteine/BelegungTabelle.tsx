@@ -1,7 +1,7 @@
 // Die Belegung EINES Kontos als Tabelle: jede Rücklage mit ihrem Anspruch (und, wenn es
 // nicht reicht, was davon gedeckt ist), darunter Stand, gebunden und frei.
 //
-// Zwei Bereiche zeigen das: der Kontoauszug für das gewählte Konto (`konten/BelegungKarte`)
+// Zwei Bereiche zeigen das: der Kontoauszug für das gewählte Konto (`kontoauszug/BelegungKarte`)
 // und die Rücklagen für alle Konten auf einem Blatt (`ruecklagen/GeldJeKontoKarte`). Ohne
 // Karte drumherum, weil die zweite mehrere davon in EINE Karte setzt — eine Karte in
 // einer Karte gibt es nicht. Gerechnet wird nichts; die Zahlen kommen aus der

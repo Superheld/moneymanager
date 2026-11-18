@@ -5,7 +5,7 @@ Gilt für alles, was den Stand eines Kontos verteilt, ein Konto aus dem Verkehr 
 ## Die Kontobelegung — wem das Geld auf einem Konto gehört
 
 Die EINE Rechnung für „wie viel von diesem Stand ist für etwas bestimmt, und wie viel ist
-frei" (`core/konten/kontobelegung.ts`, geladen über `application/konten/kontobelegung.ts`).
+frei" (`core/konten/kontobelegung.ts`, geladen über `application/kontobelegung.ts`).
 Jede Anzeige, die danach fragt, liest sie — die Rücklagen-Deckung, die Spalte „frei" und
 die Karte „Gebunden auf …" im Kontoauszug. Wer etwas Neues einführt, das Geld auf einem
 Konto beansprucht, liefert es dort als `Anspruch` an und rechnet nirgends selbst.
@@ -51,7 +51,7 @@ nichts über ihre Kategorie, und der Anspruch war schlicht das Soll; vor ihrem F
 (`findet_ab`) ist er das weiterhin. Gefunden wird mit derselben Zuständigkeit wie im
 Verbrauch eines Budgets und in der Ergebnisrechnung — eine Rücklage im Minus beansprucht
 nichts. Wer die Belegung aufruft, gibt deshalb die Budget-Sicht MIT den Rücklagen herein
-(`zustaendigkeitssichtMit`, `anspruchsbestand` in `application/konten/kontobelegung.ts`).
+(`zustaendigkeitssichtMit`, `anspruchsbestand` in `application/kontobelegung.ts`).
 
 Reicht der Stand nicht, wird **anteilig** verteilt, über alle Ansprüche gleich, ohne
 Reihenfolge. `budget.kontoId` heisst seither nur noch eines: hier liegt das Geld des
@@ -111,7 +111,7 @@ in die Gegenwart.
 ### Ein Konto loswerden — EIN Symbol, ein Dialog
 
 In der Zeile steht genau ein Symbol dafür („Auflösen"), und es steht dort in jedem Zustand.
-`ui/konten/KontoAufloesenModal.tsx` bietet an, was gerade möglich ist:
+`ui/kontenverwaltung/KontoAufloesenModal.tsx` bietet an, was gerade möglich ist:
 
 | Zustand des Kontos | was der Dialog anbietet |
 |---|---|
@@ -181,7 +181,7 @@ Vier Dinge am Löschweg selbst (`adapters/persistence/sqliteKontoentfernen.ts`):
 
 ## Die Liquiditätsvorschau zieht ZWEI Linien
 
-`core/konten/liquiditaet.ts` rechnet je Konto den Stand über die nächsten Tage vor — und
+`core/liquiditaet.ts` rechnet je Konto den Stand über die nächsten Tage vor — und
 zwar zweimal, weil die beiden Linien Verschiedenes bedeuten:
 
 | | enthält | heisst |

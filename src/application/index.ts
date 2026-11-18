@@ -198,13 +198,13 @@ export {
   type Herkunftszeile,
   type Kontoherkunft,
   type Laufbefund,
-} from "./konten/herkunftsicht";
+} from "./herkunftsicht";
 export {
   abgleichLaden,
   type Abgleichzeile,
   type Ankerpunkt,
   type AbgleichDeps,
-} from "./konten/abgleichsicht";
+} from "./buchung/abgleichsicht";
 export {
   kontenLaden,
   registerSicht,
@@ -214,7 +214,7 @@ export {
   type Registersicht,
   type Registerzeile,
   type KontenDeps,
-} from "./konten/kontensichten";
+} from "./kontensichten";
 export {
   entwurfVerdacht,
   stapelVerdacht,
@@ -228,7 +228,7 @@ export {
   anfangsbestandAbgleichen,
   kontostandFesthalten,
   type Abgleichergebnis,
-} from "./konten/kontostandAnker";
+} from "./buchung/kontostandAnker";
 export { buchungErfassen, type BuchungEingabe } from "./buchung/buchungErfassen";
 export { umbuchungErfassen } from "./buchung/umbuchungErfassen";
 export { passtAlsGegenbein, type VerbuchenErgebnis } from "./buchung/umsatzVerbuchen";
@@ -378,7 +378,7 @@ export type {
 export type { Formatwahl, Kontozuordnung } from "./fints/bankzugangPort";
 export type { AbrufBefund, Abrufergebnis, DepotBefund } from "./abrufAusfuehren";
 export type { Abrufstand, Zugangsstand } from "./fints/abrufstand";
-export type { Belegungssicht } from "./konten/kontobelegung";
+export type { Belegungssicht } from "./kontobelegung";
 export type { GeldAufKonto, GeldJeKonto, RuecklageOhneKonto } from "./ruecklagen/geldJeKonto";
 export type { Anspruch, Belegungsposten, Kontobelegung, Ruecklagenart } from "../core";
 // Was das Bankprofil hergibt, wird GERECHNET — also nicht in der Oberfläche: welcher

@@ -17,7 +17,8 @@ Gruppen: **Überblick** — was gilt und was war; **Verwaltung** — woher die D
 wie sie sortiert werden), die Zuordnung zur Komponente in `App.tsx`. Der Überblick ist
 nach Wichtigkeit sortiert (seit 2026-11-08); der Kontoauszug steht als **„Buchungen"** in
 der Verwaltung — dorthin geht man, um zuzuordnen und abzuhaken, nicht um sich zu
-informieren. Seine `ScreenId` heisst weiter `konten`: sie ist ein Schlüssel, kein Name.
+informieren. Seine `ScreenId` heisst weiter `konten`: sie ist ein Schlüssel, kein Name —
+sein UI-Ordner heisst `kontoauszug/` (unten).
 
 Übersicht beantwortet „wie stehe ich **gerade** da", Analyse „wie war es über einen
 **Zeitraum**" — diese Grenze ist beabsichtigt und entscheidet, wo Neues hingehört. Das
@@ -88,8 +89,10 @@ Einstufung „Budget oder Rücklage?" für zwei Bereiche —, `core/zustaendigke
 einen Anteil trägt, Budget oder Rücklage —, `core/fortschreibung.ts`, die Form eines
 Monats, die Budget und Rücklage beide schreiben, und `buchungsdetail.ts` mit
 `einordnungssicht.ts`, was der Buchungsdialog über Verträge, Rücklagen und Budgets liest,
-und `importUebernehmen.ts`, das einen Dateiimport übernimmt und ihm dafür die
-Kategorisierungskette hereinreicht) —
+`importUebernehmen.ts`, das einen Dateiimport übernimmt und ihm dafür die
+Kategorisierungskette hereinreicht, `core/liquiditaet.ts`, das Kontostand gegen die Last
+der Budgets vorausrechnet, und die Sichten des Kontoauszugs, `kontensichten.ts`,
+`herkunftsicht.ts` und `kontobelegung.ts` der Anwendung) —
 sie rechnen über mehrere Bereiche hinweg, und das ist ihre Aufgabe, kein Fehler. In `ui/` liegen aus demselben Grund
 die bereichsübergreifenden Tests oben (`screens`, `interaktion`, `formulare`).
 
@@ -110,7 +113,7 @@ Paaren: so ist auch jedes Paar geregelt, zwischen dem es heute keinen Bezug gibt
 | 7 | `ruecklagen` | eine Rücklage braucht Konto, Buchung und Vertrag (die Umbuchungsregel) |
 | 8 | `budgets` | ein Budget zählt „ohne die Rücklage auf seiner Unterkategorie" und muss von ihr wissen |
 | 9 | `vermoegen` (mit `vorsorge`) | sammelt Konten und Depots; Vorsorge rechnet mit dem Nettovermögen |
-| 10 | `analyse` · `uebersicht` · `einstellungen` · `review` (nur `ui/`) | Sichten ziehen zusammen, was darunter liegt, und niemand braucht sie |
+| 10 | `analyse` · `uebersicht` · `einstellungen` · `review` · `kontoauszug` · `kontenverwaltung` (die drei nur `ui/`) | Sichten ziehen zusammen, was darunter liegt, und niemand braucht sie |
 
 Zwei Ordner zählen unter anderem Namen: `ui/training` ist `klassifikator` (siehe unten),
 und `vorsorge` ist ein Teil von `vermoegen` — ein Bereich für die Regel, die Ordner bleiben
@@ -155,19 +158,20 @@ Ausführbar in `src/architektur.test.ts` („Modulgrenzen", „Rangfolge der Ber
 ist die Tabelle oben, geprüft wird jeder Bezug über alle drei Schichten — direkte Importe,
 Namen über die Fassaden bis zu ihrer Herkunft, `dienste`-Aufrufe bis zum Use-Case.
 
-**Die heutigen Verstösse stehen als Altlast in `src/architektur.altlast.ts`**, je
-Bereichspaar mit einem Satz, wie der Abbau aussieht. Ein Eintrag ist eine Quelldatei mit
-ihrer Zieldatei: ein weiterer Name aus derselben Datei bricht nichts, ein Bezug auf eine
-andere schon. **Wer eine Datei umzieht, streicht ihre Einträge** — ein Eintrag, der nichts
-mehr verletzt, macht den Test rot, damit ein abgebauter Bezug nicht still zurückkommt. Der
-Abbau ist fast überall dasselbe: ein Ordner trägt zwei Ebenen (`konten` auch den
-Kontoauszug), und die obere Hälfte zieht direkt in den Ordner der Schicht, nach
-`bausteine/` oder in ihren eigenen Bereich — so wie der Buchungsdialog nach `bausteine/`
-und das Training nach `klassifikator`. Neue
-Einträge gehören nicht hinein.
+**Die Altlast in `src/architektur.altlast.ts` ist leer**: jeder Bezug im Code folgt der
+Rangfolge. Sie bleibt stehen, damit ein Ausnahmefall einen Ort hätte — je Bereichspaar mit
+einem Satz, wie der Abbau aussieht; ein Eintrag ist eine Quelldatei mit ihrer Zieldatei,
+und einer, der nichts mehr verletzt, macht den Test rot. Neue Einträge gehören nicht
+hinein. Der Abbau war fast überall derselbe, und ein neuer Verstoss löst sich meist
+genauso: ein Ordner trug zwei Ebenen (`konten` auch den Kontoauszug), und die obere
+Hälfte zog direkt in den Ordner der Schicht, nach `bausteine/`, in ihren eigenen Bereich
+oder in einen eigenen UI-Ordner auf der Stufe der Sichten — so wie der Buchungsdialog
+nach `bausteine/`, das Training nach `klassifikator` und der Kontoauszug nach
+`ui/kontoauszug/`.
 
-Zwei Namen weichen ab, beide weil die OBERFLÄCHE der Navigation folgt und nicht der
-Fachgliederung:
+Einige Namen weichen ab. Die ersten beiden, weil die OBERFLÄCHE der Navigation folgt und
+nicht der Fachgliederung, der dritte, weil die Navigation einen Namen trägt, den die
+Fachgliederung schon vergeben hat, der vierte, weil ein Reiter keinen Navigationsnamen hat:
 
 - Der UI-Ordner heißt `training/`, weil die Navigation den Bereich so nennt (`ScreenId`);
   fachlich ist es dieselbe Sache wie `klassifikator/` in Kern und Anwendung.
@@ -175,6 +179,14 @@ Fachgliederung:
   in zweien vorkommt: der Stand in der Übersicht (`ui/uebersicht/DepotKarte.tsx`), die
   Entwicklung in der Analyse (`ui/analyse/DepotAnsicht.tsx`). Kern und Anwendung haben
   ihren `depot/`-Ordner trotzdem — dort gliedert die Fachlichkeit, nicht das Menü.
+- **Der Kontoauszug liegt in `ui/kontoauszug/`**, obwohl seine `ScreenId` `konten` heisst.
+  `konten` ist in der Rangfolge das Konto selbst und steht auf Stufe 1; der Kontoauszug
+  zeigt dazu Buchungen, Einordnung, Dubletten, Verträge und Depot und steht als Sicht auf
+  Stufe 10. Unter dem Namen `konten` lägen beide Ebenen wieder in einem Ordner.
+- **`ui/fints/` hat keine `ScreenId`.** Die Bankzugänge sind ein Reiter der
+  Kontenverwaltung (`ui/kontenverwaltung/`, Stufe 10, weil sie Konten und Bankzugänge
+  zeigt). Für sich brauchen sie nichts über dem Abruf und liegen deshalb unter dem Namen
+  ihres Bereichs, auf seiner Stufe.
 
 ### Das Datenmodell
 

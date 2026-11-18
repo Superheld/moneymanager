@@ -17,6 +17,10 @@
 // **Konten ohne Bank sind hier gleichberechtigt.** Ihre Anker kommen aus dem Kassensturz
 // statt aus dem Abruf, und die Frage „stimmt mein Stand" ist dort genauso berechtigt; nur
 // die Antwort kommt von Hand. Wer den Abgleich an die Bankzugänge hängt, sperrt sie aus.
+//
+// **Liegt bei der Buchung**, wie der Kontostands-Anker im Kern (`core/buchung/kontostand.ts`):
+// verglichen wird, was die Buchungen eines Kontos ergeben. Konto und Bankzuordnung, die sie
+// dazu liest, liegen in der Rangfolge darunter.
 
 import {
   abweichungsfenster,

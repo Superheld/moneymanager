@@ -17,14 +17,14 @@ import { useTranslation } from "react-i18next";
 import type { Kontoherkunft, Laufbefund } from "../../../application";
 import { zurueckholen, type Umsatz } from "../../../application/import";
 import { herkunft as herkunftLaden, umsatzSpeichern } from "../../dienste";
-import { Card, Pill, Button } from "../bausteine";
-import { Zeilenauswahl } from "../bausteine/Zeilenauswahl";
-import { DataTable } from "../bausteine/DataTable";
-import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
-import { geldFarbe } from "../bausteine/geldFarbe";
-import { Umschalter } from "../bausteine/Umschalter";
-import { fehlerMelden } from "../bausteine/Meldungen";
-import { Stapel } from "../bausteine/Anordnung";
+import { Card, Pill, Button } from ".";
+import { Zeilenauswahl } from "./Zeilenauswahl";
+import { DataTable } from "./DataTable";
+import { useDatum, useGeld } from "./einstellungenKontext";
+import { geldFarbe } from "./geldFarbe";
+import { Umschalter } from "./Umschalter";
+import { fehlerMelden } from "./Meldungen";
+import { Stapel } from "./Anordnung";
 
 type Statusfilter = "alle" | "verbucht" | "weggelegt" | "offen";
 

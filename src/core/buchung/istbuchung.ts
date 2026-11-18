@@ -19,7 +19,7 @@
 
 import type { Cent } from "../basis/geld";
 import type { Charakter } from "../basis/zahlungsregel";
-import { istLiquide, KONTOKLASSEN, type Kontoklasse, type Zahlungskonto } from "../konten/konto";
+import { istLiquide, KONTOKLASSEN, type Klassenstand, type Zahlungskonto } from "../konten/konto";
 
 /**
  * Herkunft einer Ist-Buchung:
@@ -233,13 +233,6 @@ export function realerKontostand(konto: Zahlungskonto, buchungen: IstBuchung[]):
  */
 export function liquideMittelReal(konten: Zahlungskonto[], buchungen: IstBuchung[]): Cent {
   return konten.filter(istLiquide).reduce((s, k) => s + realerKontostand(k, buchungen), 0);
-}
-
-/** Was auf den Konten EINER Klasse liegt, samt der Konten selbst. */
-export interface Klassenstand {
-  readonly klasse: Kontoklasse;
-  readonly stand: Cent;
-  readonly konten: readonly Zahlungskonto[];
 }
 
 /**

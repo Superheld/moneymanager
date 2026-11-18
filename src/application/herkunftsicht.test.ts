@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { herkunftLaden, type HerkunftDeps } from "./herkunftsicht";
-import type { ImportLauf, Umsatz } from "../import";
-import type { IstBuchung, Zahlungskonto } from "../../core";
+import type { ImportLauf, Umsatz } from "./import";
+import type { IstBuchung, Zahlungskonto } from "../core";
 
 const GIRO: Zahlungskonto = {
   id: "giro", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0,

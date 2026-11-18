@@ -17,7 +17,7 @@ vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 import { frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import { AbgleichBereich } from "./AbgleichBereich";
-import { KontenScreen } from "./KontenScreen";
+import { KontenScreen } from "../kontoauszug/KontenScreen";
 import { sqliteLedgerRepository as ledgerRepo } from "../../persistence/sqliteLedgerRepository";
 import { sqliteKontostandsankerRepository as ankerRepo } from "../../persistence/sqliteKontostandRepository";
 import { sqliteZahlungskontoRepository as kontoRepo } from "../../persistence/sqliteStammdatenRepositories";

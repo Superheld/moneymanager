@@ -19,7 +19,7 @@ vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 import { auswahlWaehlen, frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../testwerkzeug/harness";
 import i18n from "../../i18n/i18n";
 import { EinstellungenScreen } from "./einstellungen/EinstellungenScreen";
-import { KontenVerwaltungScreen } from "./konten/KontenVerwaltungScreen";
+import { KontenVerwaltungScreen } from "./kontenverwaltung/KontenVerwaltungScreen";
 import { RuecklagenScreen } from "./ruecklagen/RuecklagenScreen";
 import { BudgetsScreen } from "./budgets/BudgetsScreen";
 import { sqliteRuecklagenRepository } from "../persistence/sqliteRuecklagenRepository";

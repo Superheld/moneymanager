@@ -1,6 +1,6 @@
 // „Reicht das Geld?" — die Liquiditätsvorschau je Konto, taggenau.
 //
-// Die Rechnung dahinter (`core/konten/liquiditaet.ts`) stand bis 2026-11-08 als Karte
+// Die Rechnung dahinter (`core/liquiditaet.ts`) stand bis 2026-11-08 als Karte
 // „Da ist etwas zu tun" ganz oben in der Übersicht: rot gerahmt, nur sichtbar, wenn ein
 // Konto ins Minus lief. Im Gebrauch war das zu laut für eine Seite, die sagen soll, wie
 // man dasteht. Hier ist ihr leiserer Ort: eine Tabelle im Register „Ausblick", unter dem

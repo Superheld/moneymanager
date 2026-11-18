@@ -33,7 +33,7 @@ import {
 import { kannVorfall } from "../../../application";
 import { beiEnter } from "../bausteine/beiEnter";
 import { Zeilenauswahl } from "../bausteine/Zeilenauswahl";
-import { HerkunftBereich } from "./HerkunftBereich";
+import { HerkunftBereich } from "../bausteine/HerkunftBereich";
 import { Bankprofilkarte } from "./Bankprofilkarte";
 import { TanDialog, useTanFrage } from "../bausteine/TanDialog";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";

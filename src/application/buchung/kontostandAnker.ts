@@ -3,6 +3,9 @@
 // Beides sind Schreibfälle und stehen deshalb hier statt in `kontensichten` — die rechnet
 // nur. Der Abruf setzt seine Anker selbst (siehe `src/application/abrufAusfuehren.ts`); was hier steht,
 // ist der Weg von Hand.
+//
+// Bei der Buchung und nicht beim Konto, wie `core/buchung/kontostand.ts`: ein Anker sagt
+// erst etwas, wenn er gegen die Buchungen des Kontos gerechnet wird.
 
 import {
   anfangsbestandAusAnker,

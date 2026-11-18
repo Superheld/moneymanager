@@ -22,8 +22,7 @@
 //    über den Monat hinaus jemandem gehört: eine Rücklage.
 
 import type { Cent } from "../basis/geld";
-import type { Klassenstand } from "../buchung/istbuchung";
-import type { Kontoklasse } from "./konto";
+import type { Klassenstand, Kontoklasse } from "./konto";
 
 /**
  * Ein Anspruch auf Geld, das auf einem bestimmten Konto liegen soll.

@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { euroZuCent } from "../basis/geld";
-import type { Zahlungskonto } from "./konto";
+import type { Zahlungskonto } from "../konten/konto";
 import type { Zahlungsregel } from "../basis/zahlungsregel";
-import type { IstBuchung } from "../buchung/istbuchung";
+import type { IstBuchung } from "./istbuchung";
 import { kontoRegister, vorschauAlleKonten } from "./kontoregister";
 
 function konto(over: Partial<Zahlungskonto> = {}): Zahlungskonto {

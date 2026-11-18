@@ -2,8 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { bilanzJeKlasse, kontobelegung, type Anspruch } from "./kontobelegung";
-import type { Klassenstand } from "../buchung/istbuchung";
-import type { Zahlungskonto } from "./konto";
+import type { Klassenstand, Zahlungskonto } from "./konto";
 
 const anspruch = (id: string, kontoId: string, betrag: number): Anspruch => ({
   id,

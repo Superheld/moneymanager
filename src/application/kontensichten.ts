@@ -10,14 +10,20 @@
 // gar nicht und holt sie nicht zurück; ohne Löschweg blieb eine falsch importierte Zeile
 // für immer im Saldo. Richtig ist die HERKUNFT, und die steht am Import-Lauf — also an
 // einer Stelle, die eine Tabellenspalte nicht kennen kann.
+//
+// **Liegt direkt in `src/application/`, weil sie bereichsübergreifend zusammenzieht:** das
+// Konto (`konten`), seine Belege und Läufe (`import`), die Bankverbindung (`fints`), den
+// Dublettenverdacht (`dubletten`), die Buchungen samt Register und Ankern (`buchung`), das
+// Depot (`depot`), die Vertragsnamen (`vertraege`) und den Rücklagenbestand für die
+// Einordnung (`ruecklagen`). Im Bereich `konten` kannte das Konto alles über ihm.
 
-import { buchungsname } from "../buchung/buchungszeile";
-import { belegZuBuchung } from "../buchung/belegZuBuchung";
+import { buchungsname } from "./buchung/buchungszeile";
+import { belegZuBuchung } from "./buchung/belegZuBuchung";
 import {
   einordnungJeBuchung,
   einordnungVon,
   type Buchungseinordnung,
-} from "../einordnungssicht";
+} from "./einordnungssicht";
 import {
   abweichungsfenster,
   anfangsbestandAusAnker,
@@ -36,16 +42,16 @@ import {
   type Kontostandsanker,
   type Zahlungsregel,
   type Vormerkung,
-} from "../../core";
-import { ABRUF_QUELLEN, type ImportLauf, type Umsatz } from "../import";
+} from "../core";
+import { ABRUF_QUELLEN, type ImportLauf, type Umsatz } from "./import";
 import {
   freigegebenePaare,
   ledgerVerdacht,
   type Dublettenverdacht,
-} from "../dubletten/dublettensicht";
-import type { Kontozuordnung } from "../fints/bankzugangPort";
-import { depotJeKonto, depotsLaden, type Depotsicht } from "../depot/depotsichten";
-import { vertragsnamenLaden } from "../vertraege/vertragszuordnung";
+} from "./dubletten/dublettensicht";
+import type { Kontozuordnung } from "./fints/bankzugangPort";
+import { depotJeKonto, depotsLaden, type Depotsicht } from "./depot/depotsichten";
+import { vertragsnamenLaden } from "./vertraege/vertragszuordnung";
 import type {
   BudgetRepository,
   DepotRepository,
@@ -62,8 +68,8 @@ import type {
   VormerkungRepository,
   RuecklagenRepository,
   RuecklagenzuordnungRepository,
-} from "../ports";
-import { ruecklagenbestandLaden } from "../ruecklagen/ruecklagenbestand";
+} from "./ports";
+import { ruecklagenbestandLaden } from "./ruecklagen/ruecklagenbestand";
 
 // Der Verdacht selbst steht in `dublettensicht` — die Regel gilt für alle Anzeigen
 // gemeinsam, nicht nur fürs Register.

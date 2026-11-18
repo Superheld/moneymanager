@@ -19,7 +19,7 @@ vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 import { klickbareZeile, frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import i18n from "../../../i18n/i18n";
-import { HerkunftBereich } from "./HerkunftBereich";
+import { HerkunftBereich } from "../bausteine/HerkunftBereich";
 import { KontenVerwaltung } from "./KontenVerwaltung";
 import { sqliteZahlungskontoRepository as kontoRepo } from "../../persistence/sqliteStammdatenRepositories";
 import {

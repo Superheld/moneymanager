@@ -71,7 +71,7 @@ import {
   type Zahlungskonto,
   type Zahlungsregel,
 } from "./core";
-import { anspruchsbestand, belegungssicht } from "./application/konten/kontobelegung";
+import { anspruchsbestand, belegungssicht } from "./application/kontobelegung";
 import { MIGRATIONS } from "./adapters/persistence/migrations";
 import { seedEinspielen } from "./testwerkzeug/seedDaten";
 import { pluginApi } from "./testwerkzeug/harness";

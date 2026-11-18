@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { geldJeKontoLaden } from "./geldJeKonto";
-import type { KontobelegungDeps } from "../konten/kontobelegung";
+import type { KontobelegungDeps } from "../kontobelegung";
 import type { Budget, Kategorie, Ruecklage, Zahlungskonto } from "../../core";
 
 const HEUTE = "2026-07-15";

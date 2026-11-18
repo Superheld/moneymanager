@@ -58,7 +58,14 @@ und den Kategorienbaum in einem Zug und rechnet die Kontostände über den Buchu
 eine Sicht über vier Bereiche. Ebenso `buchungsdetail.ts` und `einordnungssicht.ts`: was
 der Buchungsdialog und die Spalte „Einordnung" des Kontoauszugs zeigen, zieht Verträge,
 Rücklagen und Budgets zusammen, die alle über der Buchung liegen — in `buchung/` kannte
-ein Bereich seine höheren, gegen die Rangfolge. Angelegt wird dagegen je Bereich (`kontoAnlegen` in
+ein Bereich seine höheren, gegen die Rangfolge. Ebenso die Sichten des Kontoauszugs:
+`kontensichten.ts` (Konto, Belege, Bankverbindung, Dubletten, Buchungen, Depot, Verträge,
+Rücklagen), `herkunftsicht.ts` (Konto, Belege und ob ihre Buchung noch steht — auch die
+Bankzugänge zeigen sie, die unter der Buchung liegen) und `kontobelegung.ts` (Kontostand
+gegen die Ansprüche der Rücklagen, mit Budgets und Verträgen). Im Bereich `konten/`
+kannte das Konto, was über ihm liegt. Der Abgleich und der Kontostands-Anker
+(`buchung/abgleichsicht.ts`, `buchung/kontostandAnker.ts`) rechnen dagegen nur über die
+Buchungen eines Kontos und liegen bei der Buchung. Angelegt wird dagegen je Bereich (`kontoAnlegen` in
 `konten/`, `kategorieAnlegen` in `kategorien/`, `personAnlegen` in `stammdaten/`).
 
 ## Ports

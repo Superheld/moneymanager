@@ -101,7 +101,7 @@ import {
   type VermoegensEingabe,
   type Vermoegensvergleich,
 } from "../core";
-import { belegungssicht, zustaendigkeitssichtMit } from "./konten/kontobelegung";
+import { belegungssicht, zustaendigkeitssichtMit } from "./kontobelegung";
 import { ruecklagenbestandLaden } from "./ruecklagen/ruecklagenbestand";
 import type { Umsatz } from "./import";
 import { vertragsbindungLaden } from "./vertraege/vertragszuordnung";
@@ -733,7 +733,7 @@ export interface Liquiditaetssicht {
 }
 
 /**
- * Die Liquiditätsvorschau je liquidem, aktivem Konto (`core/konten/liquiditaet.ts`).
+ * Die Liquiditätsvorschau je liquidem, aktivem Konto (`core/liquiditaet.ts`).
  *
  * Sie stand bis 2026-11-08 als Warnkarte ganz oben in der Übersicht und war dort zu
  * laut. Hier ist sie eine Tabelle im Register „Ausblick" — und anders als die Karte

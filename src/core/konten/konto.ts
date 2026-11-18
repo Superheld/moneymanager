@@ -178,6 +178,19 @@ export function liquideMittel(konten: Zahlungskonto[]): Cent {
   return konten.filter(istLiquide).reduce((s, k) => s + k.saldo, 0);
 }
 
+/**
+ * Was auf den Konten EINER Klasse liegt, samt der Konten selbst.
+ *
+ * Steht beim Konto und nicht bei der Buchung, die den Stand ausrechnet
+ * (`staendeJeKlasse` in `core/buchung/istbuchung.ts`): die Form braucht nur Klasse, Konto
+ * und einen Betrag, und die Kontobelegung, die sie liest, liegt selbst beim Konto.
+ */
+export interface Klassenstand {
+  readonly klasse: Kontoklasse;
+  readonly stand: Cent;
+  readonly konten: readonly Zahlungskonto[];
+}
+
 /** Normalisiert eine IBAN: Leerzeichen weg, Großbuchstaben. */
 export function normalisiereIban(iban: string): string {
   return iban.replace(/\s+/g, "").toUpperCase();

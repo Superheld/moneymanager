@@ -38,7 +38,7 @@ import {
   type Zahlungskonto,
 } from "../../core";
 import { budgetvorschlaegeLaden, ignorierteBudgetvorschlaege } from "./budgetvorschlaege";
-import { zustaendigkeitssichtMit } from "../konten/kontobelegung";
+import { zustaendigkeitssichtMit } from "../kontobelegung";
 import { ruecklagenbestandLaden } from "../ruecklagen/ruecklagenbestand";
 import type {
   BudgetRepository,

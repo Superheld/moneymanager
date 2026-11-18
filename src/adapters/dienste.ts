@@ -94,7 +94,7 @@ import {
 import { bestandExportieren } from "../application/bestandsexport";
 import { stammdatenLaden, type Stammdaten } from "../application/stammdatensichten";
 import { ruecklagenLaden, type Ruecklagensicht } from "../application/ruecklagen/ruecklagensichten";
-import { kontobelegungLaden, type Belegungssicht } from "../application/konten/kontobelegung";
+import { kontobelegungLaden, type Belegungssicht } from "../application/kontobelegung";
 import { geldJeKontoLaden, type GeldJeKonto } from "../application/ruecklagen/geldJeKonto";
 import {
   ruecklagenvorschlaegeLaden,
@@ -131,7 +131,7 @@ import {
 } from "../application/vorsorge/vorsorge";
 import { analyseLaden, type Analysebasis } from "../application/analysesichten";
 import { vertraegeLaden, type Vertragssicht } from "../application/vertraege/vertragssichten";
-import { kontenLaden, type Kontensicht } from "../application/konten/kontensichten";
+import { kontenLaden, type Kontensicht } from "../application/kontensichten";
 import { buchungsdetailLaden, type Buchungsdetaildaten } from "../application/buchungsdetail";
 import {
   dublettenFreigabeAufheben as dublettenFreigabeAufhebenUseCase,
@@ -140,7 +140,7 @@ import {
 import {
   anfangsbestandAbgleichen as anfangsbestandAbgleichenUseCase,
   kontostandFesthalten as kontostandFesthaltenUseCase,
-} from "../application/konten/kontostandAnker";
+} from "../application/buchung/kontostandAnker";
 import {
   buchungBearbeiten as buchungBearbeitenUseCase,
   buchungErfassen as buchungErfassenUseCase,
@@ -149,8 +149,8 @@ import {
 } from "../application/buchung/buchungErfassen";
 import { umbuchungLoeschen as umbuchungLoeschenUseCase } from "../application/buchung/umbuchungErfassen";
 import { bankzeileVerwerfen as bankzeileVerwerfenUseCase } from "../application/import/bankzeileVerwerfen";
-import { abgleichLaden as abgleichLadenUseCase } from "../application/konten/abgleichsicht";
-import { herkunftLaden as herkunftLadenUseCase } from "../application/konten/herkunftsicht";
+import { abgleichLaden as abgleichLadenUseCase } from "../application/buchung/abgleichsicht";
+import { herkunftLaden as herkunftLadenUseCase } from "../application/herkunftsicht";
 import { pruefmarkerSetzen as pruefmarkerSetzenUseCase } from "../application/buchung/pruefmarker";
 import { buchungSplitten as buchungSplittenUseCase, splitAufheben as splitAufhebenUseCase } from "../application/buchung/buchungSplitten";
 import { paarungLoesen as paarungLoesenUseCase } from "../application/buchung/umbuchungAusBuchung";

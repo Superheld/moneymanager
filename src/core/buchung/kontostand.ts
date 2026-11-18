@@ -26,8 +26,8 @@
 
 import { parseIso } from "../basis/datum";
 import type { Cent } from "../basis/geld";
-import type { IstBuchung } from "../buchung/istbuchung";
-import type { Zahlungskonto } from "./konto";
+import type { IstBuchung } from "./istbuchung";
+import type { Zahlungskonto } from "../konten/konto";
 
 /** Woher der Stichtags-Stand stammt. */
 export type Ankerherkunft = "bank" | "hand";

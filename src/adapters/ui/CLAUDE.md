@@ -47,8 +47,9 @@ ein Baustein; was einer benutzt, gehört in dessen Ordner** — auch wenn es all
 | `ruecklagen/` | Rücklagen beider Sorten in EINER Liste und ihr Verlauf (`RuecklageVerlauf`), Abschliessen (`AbschlussDialog`), „Wartet auf Zuordnung" (`WartetKarte`), Vorschläge (`VorschlaegeKarte`), Fluss, Tacho, „Wo das Geld liegt" (je Konto, `GeldJeKontoKarte`) |
 | `vermoegen/` | Nettovermögen mit Verlauf, Vermögenswerte und Schulden als Werte zum Stichtag |
 | `vertraege/` | Verträge und ihre Erkennung |
-| `konten/` | der Kontoauszug („Buchungen", `ScreenId` `konten`), Kontenverwaltung, Bankzugänge, Abgleich, Depotauszug |
-| `buchung/` | `SammelDialog` und `DublettenVergleich` — beide öffnet nur der Kontoauszug; der Buchungsdialog selbst liegt in `bausteine/` (unten) |
+| `kontoauszug/` | der Kontoauszug („Buchungen", `ScreenId` `konten`) samt Depotauszug, Vormerkungen, `SammelDialog` und `DublettenVergleich`; der Buchungsdialog selbst liegt in `bausteine/` (unten) |
+| `kontenverwaltung/` | Konten anlegen, bearbeiten und auflösen, der Abgleich und der Reiter Bankzugänge (`ScreenId` `kontenverwaltung`) |
+| `fints/` | die Bankzugänge (`BankzugaengeScreen`, `Bankprofilkarte`) — ein Reiter der Kontenverwaltung, kein eigener Navigationsbereich |
 | `import/` | Dateiimport (der Beleg) |
 | `review/` | der Navigationsbereich Import (`ImportBereich`, `ScreenId` `import`) und die Review-Inbox, in der Belege verbucht werden |
 | `training/` | Werkbank der Kategorie-Erkennung (Regeln in `training/CLAUDE.md`) |
@@ -70,6 +71,20 @@ der Stufe der Sichten. Der Bereich `ImportBereich` geht mit, weil er die Inbox a
 zeigt: wer zusammensetzt, steht mindestens so hoch wie das Höchste, das er zeigt. Ein
 eigener Ordner statt einer losen Datei direkt in `src/adapters/ui/`, weil dort nur die
 bereichsübergreifenden Tests liegen und ein Screen dort von keiner Regel erfasst wäre.
+
+Aus demselben Grund liegt der Kontoauszug in `kontoauszug/` und nicht in `konten/`, obwohl
+seine `ScreenId` `konten` heisst: er zeigt die Buchungen eines Kontos mit Einordnung,
+Dubletten, Verträgen und Depot — alles Bereiche über dem Konto. `konten` ist in der
+Rangfolge das Konto selbst (Typ, Klasse, IBAN) und steht weit unten; ein Bildschirm, der
+darüber zusammenzieht, kann nicht dort liegen. Die `ScreenId` bleibt, sie ist ein
+Schlüssel und kein Name.
+
+Die Kontenverwaltung liegt aus demselben Grund in `kontenverwaltung/` (wie ihre
+`ScreenId`): sie zeigt Konten UND Bankzugänge, und beim Anlegen eines Kontos wird der
+Bankzugang gewählt (`KontoAnlegenModal`). Die Bankzugänge selbst liegen in `fints/`, auf
+der Stufe des Bankabrufs — sie sind ein Reiter, den die Kontenverwaltung zeigt, und
+brauchen nichts über dem Abruf. Was beide zeigen, die Herkunft der Zeilen eines Kontos
+(`HerkunftBereich`), ist damit ein Baustein.
 
 ## Bausteinkatalog — wofür es schon etwas gibt
 
@@ -287,7 +302,7 @@ Wo es heute steht:
 | `bausteine/Umschalter` | drei Segmentleisten aus `aria-pressed`-Knöpfen | Base UI `ToggleGroup` |
 | „Nur Dubletten" im Kontoauszug | `aria-pressed` von Hand | Base UI `Toggle` |
 | Schalter in den Einstellungen | Kästchen | Base UI `Switch` |
-| `konten/BankSuche` | Vorschlagsliste ohne Rollen | Base UI `Combobox` |
+| `kontenverwaltung/BankSuche` | Vorschlagsliste ohne Rollen | Base UI `Combobox` |
 | Zahlenfeld im `AbrufDialog` | `<input type="number">` | Base UI `NumberField` |
 | `bausteine/Meldungen` | geschluckte Fehler, leere Listen | Base UI `Toast` |
 | `IconButton`, `Zeilenlink`, die Knöpfe in Shell, Kalender, Picker | roher `<button>` | Base UI `Button` |
@@ -543,7 +558,7 @@ einer Entscheidung.
 ## Die Einordnung an der Zeile
 
 Seit 2026-11-15 trägt jede Zeile des Kontoauszugs eine Spalte **Einordnung**
-(`konten/EinordnungsPillen.tsx`): Einnahme, Fixkosten, laufende Kosten, „aus Rücklage …",
+(`kontoauszug/EinordnungsPillen.tsx`): Einnahme, Fixkosten, laufende Kosten, „aus Rücklage …",
 Vorsorge, Umbuchung, ungeplant, wartet auf Zuordnung. Der Buchungsdialog sagt dasselbe als Satz
 mit der Begründung (`bausteine/EinordnungsBlock.tsx`) — „zählt als Fixkosten, weil sie dem
 Vertrag … zugeordnet ist". Der Satz ist die eigentliche Hilfe: das Wort allein erklärt
@@ -836,7 +851,7 @@ dort entsteht.
 
 ## Zwei Fragen, die verschieden aussehen müssen
 
-Derselbe Bereich (`konten/HerkunftBereich`) beantwortet zwei Fragen, und wer sie
+Derselbe Bereich (`bausteine/HerkunftBereich`) beantwortet zwei Fragen, und wer sie
 gleichbehandelt, beantwortet eine davon falsch:
 
 - **Unter der Kontenliste:** „Was steht für dieses Konto überhaupt in der Datenbank?"
@@ -957,7 +972,7 @@ Drei Dinge, die beim Anbauen zählen:
 
 ### Unter dem Ausblick: „Reicht das Geld?"
 
-Die Liquiditätsvorschau (`core/konten/liquiditaet.ts`, zwei Linien — siehe
+Die Liquiditätsvorschau (`core/liquiditaet.ts`, zwei Linien — siehe
 `src/core/konten/CLAUDE.md`) steht seit 2026-11-15 als eigene Karte unter dem Blick nach
 vorn (`LiquiditaetKarte.tsx`, gerechnet von `analyseLiquiditaet`). Der Saldo darüber
 rechnet monatsweise über alle liquiden Konten zusammen; die Tabelle sagt je Konto und

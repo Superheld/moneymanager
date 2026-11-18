@@ -84,7 +84,7 @@ Sie liegen als `*.test.ts` **neben dem Code**, es gibt keinen Testordner —
   über ihre Importkette herein (etwa über `dienste`), gibt `t()` deutschen Text zurück und
   `findByText("konten.keineKonten")` findet nichts; tut sie es nicht, kommt der Schlüssel
   selbst heraus. Beides gibt es im Bestand — `zugang/Sperrbildschirm.test.tsx` sucht
-  Schlüssel, `konten/auswahlMerken.test.tsx` bekommt Text.
+  Schlüssel, `kontoauszug/auswahlMerken.test.tsx` bekommt Text.
 
   Der Weg, der in beiden Fällen trägt: `i18n.t(schluessel)` im Test aufrufen und danach
   suchen. Der Test hängt dann am Schlüssel und nicht am Wortlaut, egal welcher Fall

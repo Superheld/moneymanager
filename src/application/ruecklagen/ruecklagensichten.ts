@@ -55,7 +55,7 @@ import { buchungsname } from "../buchung/buchungszeile";
 import type { Umsatz } from "../import/umsatz";
 import { buchungszeile, zeilenkontext, type Buchungszeile, type Zeilenkontext } from "../buchung/buchungszeile";
 import { vertragsnamenLaden } from "../vertraege/vertragszuordnung";
-import { anspruchsbestandLaden, type BudgetanspruchDeps } from "../konten/kontobelegung";
+import { anspruchsbestandLaden, type BudgetanspruchDeps } from "../kontobelegung";
 import { wartendeZuordnungen, type WartendeZuordnung } from "./wartendeZuordnungen";
 
 /**
