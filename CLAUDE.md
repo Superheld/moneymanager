@@ -17,7 +17,8 @@ Gruppen: **Überblick** — was gilt und was war; **Verwaltung** — woher die D
 wie sie sortiert werden), die Zuordnung zur Komponente in `App.tsx`. Der Überblick ist
 nach Wichtigkeit sortiert (seit 2026-11-08); der Kontoauszug steht als **„Buchungen"** in
 der Verwaltung — dorthin geht man, um zuzuordnen und abzuhaken, nicht um sich zu
-informieren. Seine `ScreenId` heisst weiter `konten`: sie ist ein Schlüssel, kein Name.
+informieren. Seine `ScreenId` heisst weiter `konten`: sie ist ein Schlüssel, kein Name —
+sein UI-Ordner heisst `kontoauszug/` (unten).
 
 Übersicht beantwortet „wie stehe ich **gerade** da", Analyse „wie war es über einen
 **Zeitraum**" — diese Grenze ist beabsichtigt und entscheidet, wo Neues hingehört. Das
@@ -110,7 +111,7 @@ Paaren: so ist auch jedes Paar geregelt, zwischen dem es heute keinen Bezug gibt
 | 7 | `ruecklagen` | eine Rücklage braucht Konto, Buchung und Vertrag (die Umbuchungsregel) |
 | 8 | `budgets` | ein Budget zählt „ohne die Rücklage auf seiner Unterkategorie" und muss von ihr wissen |
 | 9 | `vermoegen` (mit `vorsorge`) | sammelt Konten und Depots; Vorsorge rechnet mit dem Nettovermögen |
-| 10 | `analyse` · `uebersicht` · `einstellungen` · `review` (nur `ui/`) | Sichten ziehen zusammen, was darunter liegt, und niemand braucht sie |
+| 10 | `analyse` · `uebersicht` · `einstellungen` · `review` · `kontoauszug` (beide nur `ui/`) | Sichten ziehen zusammen, was darunter liegt, und niemand braucht sie |
 
 Zwei Ordner zählen unter anderem Namen: `ui/training` ist `klassifikator` (siehe unten),
 und `vorsorge` ist ein Teil von `vermoegen` — ein Bereich für die Regel, die Ordner bleiben
@@ -166,8 +167,9 @@ Kontoauszug), und die obere Hälfte zieht direkt in den Ordner der Schicht, nach
 und das Training nach `klassifikator`. Neue
 Einträge gehören nicht hinein.
 
-Zwei Namen weichen ab, beide weil die OBERFLÄCHE der Navigation folgt und nicht der
-Fachgliederung:
+Drei Namen weichen ab. Die ersten beiden, weil die OBERFLÄCHE der Navigation folgt und
+nicht der Fachgliederung, der dritte, weil die Navigation einen Namen trägt, den die
+Fachgliederung schon vergeben hat:
 
 - Der UI-Ordner heißt `training/`, weil die Navigation den Bereich so nennt (`ScreenId`);
   fachlich ist es dieselbe Sache wie `klassifikator/` in Kern und Anwendung.
@@ -175,6 +177,10 @@ Fachgliederung:
   in zweien vorkommt: der Stand in der Übersicht (`ui/uebersicht/DepotKarte.tsx`), die
   Entwicklung in der Analyse (`ui/analyse/DepotAnsicht.tsx`). Kern und Anwendung haben
   ihren `depot/`-Ordner trotzdem — dort gliedert die Fachlichkeit, nicht das Menü.
+- **Der Kontoauszug liegt in `ui/kontoauszug/`**, obwohl seine `ScreenId` `konten` heisst.
+  `konten` ist in der Rangfolge das Konto selbst und steht auf Stufe 1; der Kontoauszug
+  zeigt dazu Buchungen, Einordnung, Dubletten, Verträge und Depot und steht als Sicht auf
+  Stufe 10. Unter dem Namen `konten` lägen beide Ebenen wieder in einem Ordner.
 
 ### Das Datenmodell
 

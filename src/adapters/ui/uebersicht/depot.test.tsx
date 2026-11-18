@@ -18,7 +18,7 @@ import type { Depotdaten, Depotsicht } from "../../../application";
 import { frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import { DepotKarte } from "./DepotKarte";
 import { DepotAnsicht } from "../analyse/DepotAnsicht";
-import { DepotAuszug } from "../konten/DepotAuszug";
+import { DepotAuszug } from "../kontoauszug/DepotAuszug";
 
 let db: Database;
 

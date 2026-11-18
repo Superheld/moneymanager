@@ -33,19 +33,13 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     von: "konten",
     auf: "buchung",
     abbau:
-      "Der Kontoauszug ist eine Sicht und zieht bereichsübergreifend direkt in den Ordner " +
-      "seiner Schicht (`kontensichten`, " +
-      "`abgleichsicht`, `kontobelegung` der Anwendung, `KontenScreen` und Verwandte); " +
+      "Die Oberfläche des Kontoauszugs liegt in `ui/kontoauszug/`. Übrig sind seine Sichten " +
+      "der Anwendung: sie ziehen bereichsübergreifend direkt in den Ordner ihrer Schicht " +
+      "(`kontensichten`, `abgleichsicht`, `kontobelegung`); " +
       "`kontostand` und `kontoregister` rechnen über Buchungen je Konto und gehören zu " +
       "`buchung`; `liquiditaet` wägt Konto gegen Budgetlast ab und gehört direkt nach `src/core/`; " +
       "der Typ `Klassenstand` gehört zum Konto.",
     eintraege: [
-      "adapters/ui/konten/KontenScreen.tsx → adapters/ui/buchung/DublettenVergleich.tsx",
-      "adapters/ui/konten/KontenScreen.tsx → adapters/ui/buchung/SammelDialog.tsx",
-      "adapters/ui/konten/KontenScreen.tsx → application/buchung/buchungenSammelbearbeiten.ts",
-      "adapters/ui/konten/KontenScreen.tsx → application/buchung/pruefmarker.ts",
-      "adapters/ui/konten/KontenScreen.tsx → core/buchung/istbuchung.ts",
-      "adapters/ui/konten/UmbuchungModal.tsx → application/buchung/umbuchungErfassen.ts",
       "application/konten/abgleichsicht.ts → core/buchung/istbuchung.ts",
       "application/konten/kontensichten.ts → application/buchung/belegZuBuchung.ts",
       "application/konten/kontensichten.ts → application/buchung/buchungszeile.ts",
@@ -57,19 +51,6 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
       "core/konten/kontostand.ts → core/buchung/istbuchung.ts",
       "core/konten/liquiditaet.ts → core/buchung/istbuchung.ts",
       "core/konten/liquiditaet.ts → core/buchung/projektion.ts",
-    ],
-  },
-  {
-    von: "buchung",
-    auf: "vertraege",
-    abbau:
-      "Der Buchungsdialog ist abgebaut (`bausteine/BuchungDetail`, `buchungsdetail` und " +
-      "`einordnungssicht` direkt in `src/application/`). Übrig ist `SammelDialog`: ihn " +
-      "öffnet nur der Kontoauszug, er ist also kein Baustein, und in `konten/` stünde er " +
-      "unter den Verträgen. Er zieht mit dem Kontoauszug aus dem Bereich (siehe konten → buchung).",
-    eintraege: [
-      "adapters/ui/buchung/SammelDialog.tsx → application/vertraege/vertragszuordnung.ts",
-      "adapters/ui/buchung/SammelDialog.tsx → core/vertraege/vertrag.ts",
     ],
   },
   {
@@ -127,9 +108,8 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     von: "konten",
     auf: "vertraege",
     abbau:
-      "Der Kontoauszug zieht aus dem Bereich (siehe konten → buchung).",
+      "Übrig sind die Sichten der Anwendung (siehe konten → buchung).",
     eintraege: [
-      "adapters/ui/konten/KontenScreen.tsx → core/vertraege/vertrag.ts",
       "application/konten/kontensichten.ts → application/vertraege/vertragszuordnung.ts",
       "application/konten/kontobelegung.ts → application/vertraege/vertragszuordnung.ts",
     ],
@@ -149,9 +129,9 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     von: "konten",
     auf: "depot",
     abbau:
-      "Der Depotauszug ist Teil des Kontoauszugs und zieht mit ihm aus dem Bereich.",
+      "Der Depotauszug liegt mit dem Kontoauszug in `ui/kontoauszug/`; übrig ist " +
+      "`kontensichten`, das direkt nach `src/application/` zieht.",
     eintraege: [
-      "adapters/ui/konten/DepotAuszug.tsx → application/depot/depotsichten.ts",
       "application/konten/kontensichten.ts → application/depot/depotsichten.ts",
     ],
   },
@@ -159,9 +139,8 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     von: "konten",
     auf: "dubletten",
     abbau:
-      "Der Kontoauszug zieht aus dem Bereich (siehe konten → buchung).",
+      "Übrig sind die Sichten der Anwendung (siehe konten → buchung).",
     eintraege: [
-      "adapters/ui/konten/KontenScreen.tsx → application/dubletten/dublettensicht.ts",
       "application/konten/kontensichten.ts → application/dubletten/dublettensicht.ts",
     ],
   },

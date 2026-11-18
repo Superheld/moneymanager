@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AppShell, type ScreenId } from "./adapters/ui/bausteine/AppShell";
 import { UebersichtScreen } from "./adapters/ui/uebersicht/UebersichtScreen";
 import { AnalyseScreen } from "./adapters/ui/analyse/AnalyseScreen";
-import { KontenScreen } from "./adapters/ui/konten/KontenScreen";
+import { KontenScreen } from "./adapters/ui/kontoauszug/KontenScreen";
 import { KontenVerwaltungScreen } from "./adapters/ui/konten/KontenVerwaltungScreen";
 import { EinstellungenScreen } from "./adapters/ui/einstellungen/EinstellungenScreen";
 import { VertraegeScreen } from "./adapters/ui/vertraege/VertraegeScreen";

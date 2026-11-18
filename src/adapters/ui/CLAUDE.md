@@ -47,8 +47,8 @@ ein Baustein; was einer benutzt, gehört in dessen Ordner** — auch wenn es all
 | `ruecklagen/` | Rücklagen beider Sorten in EINER Liste und ihr Verlauf (`RuecklageVerlauf`), Abschliessen (`AbschlussDialog`), „Wartet auf Zuordnung" (`WartetKarte`), Vorschläge (`VorschlaegeKarte`), Fluss, Tacho, „Wo das Geld liegt" (je Konto, `GeldJeKontoKarte`) |
 | `vermoegen/` | Nettovermögen mit Verlauf, Vermögenswerte und Schulden als Werte zum Stichtag |
 | `vertraege/` | Verträge und ihre Erkennung |
-| `konten/` | der Kontoauszug („Buchungen", `ScreenId` `konten`), Kontenverwaltung, Bankzugänge, Abgleich, Depotauszug |
-| `buchung/` | `SammelDialog` und `DublettenVergleich` — beide öffnet nur der Kontoauszug; der Buchungsdialog selbst liegt in `bausteine/` (unten) |
+| `kontoauszug/` | der Kontoauszug („Buchungen", `ScreenId` `konten`) samt Depotauszug, Vormerkungen, `SammelDialog` und `DublettenVergleich`; der Buchungsdialog selbst liegt in `bausteine/` (unten) |
+| `konten/` | Kontenverwaltung, Bankzugänge, Abgleich |
 | `import/` | Dateiimport (der Beleg) |
 | `review/` | der Navigationsbereich Import (`ImportBereich`, `ScreenId` `import`) und die Review-Inbox, in der Belege verbucht werden |
 | `training/` | Werkbank der Kategorie-Erkennung (Regeln in `training/CLAUDE.md`) |
@@ -70,6 +70,13 @@ der Stufe der Sichten. Der Bereich `ImportBereich` geht mit, weil er die Inbox a
 zeigt: wer zusammensetzt, steht mindestens so hoch wie das Höchste, das er zeigt. Ein
 eigener Ordner statt einer losen Datei direkt in `src/adapters/ui/`, weil dort nur die
 bereichsübergreifenden Tests liegen und ein Screen dort von keiner Regel erfasst wäre.
+
+Aus demselben Grund liegt der Kontoauszug in `kontoauszug/` und nicht in `konten/`, obwohl
+seine `ScreenId` `konten` heisst: er zeigt die Buchungen eines Kontos mit Einordnung,
+Dubletten, Verträgen und Depot — alles Bereiche über dem Konto. `konten` ist in der
+Rangfolge das Konto selbst (Typ, Klasse, IBAN) und steht weit unten; ein Bildschirm, der
+darüber zusammenzieht, kann nicht dort liegen. Die `ScreenId` bleibt, sie ist ein
+Schlüssel und kein Name.
 
 ## Bausteinkatalog — wofür es schon etwas gibt
 
@@ -543,7 +550,7 @@ einer Entscheidung.
 ## Die Einordnung an der Zeile
 
 Seit 2026-11-15 trägt jede Zeile des Kontoauszugs eine Spalte **Einordnung**
-(`konten/EinordnungsPillen.tsx`): Einnahme, Fixkosten, laufende Kosten, „aus Rücklage …",
+(`kontoauszug/EinordnungsPillen.tsx`): Einnahme, Fixkosten, laufende Kosten, „aus Rücklage …",
 Vorsorge, Umbuchung, ungeplant, wartet auf Zuordnung. Der Buchungsdialog sagt dasselbe als Satz
 mit der Begründung (`bausteine/EinordnungsBlock.tsx`) — „zählt als Fixkosten, weil sie dem
 Vertrag … zugeordnet ist". Der Satz ist die eigentliche Hilfe: das Wort allein erklärt

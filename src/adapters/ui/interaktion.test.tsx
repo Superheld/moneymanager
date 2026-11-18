@@ -21,7 +21,7 @@ import { auswahlWaehlen, frischeDb, pluginApi, rendere, sqlLaden } from "../../t
 import { AppShell } from "./bausteine/AppShell";
 import { BudgetsScreen } from "./budgets/BudgetsScreen";
 import { RuecklagenScreen } from "./ruecklagen/RuecklagenScreen";
-import { KontenScreen } from "./konten/KontenScreen";
+import { KontenScreen } from "./kontoauszug/KontenScreen";
 import { VertraegeScreen } from "./vertraege/VertraegeScreen";
 import { sqliteRuecklagenRepository } from "../persistence/sqliteRuecklagenRepository";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";

@@ -28,7 +28,7 @@ import { AnalyseScreen } from "./analyse/AnalyseScreen";
 import { UebersichtScreen } from "./uebersicht/UebersichtScreen";
 import { ImportScreen } from "./import/ImportScreen";
 import { RuecklagenScreen } from "./ruecklagen/RuecklagenScreen";
-import { KontenScreen } from "./konten/KontenScreen";
+import { KontenScreen } from "./kontoauszug/KontenScreen";
 import { ReviewScreen } from "./review/ReviewScreen";
 import { sqliteKlassifikatorRepository } from "../persistence/sqliteKlassifikatorRepository";
 import { trainieren } from "../../core";

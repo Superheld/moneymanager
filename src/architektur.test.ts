@@ -259,6 +259,10 @@ const RANG: Readonly<Record<string, number>> = {
   // und fragt Dubletten, Umbuchungen und Verträge — eine Sicht über den Beleg, nicht der Beleg.
   // Nur in der Oberfläche; die Use-Cases dahinter gehören ihren Bereichen.
   review: 10,
+  // Der Kontoauszug („Buchungen", `ScreenId` `konten`): Buchungen eines Kontos mit
+  // Einordnung, Dubletten, Verträgen, Vormerkungen und Depot. Er zeigt das Konto, ist aber
+  // nicht das Konto — eine Sicht über alles, was auf ihm geschieht. Nur in der Oberfläche.
+  kontoauszug: 10,
 };
 
 /**

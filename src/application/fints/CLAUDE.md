@@ -30,7 +30,7 @@ Zwei Stellen rechnen und zeigen sie:
   nicht verbucht —, und `realerKontostand` sieht sie nicht. Dasselbe meint die Bank, wenn
   sie neben den Saldo einen „verfügbaren Betrag" stellt.
 - **Der Kontoauszug** zeigt sie als abgesetzten Block ÜBER dem Gebuchten
-  (`ui/konten/VormerkungsBlock.tsx`). Sie nur wirken zu lassen war der verworfene Weg:
+  (`ui/kontoauszug/VormerkungsBlock.tsx`). Sie nur wirken zu lassen war der verworfene Weg:
   bei der ersten Abweichung stünde eine Zahl da, deren Herkunft niemand sieht, und in
   einer Finanz-App ist das schlimmer als eine fehlende Zahl.
 
