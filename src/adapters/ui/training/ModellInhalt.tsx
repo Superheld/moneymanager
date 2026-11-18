@@ -9,7 +9,7 @@ import {
   type Fehltreffer,
   type Matrixzeile,
 } from "../../../application";
-import type { Laufvergleichsicht, Messprotokoll } from "../../../application/kategorien/klassifikatorTraining";
+import type { Laufvergleichsicht, Messprotokoll } from "../../../application/klassifikator/klassifikatorTraining";
 import { Button, Card, DataTable, KPIStat } from "../bausteine";
 import { ErklaerungsTafel } from "./ErklaerungsTafel";
 import { useGeld } from "../bausteine/einstellungenKontext";

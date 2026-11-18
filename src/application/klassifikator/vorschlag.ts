@@ -42,7 +42,7 @@
 // daneben.
 //
 // Rein: alles, was die Kette braucht, kommt als Kontext herein. Der lädt sich in
-// `application/kategorisierungsquellen`.
+// `kategorisierungsquellen.ts` daneben.
 
 import {
   erklaeren,

@@ -60,36 +60,6 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     ],
   },
   {
-    von: "kategorien",
-    auf: "klassifikator",
-    abbau:
-      "Das Training ist nicht der Kategorienbaum: `application/kategorien` (ohne die " +
-      "Standardkategorien) und `ui/training` werden zum Bereich `klassifikator`.",
-    eintraege: [
-      "adapters/ui/training/ErklaerungsTafel.tsx → core/klassifikator/erklaerung.ts",
-      "adapters/ui/training/KategorisierungCards.tsx → core/klassifikator/merkmale.ts",
-      "adapters/ui/training/KategorisierungCards.tsx → core/klassifikator/modell.ts",
-      "adapters/ui/training/MerkmaleBlock.tsx → core/klassifikator/merkmale.ts",
-      "adapters/ui/training/ModellInhalt.tsx → core/klassifikator/merkmale.ts",
-      "adapters/ui/training/ModellInhalt.tsx → core/klassifikator/modell.ts",
-      "adapters/ui/training/WoerterInhalt.tsx → core/klassifikator/merkmale.ts",
-      "adapters/ui/training/kartenteile.tsx → core/klassifikator/laeufe.ts",
-      "adapters/ui/training/kartenteile.tsx → core/klassifikator/merkmale.ts",
-      "application/kategorien/kategorieAbgleich.ts → application/klassifikator/vorschlag.ts",
-      "application/kategorien/kategorisierungsquellen.ts → core/klassifikator/merkmale.ts",
-      "application/kategorien/kategorisierungsquellen.ts → application/klassifikator/vorschlag.ts",
-      "application/kategorien/klassifikatorTraining.ts → core/klassifikator/laeufe.ts",
-      "application/kategorien/klassifikatorTraining.ts → core/klassifikator/merkmale.ts",
-      "application/kategorien/klassifikatorTraining.ts → core/klassifikator/messung.ts",
-      "application/kategorien/klassifikatorTraining.ts → core/klassifikator/modell.ts",
-      "application/kategorien/merkmalsbestand.ts → core/klassifikator/merkmale.ts",
-      "application/kategorien/merkmalskonfiguration.ts → core/klassifikator/erklaerung.ts",
-      "application/kategorien/merkmalskonfiguration.ts → core/klassifikator/merkmale.ts",
-      "application/kategorien/merkmalskonfiguration.ts → core/klassifikator/modell.ts",
-      "application/kategorien/trainingsmaterial.ts → core/klassifikator/merkmale.ts",
-    ],
-  },
-  {
     von: "buchung",
     auf: "vertraege",
     abbau:
@@ -127,21 +97,6 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     ],
   },
   {
-    von: "kategorien",
-    auf: "buchung",
-    abbau:
-      "Das Training liest Zahlungsspuren; als `klassifikator` steht es über der Buchung, " +
-      "und der Bezug ist erlaubt.",
-    eintraege: [
-      "adapters/ui/training/MerkmaleBlock.tsx → core/buchung/istbuchung.ts",
-      "application/kategorien/kategorieAbgleich.ts → application/buchung/zahlungsspuren.ts",
-      "application/kategorien/kategorieAbgleich.ts → core/buchung/zahlungsspur.ts",
-      "application/kategorien/merkmalskonfiguration.ts → application/buchung/zahlungsspuren.ts",
-      "application/kategorien/trainingsmaterial.ts → application/buchung/zahlungsspuren.ts",
-      "application/kategorien/trainingsmaterial.ts → core/buchung/zahlungsspur.ts",
-    ],
-  },
-  {
     von: "konten",
     auf: "import",
     abbau:
@@ -154,16 +109,6 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
       "application/konten/herkunftsicht.ts → application/import/umsatz.ts",
       "application/konten/kontensichten.ts → application/import/importLauf.ts",
       "application/konten/kontensichten.ts → application/import/umsatz.ts",
-    ],
-  },
-  {
-    von: "kategorien",
-    auf: "import",
-    abbau:
-      "Mit dem Umzug des Trainings nach `klassifikator` (über dem Beleg) erlaubt.",
-    eintraege: [
-      "adapters/ui/training/MerkmaleBlock.tsx → application/import/umsatz.ts",
-      "application/kategorien/kategorieAbgleich.ts → application/import/umsatz.ts",
     ],
   },
   {

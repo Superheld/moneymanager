@@ -21,9 +21,9 @@ import { useProzent } from "../bausteine/einstellungenKontext";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type Bewertung, type Kategorie } from "../../../application";
-import { type Abgleichsplan } from "../../../application/kategorien/kategorieAbgleich";
-import type { Wirkung } from "../../../application/kategorien/merkmalskonfiguration";
-import type { Laufvergleichsicht, Messprotokoll } from "../../../application/kategorien/klassifikatorTraining";
+import { type Abgleichsplan } from "../../../application/klassifikator/kategorieAbgleich";
+import type { Wirkung } from "../../../application/klassifikator/merkmalskonfiguration";
+import type { Laufvergleichsicht, Messprotokoll } from "../../../application/klassifikator/klassifikatorTraining";
 import {
   herkunftUmschalten,
   kategorieAbgleichAnwenden,

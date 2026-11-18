@@ -20,7 +20,7 @@
 // um eine Schichtgrenze zu bedienen, die niemand verletzt sieht.
 
 import type { Cent, Charakter, Zahlungsspur } from "../../core";
-import { vorschlagsbefundFuer, type Vorschlagskontext } from "../klassifikator/vorschlag";
+import { vorschlagsbefundFuer, type Vorschlagskontext } from "./vorschlag";
 import type { VorschlagQuelle } from "../import/umsatz";
 import { kategorisierungsquellen, type QuellenDeps } from "./kategorisierungsquellen";
 import { zahlungsspuren } from "../buchung/zahlungsspuren";

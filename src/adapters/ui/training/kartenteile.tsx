@@ -4,10 +4,10 @@
 
 import { type ReactNode } from "react";
 import { type Trainingslauf, type Merkmalsherkunft } from "../../../application";
-import { type Materialbefund } from "../../../application/kategorien/trainingsmaterial";
+import { type Materialbefund } from "../../../application/klassifikator/trainingsmaterial";
 import {
   type Modellzustand,
-} from "../../../application/kategorien/klassifikatorTraining";
+} from "../../../application/klassifikator/klassifikatorTraining";
 import type { GespeicherterAusschluss } from "../../../application/ports";
 
 /**

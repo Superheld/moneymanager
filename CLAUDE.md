@@ -112,11 +112,13 @@ Paaren: so ist auch jedes Paar geregelt, zwischen dem es heute keinen Bezug gibt
 | 9 | `vermoegen` (mit `vorsorge`) | sammelt Konten und Depots; Vorsorge rechnet mit dem Nettovermögen |
 | 10 | `analyse` · `uebersicht` · `einstellungen` · `review` (nur `ui/`) | Sichten ziehen zusammen, was darunter liegt, und niemand braucht sie |
 
-Zwei Ordner zählen unter anderem Namen: `ui/training` ist `kategorien` (siehe unten), und
-`vorsorge` ist ein Teil von `vermoegen` — ein Bereich für die Regel, die Ordner bleiben
-vorerst. In der Anwendung liegt in `klassifikator/` bisher nur die Kategorisierungskette
-(`vorschlag.ts`); der übrige Teil in `application/kategorien` und `ui/training` zählt bis
-zu seinem Umzug als `kategorien`.
+Zwei Ordner zählen unter anderem Namen: `ui/training` ist `klassifikator` (siehe unten),
+und `vorsorge` ist ein Teil von `vermoegen` — ein Bereich für die Regel, die Ordner bleiben
+vorerst. **Das Training ist nicht der Kategorienbaum:** `kategorien` hält nur den Baum
+(Standardkategorien, `kategorieAnlegen`, die Nachschlagekarten in
+`core/kategorien/kategorie.ts`) und steht ganz unten; Training, Merkmale und die
+Kategorisierungskette liegen in `klassifikator` und stehen über Buchung und Verträgen,
+deren Zahlungsspuren sie lesen.
 
 **Der Import kennt die Kategorisierungskette nicht, er bekommt sie hereingereicht.** Die
 Kette fragt Verträge und das Modell, beide über dem Beleg. `umsaetzeUebernehmen` legt
@@ -158,17 +160,17 @@ Bereichspaar mit einem Satz, wie der Abbau aussieht. Ein Eintrag ist eine Quelld
 ihrer Zieldatei: ein weiterer Name aus derselben Datei bricht nichts, ein Bezug auf eine
 andere schon. **Wer eine Datei umzieht, streicht ihre Einträge** — ein Eintrag, der nichts
 mehr verletzt, macht den Test rot, damit ein abgebauter Bezug nicht still zurückkommt. Der
-Abbau ist fast überall dasselbe: drei Ordner tragen heute zwei Ebenen (`konten` auch den
-Kontoauszug, `kategorien` auch das Training, `buchung` auch den Buchungsdialog), und die
-obere Hälfte zieht direkt in den Ordner der Schicht, nach `bausteine/` oder in ihren
-eigenen Bereich. Neue
+Abbau ist fast überall dasselbe: ein Ordner trägt zwei Ebenen (`konten` auch den
+Kontoauszug), und die obere Hälfte zieht direkt in den Ordner der Schicht, nach
+`bausteine/` oder in ihren eigenen Bereich — so wie der Buchungsdialog nach `bausteine/`
+und das Training nach `klassifikator`. Neue
 Einträge gehören nicht hinein.
 
 Zwei Namen weichen ab, beide weil die OBERFLÄCHE der Navigation folgt und nicht der
 Fachgliederung:
 
 - Der UI-Ordner heißt `training/`, weil die Navigation den Bereich so nennt (`ScreenId`);
-  fachlich ist es dieselbe Sache wie `kategorien/` in Kern und Anwendung.
+  fachlich ist es dieselbe Sache wie `klassifikator/` in Kern und Anwendung.
 - **`depot/` gibt es in `ui/` gar nicht.** Ein Depot ist kein Bereich, sondern etwas, das
   in zweien vorkommt: der Stand in der Übersicht (`ui/uebersicht/DepotKarte.tsx`), die
   Entwicklung in der Analyse (`ui/analyse/DepotAnsicht.tsx`). Kern und Anwendung haben

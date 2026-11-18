@@ -10,7 +10,7 @@
 // laden, dann übernehmen. Einmal vor dem Lauf, nicht je Zeile — der Bestand ändert sich
 // währenddessen nicht.
 
-import { kategorisierungsquellen, type QuellenDeps } from "./kategorien/kategorisierungsquellen";
+import { kategorisierungsquellen, type QuellenDeps } from "./klassifikator/kategorisierungsquellen";
 import {
   umsaetzeUebernehmen,
   type UebernahmeDeps,

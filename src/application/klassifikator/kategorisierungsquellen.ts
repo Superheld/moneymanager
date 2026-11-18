@@ -10,7 +10,7 @@
 // frisch aufgesetzten App.
 
 import { STANDARD_KONFIGURATION, katalogNachId, katalogNachName, type Kategorie } from "../../core";
-import type { Vorschlagskontext } from "../klassifikator/vorschlag";
+import type { Vorschlagskontext } from "./vorschlag";
 import { konfigurationLaden } from "./merkmalskonfiguration";
 import type {
   KategorieRepository,

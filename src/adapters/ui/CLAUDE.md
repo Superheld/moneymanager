@@ -60,7 +60,7 @@ Die Navigation steht in `bausteine/AppShell.tsx`, die Zuordnung zur Komponente i
 `App.tsx`, die gebundenen Aufrufe in `../dienste.ts`.
 
 Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlich ist es
-`kategorien/` wie in Kern und Anwendung. Die bereichsübergreifenden Tests (`screens`,
+`klassifikator/` wie in Kern und Anwendung. Die bereichsübergreifenden Tests (`screens`,
 `interaktion`, `formulare`, `leereZustaende`) liegen direkt in `src/adapters/ui/`.
 
 Die Inbox liegt in `review/` und nicht bei `import/`, obwohl sie im Menü unter Import

@@ -245,10 +245,8 @@ const RANG: Readonly<Record<string, number>> = {
   buchung: 4,
   depot: 4,
   vertraege: 5,
-  // Das Training und die Kategorisierung. Im Kern gibt es den Ordner schon (Modell,
-  // Merkmale, Messung); der Teil in `application/kategorien` und `ui/training` zieht erst
-  // in einem späteren Paket hierher und zählt bis dahin als `kategorien` — daher ein guter
-  // Teil der Altlast `kategorien → klassifikator`.
+  // Das Training und die Kategorisierungskette — in der Oberfläche `ui/training` (siehe
+  // `ABBILDUNG`).
   klassifikator: 6,
   ruecklagen: 7,
   budgets: 8,
@@ -266,12 +264,13 @@ const RANG: Readonly<Record<string, number>> = {
 /**
  * Ordner, die unter anderem Namen ein Bereich der Rangfolge SIND.
  *
- * - `training` heisst in der Oberfläche so, weil die Navigation den Bereich so nennt.
+ * - `training` heisst in der Oberfläche so, weil die Navigation den Bereich so nennt;
+ *   fachlich ist es der Klassifikator wie in Kern und Anwendung, nicht der Kategorienbaum.
  * - `vorsorge` ist ein Teil von Vermögen: das Vorsorgevermögen ist das Nettovermögen, die
  *   Regeln stehen in `core/vermoegen/CLAUDE.md`, die Oberfläche im Vermögen-Screen. Die
  *   Ordner bleiben vorerst; für die Regel ist es ein Bereich, Bezüge untereinander sind frei.
  */
-const ABBILDUNG: Readonly<Record<string, string>> = { training: "kategorien", vorsorge: "vermoegen" };
+const ABBILDUNG: Readonly<Record<string, string>> = { training: "klassifikator", vorsorge: "vermoegen" };
 
 /** Ordner, die bewusst KEIN Bereich sind: Primitive quer durch alles, geteilte Bausteine. */
 const KEIN_BEREICH: readonly string[] = ["basis", "bausteine"];

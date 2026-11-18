@@ -36,8 +36,11 @@ die Stelle, an der geprüft wird:
 
 Bereiche wie im Kern (`buchung/`, `konten/`, `budgets/`, `vertraege/`, `kategorien/`,
 `klassifikator/`, `ruecklagen/`, `dubletten/`, `stammdaten/`) plus die eigenen Kontexte
-`import/` und `fints/`. In `klassifikator/` liegt die Kategorisierungskette (`vorschlag.ts`:
-Umbuchung → Vertrag → Quelle → Modell).
+`import/` und `fints/`. In `kategorien/` liegt nur der Baum (Standardkategorien,
+`kategorieAnlegen`); was mit dem Erkennen zu tun hat — Training, Merkmale, Trainingsmaterial,
+der Abgleich und die Kategorisierungskette (`vorschlag.ts`: Umbuchung → Vertrag → Quelle →
+Modell) —, liegt in `klassifikator/`. Der Baum braucht nichts Fachliches, das Erkennen liest
+Zahlungsspuren und Verträge; in einem Ordner stünde der Baum mit über der Buchung.
 
 Direkt in `src/application/` bleibt, was keinem Bereich gehört: `index.ts` (Fassade zur UI), `ports.ts`
 (die Interfaces, von 76 Stellen benutzt), `bootstrap.ts`, `einstellungen.ts` und die
