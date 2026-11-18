@@ -23,7 +23,7 @@ const halter = vi.hoisted(() => {
 vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 import { klickbareZeile, frischeDb, pluginApi, rendere, sqlLaden } from "../../testwerkzeug/harness";
-import { KontenVerwaltung } from "./konten/KontenVerwaltung";
+import { KontenVerwaltung } from "./kontenverwaltung/KontenVerwaltung";
 import { KontenScreen } from "./kontoauszug/KontenScreen";
 import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";

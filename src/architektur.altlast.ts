@@ -57,22 +57,9 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     von: "konten",
     auf: "fints",
     abbau:
-      "Die Bankzugangs-Oberfläche (`BankzugaengeScreen`, `Bankprofilkarte`) zieht in einen " +
-      "eigenen Ordner `ui/fints`, die Kontoauszug-Sichten direkt nach `src/application/`. " +
-      "Erst nach der offenen Frage: `KontenVerwaltungScreen` zeigt `BankzugaengeScreen` als " +
-      "Reiter und stünde als `konten` unter ihm, solange er selbst dort liegt. Offen: ob die " +
-      "Bankzuordnung beim Anlegen eines Kontos (`KontoAnlegenModal`, " +
-      "`KontenVerwaltungScreen`) zum Konto gehört oder ein eigener Schritt des Bankzugangs " +
-      "wird.",
+      "Die Oberfläche ist abgebaut (Bankzugänge in `ui/fints/`, die Kontenverwaltung in " +
+      "`ui/kontenverwaltung/`). Übrig sind die Sichten der Anwendung (siehe konten → buchung).",
     eintraege: [
-      "adapters/ui/konten/Bankprofilkarte.tsx → application/fints/abrufPort.ts",
-      "adapters/ui/konten/BankzugaengeScreen.tsx → application/fints/abrufPort.ts",
-      "adapters/ui/konten/BankzugaengeScreen.tsx → application/fints/bankprofil.ts",
-      "adapters/ui/konten/BankzugaengeScreen.tsx → application/fints/bankzugangPort.ts",
-      "adapters/ui/konten/KontenVerwaltungScreen.tsx → application/fints/abrufPort.ts",
-      "adapters/ui/konten/KontenVerwaltungScreen.tsx → application/fints/bankzugangPort.ts",
-      "adapters/ui/konten/KontoAnlegenModal.tsx → application/fints/abrufPort.ts",
-      "adapters/ui/konten/KontoAnlegenModal.tsx → application/fints/bankzugangPort.ts",
       "application/konten/abgleichsicht.ts → application/fints/bankzugangPort.ts",
       "application/konten/kontensichten.ts → application/fints/bankzugangPort.ts",
     ],
@@ -81,11 +68,10 @@ export const RANG_ALTLAST: readonly AltlastGruppe[] = [
     von: "konten",
     auf: "import",
     abbau:
-      "Die Herkunft im Kontoauszug ist eine Sicht und zieht mit ihm aus dem Bereich; " +
-      "`typAusName` (aus `kontoMatch`) leitet einen Kontotyp ab und gehört zu `konten`.",
+      "Die Oberfläche ist abgebaut (`HerkunftBereich` in `bausteine/`, `KontoAnlegenModal` in " +
+      "`ui/kontenverwaltung/`). Übrig sind `herkunftsicht` und `kontensichten`: sie ziehen " +
+      "Konto, Beleg und Buchung zusammen und gehören direkt nach `src/application/`.",
     eintraege: [
-      "adapters/ui/konten/HerkunftBereich.tsx → application/import/umsatz.ts",
-      "adapters/ui/konten/KontoAnlegenModal.tsx → application/import/kontoMatch.ts",
       "application/konten/herkunftsicht.ts → application/import/importLauf.ts",
       "application/konten/herkunftsicht.ts → application/import/umsatz.ts",
       "application/konten/kontensichten.ts → application/import/importLauf.ts",

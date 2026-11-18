@@ -111,7 +111,7 @@ in die Gegenwart.
 ### Ein Konto loswerden — EIN Symbol, ein Dialog
 
 In der Zeile steht genau ein Symbol dafür („Auflösen"), und es steht dort in jedem Zustand.
-`ui/konten/KontoAufloesenModal.tsx` bietet an, was gerade möglich ist:
+`ui/kontenverwaltung/KontoAufloesenModal.tsx` bietet an, was gerade möglich ist:
 
 | Zustand des Kontos | was der Dialog anbietet |
 |---|---|

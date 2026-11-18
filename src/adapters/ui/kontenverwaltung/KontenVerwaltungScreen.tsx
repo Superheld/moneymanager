@@ -19,7 +19,7 @@ import {
 } from "../../dienste";
 import { Bereich } from "../bausteine/Bereich";
 import { AbgleichBereich } from "./AbgleichBereich";
-import { BankzugaengeScreen } from "./BankzugaengeScreen";
+import { BankzugaengeScreen } from "../fints/BankzugaengeScreen";
 import { KontenVerwaltung, type KontoVerbindung } from "./KontenVerwaltung";
 import { fehlerMelden } from "../bausteine/Meldungen";
 import type { ScreenId } from "../bausteine/AppShell";

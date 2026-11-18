@@ -111,7 +111,7 @@ Paaren: so ist auch jedes Paar geregelt, zwischen dem es heute keinen Bezug gibt
 | 7 | `ruecklagen` | eine Rücklage braucht Konto, Buchung und Vertrag (die Umbuchungsregel) |
 | 8 | `budgets` | ein Budget zählt „ohne die Rücklage auf seiner Unterkategorie" und muss von ihr wissen |
 | 9 | `vermoegen` (mit `vorsorge`) | sammelt Konten und Depots; Vorsorge rechnet mit dem Nettovermögen |
-| 10 | `analyse` · `uebersicht` · `einstellungen` · `review` · `kontoauszug` (beide nur `ui/`) | Sichten ziehen zusammen, was darunter liegt, und niemand braucht sie |
+| 10 | `analyse` · `uebersicht` · `einstellungen` · `review` · `kontoauszug` · `kontenverwaltung` (die drei nur `ui/`) | Sichten ziehen zusammen, was darunter liegt, und niemand braucht sie |
 
 Zwei Ordner zählen unter anderem Namen: `ui/training` ist `klassifikator` (siehe unten),
 und `vorsorge` ist ein Teil von `vermoegen` — ein Bereich für die Regel, die Ordner bleiben
@@ -167,9 +167,9 @@ Kontoauszug), und die obere Hälfte zieht direkt in den Ordner der Schicht, nach
 und das Training nach `klassifikator`. Neue
 Einträge gehören nicht hinein.
 
-Drei Namen weichen ab. Die ersten beiden, weil die OBERFLÄCHE der Navigation folgt und
+Einige Namen weichen ab. Die ersten beiden, weil die OBERFLÄCHE der Navigation folgt und
 nicht der Fachgliederung, der dritte, weil die Navigation einen Namen trägt, den die
-Fachgliederung schon vergeben hat:
+Fachgliederung schon vergeben hat, der vierte, weil ein Reiter keinen Navigationsnamen hat:
 
 - Der UI-Ordner heißt `training/`, weil die Navigation den Bereich so nennt (`ScreenId`);
   fachlich ist es dieselbe Sache wie `klassifikator/` in Kern und Anwendung.
@@ -181,6 +181,10 @@ Fachgliederung schon vergeben hat:
   `konten` ist in der Rangfolge das Konto selbst und steht auf Stufe 1; der Kontoauszug
   zeigt dazu Buchungen, Einordnung, Dubletten, Verträge und Depot und steht als Sicht auf
   Stufe 10. Unter dem Namen `konten` lägen beide Ebenen wieder in einem Ordner.
+- **`ui/fints/` hat keine `ScreenId`.** Die Bankzugänge sind ein Reiter der
+  Kontenverwaltung (`ui/kontenverwaltung/`, Stufe 10, weil sie Konten und Bankzugänge
+  zeigt). Für sich brauchen sie nichts über dem Abruf und liegen deshalb unter dem Namen
+  ihres Bereichs, auf seiner Stufe.
 
 ### Das Datenmodell
 

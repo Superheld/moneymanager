@@ -263,6 +263,10 @@ const RANG: Readonly<Record<string, number>> = {
   // Einordnung, Dubletten, Verträgen, Vormerkungen und Depot. Er zeigt das Konto, ist aber
   // nicht das Konto — eine Sicht über alles, was auf ihm geschieht. Nur in der Oberfläche.
   kontoauszug: 10,
+  // Die Kontenverwaltung zeigt Konten UND Bankzugänge auf einem Bildschirm, und beim Anlegen
+  // eines Kontos wird der Bankzugang gewählt. Wer zusammensetzt, steht mindestens so hoch
+  // wie das Höchste, das er zeigt. Nur in der Oberfläche.
+  kontenverwaltung: 10,
 };
 
 /**

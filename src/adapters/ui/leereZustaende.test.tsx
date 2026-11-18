@@ -39,7 +39,7 @@ import { VertraegeScreen } from "./vertraege/VertraegeScreen";
 import { BudgetsScreen } from "./budgets/BudgetsScreen";
 import { RuecklagenScreen } from "./ruecklagen/RuecklagenScreen";
 import { KontenScreen } from "./kontoauszug/KontenScreen";
-import { KontenVerwaltungScreen } from "./konten/KontenVerwaltungScreen";
+import { KontenVerwaltungScreen } from "./kontenverwaltung/KontenVerwaltungScreen";
 import { AnalyseScreen } from "./analyse/AnalyseScreen";
 import { UebersichtScreen } from "./uebersicht/UebersichtScreen";
 import { ReviewScreen } from "./review/ReviewScreen";

@@ -4,7 +4,7 @@
 // reine ANZEIGE: er nimmt entgegen, was da ist, und meldet nichts zurück. Damit ist er
 // der Teil des Formulars, der am wenigsten mit dem Rest zu tun hat.
 //
-// Nicht zu verwechseln mit `konten/HerkunftBereich`: der zeigt, was für ein KONTO in der
+// Nicht zu verwechseln mit `bausteine/HerkunftBereich`: der zeigt, was für ein KONTO in der
 // Datenbank steht (alle eingelesenen Zeilen). Hier geht es um eine einzelne Buchung.
 
 import { useTranslation } from "react-i18next";

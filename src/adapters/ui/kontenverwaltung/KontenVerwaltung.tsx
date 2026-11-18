@@ -31,7 +31,7 @@ import {
 } from "../../dienste";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
-import { HerkunftBereich } from "./HerkunftBereich";
+import { HerkunftBereich } from "../bausteine/HerkunftBereich";
 import { IconButton } from "../bausteine/IconButton";
 import { KontoAnlegenModal } from "./KontoAnlegenModal";
 import { KontoAufloesenModal } from "./KontoAufloesenModal";
