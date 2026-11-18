@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { IstBuchung, Kategorie, Ruecklage } from "../../core";
-import type { BudgetanspruchDeps } from "../konten/kontobelegung";
+import type { BudgetanspruchDeps } from "../kontobelegung";
 import type { RuecklagenAusbuchung } from "../ports";
 import { ruecklageAbschliessen } from "./ruecklageAbschliessen";
 

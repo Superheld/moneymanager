@@ -100,7 +100,7 @@ nur im Kontoauszug, je Konto. Drei Dinge daran:
 **Die Karte „Da ist etwas zu tun" ist seit 2026-11-08 weg.** Sie stand ganz oben, rot
 gerahmt, und meldete Konten, die im Vorschaufenster ins Minus laufen, dazu einen zu lange
 zurückliegenden Abruf. Im Gebrauch war das zu laut für eine Seite, die sagen soll, wie man
-dasteht. Die Rechnung dahinter (`liquiditaetsvorschau` in `core/konten/liquiditaet.ts`)
+dasteht. Die Rechnung dahinter (`liquiditaetsvorschau` in `core/liquiditaet.ts`)
 hat **seit 2026-11-15 ihren leiseren Ort**: das Register „Ausblick" der Analyse, als
 Tabelle „Reicht das Geld?" (`../analyse/LiquiditaetKarte.tsx`). Sie gehört dorthin und
 nicht zurück in die Übersicht — „reicht es in den nächsten Wochen" ist eine Frage nach

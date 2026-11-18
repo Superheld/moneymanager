@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import type { Depotwert } from "../core";
 import { depotEntwicklung, type Depotsicht } from "./depot/depotsichten";
 import { bilanzJeKlasse, ergebnisbasis, monatsErgebnis, staendeJeKlasse } from "../core";
-import { belegungssicht } from "./konten/kontobelegung";
+import { belegungssicht } from "./kontobelegung";
 import { analyseAusblick, analyseBericht, analyseBuchungen, analyseFensterTaggenau, analyseKostenverlauf, analyseLiquiditaet, analyseReichweite, type Analysebasis } from "./analysesichten";
 
 describe("analyseFensterTaggenau", () => {
@@ -315,7 +315,7 @@ describe("analyseKostenverlauf", () => {
 
 /**
  * „Reicht das Geld?" — der Use-Case über der Liquiditätsvorschau. Die Rechnung selbst
- * ist im Kern geprüft (`core/konten/liquiditaet.test.ts`); hier steht, was der Use-Case
+ * ist im Kern geprüft (`core/liquiditaet.test.ts`); hier steht, was der Use-Case
  * AUSWÄHLT und hineinreicht. Alle Werte erfunden.
  */
 describe("analyseLiquiditaet", () => {

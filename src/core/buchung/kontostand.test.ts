@@ -6,8 +6,8 @@
 
 import { describe, expect, it } from "vitest";
 import { FachlicherFehler } from "../basis/fehler";
-import type { IstBuchung } from "../buchung/istbuchung";
-import type { Zahlungskonto } from "./konto";
+import type { IstBuchung } from "./istbuchung";
+import type { Zahlungskonto } from "../konten/konto";
 import {
   abweichungsfenster,
   anfangsbestandAusAnker,

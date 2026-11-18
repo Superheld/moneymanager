@@ -18,7 +18,7 @@ import type { Cent } from "../basis/geld";
 import { addMonate, parseIso, tageImMonat, toIso } from "../basis/datum";
 import type { IstBuchung } from "../buchung/istbuchung";
 import type { Depotwert } from "../depot/depot";
-import { istSummeBis } from "../konten/kontostand";
+import { istSummeBis } from "../buchung/kontostand";
 import type { Zahlungskonto } from "../konten/konto";
 
 export const VERMOEGENSARTEN = [

@@ -20,7 +20,7 @@ import {
   type Zahlungskonto,
 } from "../../core";
 import { vertragsBuchungenLaden } from "../vertraege/vertragszuordnung";
-import { anspruchsbestand, belegungssicht, zustaendigkeitssichtMit, type Belegungssicht, type KontobelegungDeps } from "../konten/kontobelegung";
+import { anspruchsbestand, belegungssicht, zustaendigkeitssichtMit, type Belegungssicht, type KontobelegungDeps } from "../kontobelegung";
 import { ruecklagenbestandLaden } from "./ruecklagenbestand";
 
 /** Ein Konto, auf dem mindestens eine Rücklage Geld beansprucht. */

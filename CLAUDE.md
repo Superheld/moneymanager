@@ -89,8 +89,10 @@ Einstufung „Budget oder Rücklage?" für zwei Bereiche —, `core/zustaendigke
 einen Anteil trägt, Budget oder Rücklage —, `core/fortschreibung.ts`, die Form eines
 Monats, die Budget und Rücklage beide schreiben, und `buchungsdetail.ts` mit
 `einordnungssicht.ts`, was der Buchungsdialog über Verträge, Rücklagen und Budgets liest,
-und `importUebernehmen.ts`, das einen Dateiimport übernimmt und ihm dafür die
-Kategorisierungskette hereinreicht) —
+`importUebernehmen.ts`, das einen Dateiimport übernimmt und ihm dafür die
+Kategorisierungskette hereinreicht, `core/liquiditaet.ts`, das Kontostand gegen die Last
+der Budgets vorausrechnet, und die Sichten des Kontoauszugs, `kontensichten.ts`,
+`herkunftsicht.ts` und `kontobelegung.ts` der Anwendung) —
 sie rechnen über mehrere Bereiche hinweg, und das ist ihre Aufgabe, kein Fehler. In `ui/` liegen aus demselben Grund
 die bereichsübergreifenden Tests oben (`screens`, `interaktion`, `formulare`).
 
@@ -156,16 +158,16 @@ Ausführbar in `src/architektur.test.ts` („Modulgrenzen", „Rangfolge der Ber
 ist die Tabelle oben, geprüft wird jeder Bezug über alle drei Schichten — direkte Importe,
 Namen über die Fassaden bis zu ihrer Herkunft, `dienste`-Aufrufe bis zum Use-Case.
 
-**Die heutigen Verstösse stehen als Altlast in `src/architektur.altlast.ts`**, je
-Bereichspaar mit einem Satz, wie der Abbau aussieht. Ein Eintrag ist eine Quelldatei mit
-ihrer Zieldatei: ein weiterer Name aus derselben Datei bricht nichts, ein Bezug auf eine
-andere schon. **Wer eine Datei umzieht, streicht ihre Einträge** — ein Eintrag, der nichts
-mehr verletzt, macht den Test rot, damit ein abgebauter Bezug nicht still zurückkommt. Der
-Abbau ist fast überall dasselbe: ein Ordner trägt zwei Ebenen (`konten` auch den
-Kontoauszug), und die obere Hälfte zieht direkt in den Ordner der Schicht, nach
-`bausteine/` oder in ihren eigenen Bereich — so wie der Buchungsdialog nach `bausteine/`
-und das Training nach `klassifikator`. Neue
-Einträge gehören nicht hinein.
+**Die Altlast in `src/architektur.altlast.ts` ist leer**: jeder Bezug im Code folgt der
+Rangfolge. Sie bleibt stehen, damit ein Ausnahmefall einen Ort hätte — je Bereichspaar mit
+einem Satz, wie der Abbau aussieht; ein Eintrag ist eine Quelldatei mit ihrer Zieldatei,
+und einer, der nichts mehr verletzt, macht den Test rot. Neue Einträge gehören nicht
+hinein. Der Abbau war fast überall derselbe, und ein neuer Verstoss löst sich meist
+genauso: ein Ordner trug zwei Ebenen (`konten` auch den Kontoauszug), und die obere
+Hälfte zog direkt in den Ordner der Schicht, nach `bausteine/`, in ihren eigenen Bereich
+oder in einen eigenen UI-Ordner auf der Stufe der Sichten — so wie der Buchungsdialog
+nach `bausteine/`, das Training nach `klassifikator` und der Kontoauszug nach
+`ui/kontoauszug/`.
 
 Einige Namen weichen ab. Die ersten beiden, weil die OBERFLÄCHE der Navigation folgt und
 nicht der Fachgliederung, der dritte, weil die Navigation einen Namen trägt, den die

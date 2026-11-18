@@ -2,11 +2,11 @@
 
 import { describe, expect, it } from "vitest";
 import { handlungsbedarf, liquiditaetsvorschau } from "./liquiditaet";
-import type { Zahlungskonto } from "./konto";
-import type { Zahlungsregel } from "../basis/zahlungsregel";
-import type { Budget } from "../budgets/budget";
-import type { Zustaendigkeitssicht } from "../zustaendigkeit";
-import type { Kategorie } from "../kategorien/kategorie";
+import type { Zahlungskonto } from "./konten/konto";
+import type { Zahlungsregel } from "./basis/zahlungsregel";
+import type { Budget } from "./budgets/budget";
+import type { Zustaendigkeitssicht } from "./zustaendigkeit";
+import type { Kategorie } from "./kategorien/kategorie";
 
 const HEUTE = "2026-06-01";
 

@@ -15,7 +15,11 @@ macht jeden Test von der Laufzeit abhängig. Zeitpunkte kommen als Parameter her
 `sicherung/`), und zwischen ihnen gilt die Rangfolge aus der `CLAUDE.md` des Projekts
 („Zwischen den Bereichen gibt es eine Rangfolge"). Direkt in `src/core/` bleibt nur, was über Bereiche hinweg rechnet
 (`monatsausblick.ts`, `einordnung.ts`, `ergebnis.ts`, `reichweite.ts`, `bericht.ts`, `einrichtung.ts`,
-`ausgabenvorschlaege.ts` — Budget oder Rücklage, für beide Bereiche in einer Rechnung) und die Fassade `index.ts`.
+`ausgabenvorschlaege.ts` — Budget oder Rücklage, für beide Bereiche in einer Rechnung —,
+`liquiditaet.ts` — Kontostand und geplante Zahlungen gegen die Last der Budgets) und die
+Fassade `index.ts`. Was über die Buchungen EINES Kontos rechnet — sein Register
+(`buchung/kontoregister.ts`), seine Anker (`buchung/kontostand.ts`) —, gehört zur Buchung,
+nicht zum Konto: das Konto selbst braucht keine Buchung.
 
 Dazu zwei Dateien, die **genau zwischen zwei Bereichen stehen**, weil
 Rücklagen keine Budgets kennen (`CLAUDE.md` des Projekts, „Modulgrenzen"):
@@ -229,7 +233,7 @@ vergangene Monate auswertet (`ergebnisKennzahlen`), reicht die Grenze mit durch.
 
 ## Kontostands-Anker
 
-Ein Anker (`konten/kontostand.ts`) ist eine **Beobachtung, kein Rechenergebnis**: an DIESEM
+Ein Anker (`buchung/kontostand.ts`) ist eine **Beobachtung, kein Rechenergebnis**: an DIESEM
 Stichtag lag DIESER Betrag auf dem Konto — von der Bank gemeldet oder von Hand gezählt. Er
 wird nie ungültig und nie neu berechnet, auch nicht, wenn jemand nachträglich eine Buchung
 davor einfügt. Was sich ändert, ist die Differenz, und genau die will man sehen.

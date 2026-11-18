@@ -32,7 +32,7 @@ import {
   type Ruecklage,
 } from "../../core";
 import type { RuecklagenAusbuchung } from "../ports";
-import { anspruchsbestandLaden, type BudgetanspruchDeps } from "../konten/kontobelegung";
+import { anspruchsbestandLaden, type BudgetanspruchDeps } from "../kontobelegung";
 
 export interface AbschliessenEingabe {
   /** Der Tag des Abschlusses (ISO) — im laufenden Monat, nicht später als heute, nicht vor dem Beginn. */

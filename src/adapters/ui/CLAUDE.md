@@ -972,7 +972,7 @@ Drei Dinge, die beim Anbauen zählen:
 
 ### Unter dem Ausblick: „Reicht das Geld?"
 
-Die Liquiditätsvorschau (`core/konten/liquiditaet.ts`, zwei Linien — siehe
+Die Liquiditätsvorschau (`core/liquiditaet.ts`, zwei Linien — siehe
 `src/core/konten/CLAUDE.md`) steht seit 2026-11-15 als eigene Karte unter dem Blick nach
 vorn (`LiquiditaetKarte.tsx`, gerechnet von `analyseLiquiditaet`). Der Saldo darüber
 rechnet monatsweise über alle liquiden Konten zusammen; die Tabelle sagt je Konto und

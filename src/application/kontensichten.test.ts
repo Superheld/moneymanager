@@ -6,9 +6,9 @@
 
 import { describe, expect, it } from "vitest";
 import { kontenLaden, registerSicht, type KontenDeps } from "./kontensichten";
-import type { ImportLauf, Umsatz } from "../import";
-import type { IstBuchung, Vertrag, Vertragszuordnung, Zahlungskonto } from "../../core";
-import { freigabeAus, type Dublettenfreigabe } from "../dubletten/dublettensicht";
+import type { ImportLauf, Umsatz } from "./import";
+import type { IstBuchung, Vertrag, Vertragszuordnung, Zahlungskonto } from "../core";
+import { freigabeAus, type Dublettenfreigabe } from "./dubletten/dublettensicht";
 
 const KONTO: Zahlungskonto = {
   id: "giro", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0,

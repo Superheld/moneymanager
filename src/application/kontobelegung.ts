@@ -9,6 +9,11 @@
 // über `anspruchsbestandLaden` von derselben Stelle, damit sie nicht an einem Konto anders
 // rechnet als die Kontenansicht, und die Karte „Wo das Geld liegt" im Bereich Rücklagen
 // liest `belegungssicht` selbst (`application/ruecklagen/geldJeKonto.ts`).
+//
+// **Liegt direkt in `src/application/`, weil es bereichsübergreifend abwägt:** den Stand
+// der Konten (`konten`, gerechnet über `buchung`) gegen die Ansprüche der Rücklagen
+// (`ruecklagen`), deren Fund über die Zuständigkeit Budgets (`budgets`) und
+// Vertragsbuchungen (`vertraege`) braucht. Rücklagen und Budgets lesen das Ergebnis.
 
 import {
   kontobelegung,
@@ -22,8 +27,8 @@ import {
   type Kontobelegung,
   type Ruecklage,
   type Zahlungskonto,
-} from "../../core";
-import { vertragsBuchungenLaden } from "../vertraege/vertragszuordnung";
+} from "../core";
+import { vertragsBuchungenLaden } from "./vertraege/vertragszuordnung";
 import type {
   BudgetRepository,
   KategorieRepository,
@@ -32,8 +37,8 @@ import type {
   RuecklagenzuordnungRepository,
   VertragszuordnungRepository,
   ZahlungskontoRepository,
-} from "../ports";
-import { alleRuecklagen, ruecklagenbestandLaden, type Ruecklagenbestand } from "../ruecklagen/ruecklagenbestand";
+} from "./ports";
+import { alleRuecklagen, ruecklagenbestandLaden, type Ruecklagenbestand } from "./ruecklagen/ruecklagenbestand";
 
 export interface BudgetanspruchDeps {
   readonly ledger: LedgerPort;

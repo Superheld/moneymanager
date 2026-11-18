@@ -6,9 +6,9 @@
 import type { Cent } from "../basis/geld";
 import { addTage, ord, parseIso, toIso } from "../basis/datum";
 import type { Charakter, Zahlungsregel } from "../basis/zahlungsregel";
-import { istAktiv, type Zahlungskonto } from "./konto";
-import { projiziereRegel } from "../buchung/projektion";
-import type { IstBuchung, PlanRef } from "../buchung/istbuchung";
+import { istAktiv, type Zahlungskonto } from "../konten/konto";
+import { projiziereRegel } from "./projektion";
+import type { IstBuchung, PlanRef } from "./istbuchung";
 
 /** Eine Zeile im Konto-Register — entweder gebuchtes Ist oder geplante Vorschau. */
 export interface RegisterZeile {

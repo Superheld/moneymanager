@@ -33,7 +33,7 @@ import {
 } from "../core";
 import { budgetstaende, type Budgetstand } from "./budgets/budgetsichten";
 import type { Zustaendigkeitssicht } from "../core";
-import { belegungssicht } from "./konten/kontobelegung";
+import { belegungssicht } from "./kontobelegung";
 import { vermoegensbestandLaden } from "./vermoegen/vermoegensichten";
 import { ergebnisvorsorgeLaden, type VorsorgeDeps } from "./vorsorge/vorsorge";
 import type {

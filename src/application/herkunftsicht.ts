@@ -17,15 +17,20 @@
 // aller Läufe bringt nichts Neues — sie holen, vergleichen, verwerfen. Eine Liste, die
 // jeden Lauf gleich gross zeigt, besteht deshalb überwiegend aus Rauschen, und die
 // wenigen Läufe, bei denen etwas passiert ist, gehen darin unter.
+//
+// **Liegt direkt in `src/application/`, weil sie bereichsübergreifend zusammenzieht:** das
+// Konto (`konten`), seine Belege und Läufe (`import`) und den Buchungsbestand (`buchung`),
+// aus dem sie liest, ob die erzeugte Buchung noch steht. In `buchung/` läge sie zu hoch:
+// die Bankzugänge (`ui/fints/`, unter der Buchung) zeigen dieselbe Herkunft je Abruf.
 
-import type { Zahlungskonto } from "../../core";
-import type { ImportLauf, Umsatz } from "../import";
+import type { Zahlungskonto } from "../core";
+import type { ImportLauf, Umsatz } from "./import";
 import type {
   ImportLaufRepository,
   LedgerPort,
   UmsatzRepository,
   ZahlungskontoRepository,
-} from "../ports";
+} from "./ports";
 
 /** Was ein Lauf FÜR DIESES KONTO gebracht hat — nicht insgesamt. */
 export interface Laufbefund {

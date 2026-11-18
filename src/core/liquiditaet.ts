@@ -31,16 +31,21 @@
 // **Ein AUFBAUENDES Budget zählt nicht mit.** Seine Rate wird nicht ausgegeben, sie bleibt
 // liegen — sie mitzurechnen hiesse, Geld abfliessen zu lassen, das auf dem Konto bleibt.
 // Was daraus einmal gekauft wird, ist unvorhersagbar und gehört in keine Vorschau.
+//
+// **Liegt direkt in `src/core/`, weil sie bereichsübergreifend abwägt:** den Stand eines
+// Kontos (`konten`, mit seinen Vormerkungen) samt Buchungen und geplanten Zahlungen
+// (`buchung`) gegen die Last der Budgets (`budgets`, über die Zuständigkeit). Im Bereich
+// `konten` kannte das Konto die Budgets über ihm.
 
-import { addTage, parseIso, tageImMonat, toIso } from "../basis/datum";
-import type { Cent } from "../basis/geld";
-import { vormerkungslast, type Vormerkung } from "./vormerkung";
-import { realerKontostand, type IstBuchung } from "../buchung/istbuchung";
-import { projiziereRegel } from "../buchung/projektion";
-import type { Zahlungsregel } from "../basis/zahlungsregel";
-import { betragImMonat, budgetStand, type Budget } from "../budgets/budget";
-import type { Zustaendigkeitssicht } from "../zustaendigkeit";
-import { istAktiv, type Zahlungskonto } from "./konto";
+import { addTage, parseIso, tageImMonat, toIso } from "./basis/datum";
+import type { Cent } from "./basis/geld";
+import { vormerkungslast, type Vormerkung } from "./konten/vormerkung";
+import { realerKontostand, type IstBuchung } from "./buchung/istbuchung";
+import { projiziereRegel } from "./buchung/projektion";
+import type { Zahlungsregel } from "./basis/zahlungsregel";
+import { betragImMonat, budgetStand, type Budget } from "./budgets/budget";
+import type { Zustaendigkeitssicht } from "./zustaendigkeit";
+import { istAktiv, type Zahlungskonto } from "./konten/konto";
 
 export interface Verlaufsbefund {
   /** Der niedrigste Stand im Fenster. */
