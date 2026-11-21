@@ -1143,4 +1143,206 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     laufId: LAUF_FG, kontoId: "konto-giro", datum: tagIn(-1, 1), betrag: -98000,
     partei: "Steenbeck", zweck: "Monatsmiete", hash: "hash-dublette-1", status: "duplikat",
   });
+
+  ruecklagenFaelle(setzen, tagIn, monat, JETZT);
+}
+
+/**
+ * Die Faelle des Ruecklagen-Umbaus (ADR-0006), zum Durchspielen im Bereich Ruecklagen:
+ * Warten auf Zuordnung, Abschliessen mit Rest und im Minus, Abgeschlossenes in der
+ * Geschichte, Altbestand, Vorschlaege, Geld je Konto, ein Budget ueber einer Ruecklage.
+ *
+ * **Alles hier traegt eine eigene Id mit `fall` darin** (`rue-fall-…`, `buchung-fall-…`,
+ * `budget-fall-…`, `konto-fall-…`), und das ist der Grund, warum es ein eigener Abschnitt
+ * ist: die Umstellungsprobe (`src/umstellungsprobe.test.ts`) rechnet gegen eine Erwartung
+ * vom Spielstand davor und nimmt diese Zeilen ueber die Ids wieder heraus. Ohne eigene
+ * Ids verschoebe jede neue Buchung die Nummern der alten (`buchung-0412` …), und die
+ * Erwartung hinge an Zufall.
+ *
+ * Aus demselben Grund zieht dieser Abschnitt **nichts aus dem Wuerfel**: jede Zahl hier
+ * verschoebe sonst die Folge fuer alles, was danach gewuerfelt wird. Die Betraege sind
+ * fest, rund und erfunden; die Namen der Empfaenger kommen nur hier vor (Regel 3 in
+ * `src/CLAUDE.md`).
+ *
+ * Bezahlt wird von Giro und Kreditkarte, nicht vom Konto der Ruecklage — so, wie man es
+ * im Alltag tut. Der Kontostand des Ruecklagenkontos bleibt dabei stehen, und genau daran
+ * wird die anteilige Verteilung auf `konto-fall-tagesgeld` sichtbar.
+ */
+function ruecklagenFaelle(
+  setzen: (sql: string, werte?: (string | number | null)[]) => unknown,
+  tagIn: (versatz: number, tag: number) => string,
+  monat: (versatz: number) => string,
+  jetzt: string,
+): void {
+  // Ein zweites Ruecklagenkonto, mit weniger darauf, als die Ruecklagen dort beanspruchen:
+  // die Karte „Wo das Geld liegt" verteilt dann anteilig, und „frei" steht im Minus.
+  setzen(
+    "INSERT INTO zahlungskonto (id, bezeichnung, typ, iban, inhaber_ids, kontostand, klasse, aktiv) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    ["konto-fall-tagesgeld", "Tagesgeld 2", "Tagesgeld", iban("99999906", 2203304), '["person-1"]', 90000, "ruecklage", 1],
+  );
+  setzen(
+    "INSERT INTO kontostand_anker (konto_id, datum, herkunft, betrag, erfasst_am) VALUES (?, ?, ?, ?, ?)",
+    ["konto-fall-tagesgeld", tagIn(-MONATE, 1), "hand", 90000, jetzt],
+  );
+
+  let nr = 0;
+  const buchung = (
+    datum: string,
+    betrag: number,
+    kontoId: string,
+    kategorieId: string,
+    notiz: string,
+    budgetrelevant = true,
+  ): string => {
+    const id = `buchung-fall-${String(++nr).padStart(2, "0")}`;
+    setzen(
+      "INSERT INTO ist_buchung (id, datum, betrag, konto_id, kategorie_id, charakter, quelle, kategorie_herkunft, zu_pruefen, notiz, budgetrelevant) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [id, datum, betrag, kontoId, kategorieId, "Aufwand", "manuell", "manuell", 0, notiz, budgetrelevant ? 1 : 0],
+    );
+    return id;
+  };
+
+  /** Eine Ruecklage so, wie die App sie anlegt — mit Kategorie, findet ab ihrem Beginn. */
+  const ruecklage = (r: {
+    id: string; bezeichnung: string; kategorie: string | null; konto: string | null;
+    art: "fortlaufend" | "abschliessend"; beginn: string; findetAb: string | null;
+    ziel?: number; frist?: number; rate?: number; rateAb?: string; beendetAm?: string;
+  }) => {
+    setzen(
+      "INSERT INTO ruecklage (id, bezeichnung, ziel, frist_monate, rate, beginn, kategorie_id, konto_id, art, findet_ab, beendet_am) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [r.id, r.bezeichnung, r.ziel ?? null, r.frist ?? null, null, r.beginn, r.kategorie, r.konto, r.art, r.findetAb, r.beendetAm ?? null],
+    );
+    // Die freie Rate steht seit Migration 80 in der Reihe, nie in `rate`.
+    if (r.rate != null && r.rateAb) {
+      setzen("INSERT INTO ruecklage_rate (ruecklage_id, ab_monat, betrag) VALUES (?, ?, ?)", [r.id, r.rateAb, r.rate]);
+    }
+  };
+
+  /**
+   * Was `ruecklageAbschliessen` schreibt: eine Zeile OHNE Buchung und mit Betrag 0, der
+   * beendete Zyklus festgehalten. Eine freie Rate mit Reihe haelt er nicht fest — die
+   * Reihe traegt den Zyklus selbst (`abschliessen` in `core/ruecklagen/topf.ts`).
+   */
+  const abschluss = (a: { id: string; ruecklage: string; datum: string; zyklusBeginn: string; ziel?: number; frist?: number }) =>
+    setzen(
+      "INSERT INTO ruecklage_ausbuchung (id, ruecklage_id, datum, betrag, istbuchung_id, notiz, zyklus_beginn, zyklus_ziel, zyklus_frist, zyklus_rate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [a.id, a.ruecklage, a.datum, 0, null, null, a.zyklusBeginn, a.ziel ?? null, a.frist ?? null, null],
+    );
+
+  // (1) Wartet auf Zuordnung. An `kat-anschaffungen` haengen schon zwei Ruecklagen, die
+  // beide finden (`budget-anschaffung` und `rue-6`, oben) — jede Buchung dort seit dem
+  // Beginn von `rue-6` wartet. Fuenf eigene, damit die Karte nicht am Wuerfel haengt: drei
+  // bleiben offen, eine ist ausdruecklich `rue-6` zugeordnet, eine ausdruecklich keiner.
+  buchung(tagIn(-2, 6), -24900, "konto-giro", "kat-anschaffungen", "Harlinde Versand Bestellung");
+  buchung(tagIn(-2, 19), -8700, "konto-kk", "kat-anschaffungen", "Morwitz Handel Ersatzteil");
+  buchung(tagIn(-1, 11), -15400, "konto-giro", "kat-anschaffungen", "Quendt Lager Neuanschaffung");
+  const zugeordnet = buchung(tagIn(-1, 4), -42000, "konto-giro", "kat-anschaffungen", "Ostrup Handel Polstermoebel");
+  const keine = buchung(tagIn(-2, 23), -6900, "konto-kk", "kat-anschaffungen", "Feldwiek Handel Zubehoer");
+  setzen("INSERT INTO ruecklage_zuordnung (istbuchung_id, kategorie_id, ruecklage_id) VALUES (?, ?, ?)", [zugeordnet, "kat-anschaffungen", "rue-6"]);
+  setzen("INSERT INTO ruecklage_zuordnung (istbuchung_id, kategorie_id, ruecklage_id) VALUES (?, ?, ?)", [keine, "kat-anschaffungen", null]);
+
+  // (2) Abschliessen mit Rest: eine Reise, zehn Monate angespart, in den letzten zwei
+  // Monaten fuenf Ausgaben — zusammen weniger als angespart. Liegt auf dem zweiten
+  // Tagesgeld und traegt dort den groessten Anspruch.
+  ruecklage({
+    id: "rue-fall-reise", bezeichnung: "Sommerreise", kategorie: "kat-reisen-urlaub", konto: "konto-fall-tagesgeld",
+    art: "abschliessend", beginn: tagIn(-10, 1), findetAb: tagIn(-10, 1), ziel: 240000, frist: 12,
+  });
+  buchung(tagIn(-2, 3), -38000, "konto-giro", "kat-reisen-urlaub", "Quellbrink Unterkunft");
+  buchung(tagIn(-2, 14), -24000, "konto-kk", "kat-reisen-urlaub", "Annstedt Anreise");
+  buchung(tagIn(-1, 2), -9500, "konto-kk", "kat-reisen-urlaub", "Hollwarth Ausflug");
+  buchung(tagIn(-1, 5), -12800, "konto-kk", "kat-reisen-urlaub", "Pellnitz Verpflegung");
+  buchung(tagIn(-1, 8), -6400, "konto-kk", "kat-reisen-urlaub", "Annstedt Rueckreise");
+
+  // (3) Abschliessen im Minus: das Geraet kam teurer und frueher als geplant.
+  ruecklage({
+    id: "rue-fall-kamera", bezeichnung: "Kamera", kategorie: "kat-elektronik", konto: "konto-tagesgeld",
+    art: "abschliessend", beginn: tagIn(-4, 1), findetAb: tagIn(-4, 1), ziel: 60000, frist: 10,
+  });
+  buchung(tagIn(-1, 18), -54900, "konto-giro", "kat-elektronik", "Brakwede Handel Geraet");
+  buchung(tagIn(-1, 21), -4990, "konto-kk", "kat-elektronik", "Brakwede Handel Zubehoer");
+
+  // (4a) Schon einmal abgeschlossen und neu begonnen: der erste Zyklus endete vor fuenf
+  // Monaten mit einem Rest, der frei wurde; seither spart sie von vorn. Die Geschichte
+  // zeigt den Abschluss mit „Frei geworden", der Verlauf den Monat mit „abgeschlossen".
+  // Ohne Konto — der Fall „Ohne Konto" auf der Karte „Wo das Geld liegt".
+  ruecklage({
+    id: "rue-fall-geschenke", bezeichnung: "Geschenke", kategorie: "kat-geschenke", konto: null,
+    art: "abschliessend", beginn: tagIn(-5, 25), findetAb: tagIn(-15, 1), ziel: 36000, frist: 12,
+  });
+  buchung(tagIn(-6, 9), -8500, "konto-giro", "kat-geschenke", "Lindhoff Handel Geschenk");
+  buchung(tagIn(-5, 4), -11200, "konto-kk", "kat-geschenke", "Veltrup Versand Geschenk");
+  buchung(tagIn(-5, 18), -4800, "konto-kk", "kat-geschenke", "Lindhoff Handel Geschenk");
+  abschluss({ id: "abschluss-fall-geschenke", ruecklage: "rue-fall-geschenke", datum: tagIn(-5, 25), zyklusBeginn: tagIn(-15, 1), ziel: 36000, frist: 12 });
+
+  // (4b) Abgeschlossen und beendet: ein Fest mit freier Rate, danach erledigt. Sie steht
+  // nur noch in der Geschichte, mit der Pille „beendet".
+  ruecklage({
+    id: "rue-fall-fest", bezeichnung: "Familienfest", kategorie: "kat-veranstaltungen", konto: "konto-fall-tagesgeld",
+    art: "abschliessend", beginn: tagIn(-12, 1), findetAb: tagIn(-12, 1), rate: 10000, rateAb: monat(-12),
+    beendetAm: tagIn(-4, 26),
+  });
+  buchung(tagIn(-4, 6), -42000, "konto-giro", "kat-veranstaltungen", "Grevemoor Saal Miete");
+  buchung(tagIn(-4, 13), -18500, "konto-giro", "kat-veranstaltungen", "Tessenow Kueche Bewirtung");
+  buchung(tagIn(-4, 20), -9000, "konto-kk", "kat-veranstaltungen", "Ruhland Druck Einladungen");
+  abschluss({ id: "abschluss-fall-fest", ruecklage: "rue-fall-fest", datum: tagIn(-4, 26), zyklusBeginn: tagIn(-12, 1) });
+
+  // (5a) Laeuft weiter und steht im Minus: eine teure Reparatur, bevor genug da war.
+  ruecklage({
+    id: "rue-fall-instandhaltung", bezeichnung: "Instandhaltung", kategorie: "kat-instandhaltung", konto: "konto-tagesgeld",
+    art: "fortlaufend", beginn: tagIn(-8, 1), findetAb: tagIn(-8, 1), rate: 5000, rateAb: monat(-8),
+  });
+  buchung(tagIn(-5, 7), -12000, "konto-giro", "kat-instandhaltung", "Kornhaas Dienst Wartung");
+  buchung(tagIn(-1, 16), -78000, "konto-giro", "kat-instandhaltung", "Wilmerdinck Dienst Reparatur");
+
+  // (5b) Laeuft weiter und ist gut gefuellt: einmal im Jahr eine Zahlung, sonst wird
+  // angespart. Liegt mit der Reise auf dem zweiten Tagesgeld.
+  ruecklage({
+    id: "rue-fall-beitraege", bezeichnung: "Beitraege", kategorie: "kat-mitgliedschaften", konto: "konto-fall-tagesgeld",
+    art: "fortlaufend", beginn: tagIn(-16, 1), findetAb: tagIn(-16, 1), rate: 4000, rateAb: monat(-16),
+  });
+  buchung(tagIn(-12, 15), -21000, "konto-giro", "kat-mitgliedschaften", "Oberkamp Verein Jahresbeitrag");
+
+  // (6) Altbestand ohne Kategorie: vor der Umstellung mit Kauf ausgebucht, wie
+  // `ruecklageAusbuchen` es schreibt — Zyklus festgehalten, Buchung verknuepft und aus der
+  // Budgetbewertung genommen, danach mit Ziel neu begonnen. Der Kauf lag etwas ueber dem
+  // Angesparten, die Geschichte zeigt „ungedeckt".
+  ruecklage({
+    id: "rue-fall-kueche", bezeichnung: "Kuechenmaschine", kategorie: null, konto: "konto-tagesgeld",
+    art: "abschliessend", beginn: tagIn(-7, 12), findetAb: null, ziel: 48000, frist: 12,
+  });
+  const kauf = buchung(tagIn(-7, 12), -43900, "konto-giro", "kat-haushalt", "Sandmeyer Handel Geraet", false);
+  setzen(
+    "INSERT INTO ruecklage_ausbuchung (id, ruecklage_id, datum, betrag, istbuchung_id, notiz, zyklus_beginn, zyklus_ziel, zyklus_frist, zyklus_rate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ["ausbuchung-fall-kueche", "rue-fall-kueche", tagIn(-7, 12), 43900, kauf, "Ersatz", tagIn(-17, 1), 48000, 12, null],
+  );
+
+  // (7) Vorschlaege. Beide Hauptkategorien tragen weder Budget noch Ruecklage:
+  //
+  //  • „Finanzen" — nur in zwei Monaten etwas, dann viel (eine Nachzahlung, dazu die
+  //    Rueckerstattung oben). Das stuft `ausgabenvorschlaege` als Ruecklage ein.
+  //  • „Familie & Kinder" — jeden Monat etwas, in wechselnder Hoehe und bei
+  //    wechselnden Empfaengern, damit die Wiederkehr-Erkennung keinen Vertrag darin
+  //    sieht. Das wird ein Budget.
+  buchung(tagIn(-8, 20), -96000, "konto-giro", "kat-steuern", "Nachzahlung Vorvorjahr");
+  const schule = [4200, 6800, 3900, 5400, 7100, 4600, 3500, 8200, 5100, 4400, 6300];
+  const schulnamen = ["Ewerbeck Lernmittel", "Haselkamp Kurs", "Tormaehlen Ausflug"];
+  schule.forEach((betrag, i) => {
+    buchung(tagIn(-(11 - i), 4 + 2 * i), -betrag, i % 2 === 0 ? "konto-giro" : "konto-kk", "kat-schule-lernen", schulnamen[i % 3]);
+  });
+
+  // (9) Ein monatliches Budget auf der Hauptkategorie „Gesundheit", darunter eine
+  // Ruecklage auf „Arzt & Apotheke": sie nimmt dem Budget ihre Buchungen ab, und das
+  // Budget sagt es an seiner Zeile („ohne Ruecklage …").
+  setzen("INSERT INTO budget (id, kategorie_id, konto_id, art, start) VALUES (?, ?, ?, ?, ?)", [
+    "budget-fall-gesundheit", "kat-gesundheit", "konto-giro", "monatlich", tagIn(-9, 1),
+  ]);
+  setzen("INSERT INTO budget_betrag (budget_id, ab_monat, betrag) VALUES (?, ?, ?)", ["budget-fall-gesundheit", monat(-9), 9000]);
+  ruecklage({
+    id: "rue-fall-behandlung", bezeichnung: "Behandlungen", kategorie: "kat-arzt-apotheke", konto: "konto-tagesgeld",
+    art: "fortlaufend", beginn: tagIn(-9, 1), findetAb: tagIn(-9, 1), rate: 4000, rateAb: monat(-9),
+  });
+  buchung(tagIn(-6, 11), -18500, "konto-giro", "kat-arzt-apotheke", "Steinforth Praxis Rechnung");
+  buchung(tagIn(-2, 8), -9200, "konto-giro", "kat-arzt-apotheke", "Steinforth Praxis Rechnung");
 }
