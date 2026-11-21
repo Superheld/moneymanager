@@ -32,6 +32,18 @@ import { sqliteVertragRepository } from "./adapters/persistence/sqliteVertragRep
 import { sqliteKontozuordnungRepository } from "./adapters/persistence/sqliteBankzugangRepositories";
 import { vermoegenLaden } from "./application/vermoegen/vermoegensichten";
 import { vorsorgeLaden } from "./application/vorsorge/vorsorge";
+import { sqliteBudgetRepository } from "./adapters/persistence/sqliteBudgetRepository";
+import { sqliteKategorieRepository } from "./adapters/persistence/sqliteStammdatenRepositories";
+import { sqliteVertragszuordnungRepository } from "./adapters/persistence/sqliteVertragZuordnungRepositories";
+import { sqliteRuecklagenRepository } from "./adapters/persistence/sqliteRuecklagenRepository";
+import { sqliteRuecklagenzuordnungRepository } from "./adapters/persistence/sqliteRuecklagenzuordnungRepository";
+import { sqliteZahlungsregelRepository } from "./adapters/persistence/sqliteZahlungsregelRepository";
+import { sqliteUmsatzRepository } from "./adapters/persistence/sqliteImportRepositories";
+import { sqliteEinstellungenRepository } from "./adapters/persistence/sqliteEinstellungenRepository";
+import { abschlussvorschau, ruecklagenLaden, ruecklagenVerlauf, type Ruecklagensicht } from "./application/ruecklagen/ruecklagensichten";
+import { geldJeKontoLaden } from "./application/ruecklagen/geldJeKonto";
+import { ruecklagenvorschlaegeLaden } from "./application/ruecklagen/ruecklagenvorschlaege";
+import { budgetbereichLaden, budgetuebersichtLaden } from "./application/budgets/budgetsichten";
 
 // Fuer die Faelle, die den Spielstand durch die USE-CASES lesen statt per SQL: `getDb`
 // zeigt dann auf dieselbe sql.js-Datenbank, in die der Seed geschrieben hat.
@@ -171,7 +183,11 @@ describe("Spielstand", () => {
         "SELECT COUNT(*) FROM ruecklage WHERE kategorie_id = 'kat-anschaffungen' AND (findet_ab IS NOT NULL OR art = 'fortlaufend')",
       ),
     ).toBe(2);
-    expect(zahl(db, "SELECT COUNT(*) FROM ruecklage_zuordnung")).toBe(0);
+    // Bis Paket 5 stand hier 0: der Spielstand hatte keine Zuordnung. Seit den Faellen zum
+    // Durchspielen (`ruecklagenFaelle`) sind es genau die beiden ausdruecklichen
+    // Entscheidungen an `kat-anschaffungen` — eine Ruecklage und „keine". Mehr soll es
+    // nicht sein: alles andere dort soll warten.
+    expect(zahl(db, "SELECT COUNT(*) FROM ruecklage_zuordnung")).toBe(2);
   });
 
   /**
@@ -729,5 +745,138 @@ describe("Spielstand — Vermoegen und Vorsorge", () => {
     expect(sicht!.stand.deckung).toBeLessThan(1);
     // Und der Vermoegenswert, der dem Ziel zugeordnet ist, zaehlt mit.
     expect(sicht!.vermoegen.vermoegenswerte).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * Die Faelle des Ruecklagen-Umbaus (`ruecklagenFaelle` in `seedDaten.ts`), gelesen ueber
+ * dieselben Use-Cases wie der Bereich Ruecklagen. Per SQL liesse sich nur sagen, dass
+ * Zeilen da sind — ob die Karte „Wartet auf Zuordnung" etwas zeigt oder eine Ruecklage
+ * im Minus steht, entscheidet die Rechnung.
+ */
+describe("Spielstand — Ruecklagen zum Durchspielen", () => {
+  const HEUTE = "2026-06-15"; // derselbe Tag wie STICHTAG
+  const deps = {
+    ledger: sqliteLedgerRepository,
+    kategorieRepo: sqliteKategorieRepository,
+    budgetRepo: sqliteBudgetRepository,
+    zuordnungRepo: sqliteVertragszuordnungRepository,
+    ruecklagenRepo: sqliteRuecklagenRepository,
+    ruecklagenzuordnungRepo: sqliteRuecklagenzuordnungRepository,
+    kontoRepo: sqliteZahlungskontoRepository,
+    regelRepo: sqliteZahlungsregelRepository,
+    vertragRepo: sqliteVertragRepository,
+    umsatzRepo: sqliteUmsatzRepository,
+    einstellungenRepo: sqliteEinstellungenRepository,
+  };
+  const laden = async (): Promise<Ruecklagensicht> => {
+    halter.setzen(pluginApi(mitSeed()));
+    return ruecklagenLaden(deps, HEUTE);
+  };
+  const zeile = (s: Ruecklagensicht, id: string) => {
+    const z = s.zeilen.find((x) => x.ruecklage.id === id);
+    expect(z, id).toBeDefined();
+    return z!;
+  };
+
+  it("laesst mindestens drei Buchungen auf eine Zuordnung warten — und zwei sind entschieden", async () => {
+    const s = await laden();
+    const anAnschaffungen = s.wartend.filter((w) => w.kategorieId === "kat-anschaffungen");
+    expect(anAnschaffungen.length).toBeGreaterThanOrEqual(3);
+    // Die beiden entschiedenen stehen NICHT auf der Karte: eine traegt `rue-6`, eine keine.
+    const zuordnungen = await sqliteRuecklagenzuordnungRepository.alle();
+    expect(zuordnungen.map((z) => z.ruecklageId ?? null).sort()).toEqual([null, "rue-6"].sort());
+    const wartend = new Set(s.wartend.map((w) => w.buchungId));
+    for (const z of zuordnungen) expect(wartend.has(z.istbuchungId), z.istbuchungId).toBe(false);
+  });
+
+  it("hat eine Ruecklage, die mit Rest abgeschlossen werden kann", async () => {
+    const s = await laden();
+    const reise = zeile(s, "rue-fall-reise");
+    expect(reise.abschlussweg).toBe("abschliessen");
+    const vorschau = abschlussvorschau(s, reise.ruecklage, HEUTE)!;
+    expect(vorschau.getragen).toBeGreaterThan(0);
+    expect(vorschau.frei).toBeGreaterThan(0);
+    expect(vorschau.ungedeckt).toBe(0);
+    // Die Ausgaben verteilen sich ueber zwei Monate des Verlaufs.
+    const verlauf = ruecklagenVerlauf(s, reise.ruecklage, HEUTE);
+    expect(verlauf.filter((m) => m.verbraucht > 0)).toHaveLength(2);
+  });
+
+  it("hat eine Ruecklage, die im Minus abgeschlossen wuerde", async () => {
+    const s = await laden();
+    const kamera = zeile(s, "rue-fall-kamera");
+    expect(kamera.abschlussweg).toBe("abschliessen");
+    const vorschau = abschlussvorschau(s, kamera.ruecklage, HEUTE)!;
+    expect(vorschau.ungedeckt).toBeGreaterThan(0);
+    expect(vorschau.frei).toBe(0);
+  });
+
+  it("zeigt einen frueheren Abschluss mit Neubeginn und einen beendeten in der Geschichte", async () => {
+    const s = await laden();
+    const geschenke = s.geschichte.find((g) => g.ruecklageId === "rue-fall-geschenke");
+    expect(geschenke).toMatchObject({ abschluss: true, beendet: false });
+    expect(geschenke!.frei!).toBeGreaterThan(0);
+    // Sie laeuft weiter, im neuen Zyklus ab dem Abschlusstag — und der Verlauf hat den
+    // Monat, in dem frei wurde.
+    const neu = zeile(s, "rue-fall-geschenke");
+    expect(neu.ruecklage.beginn).toBe(geschenke!.datum);
+    expect(ruecklagenVerlauf(s, neu.ruecklage, HEUTE).some((m) => (m.abgeschlossen ?? 0) > 0)).toBe(true);
+
+    const fest = s.geschichte.find((g) => g.ruecklageId === "rue-fall-fest");
+    expect(fest).toMatchObject({ abschluss: true, beendet: true });
+    expect(s.zeilen.some((z) => z.ruecklage.id === "rue-fall-fest")).toBe(false);
+  });
+
+  it("hat eine, die weiterlaeuft und im Minus steht, und eine gut gefuellte", async () => {
+    const s = await laden();
+    const minus = zeile(s, "rue-fall-instandhaltung");
+    expect(minus.art).toBe("fortlaufend");
+    expect(minus.stand).toBeLessThan(0);
+    expect(minus.soll).toBe(0);
+    const voll = zeile(s, "rue-fall-beitraege");
+    expect(voll.art).toBe("fortlaufend");
+    expect(voll.stand).toBeGreaterThan(voll.rate * 6);
+  });
+
+  it("fuehrt den Altbestand ohne Kategorie mit Ausbuchung und verknuepfter Buchung", async () => {
+    const s = await laden();
+    const kueche = zeile(s, "rue-fall-kueche");
+    expect(kueche.ruecklage.kategorieId).toBeUndefined();
+    expect(kueche.abschlussweg).toBe("ausbuchen");
+    const eintrag = s.geschichte.find((g) => g.ruecklageId === "rue-fall-kueche");
+    expect(eintrag).toMatchObject({ abschluss: false, beendet: false });
+    expect(eintrag!.buchung?.budgetrelevant).toBe(false);
+    expect(eintrag!.ungedeckt!).toBeGreaterThan(0);
+  });
+
+  it("schlaegt fuer Finanzen eine Ruecklage vor und fuer Familie & Kinder ein Budget", async () => {
+    halter.setzen(pluginApi(mitSeed()));
+    const ruecklagen = await ruecklagenvorschlaegeLaden(deps, HEUTE);
+    expect(ruecklagen.map((v) => v.kategorieId)).toContain("kat-finanzen");
+    const budgets = (await budgetbereichLaden(deps, HEUTE)).vorschlaege;
+    expect(budgets.map((v) => v.kategorieId)).toContain("kat-familie-kinder");
+    // Und jede in genau einer Liste.
+    expect(budgets.map((v) => v.kategorieId)).not.toContain("kat-finanzen");
+    expect(ruecklagen.map((v) => v.kategorieId)).not.toContain("kat-familie-kinder");
+  });
+
+  it("verteilt auf einem unterdeckten Konto anteilig und fuehrt eine Ruecklage ohne Konto", async () => {
+    halter.setzen(pluginApi(mitSeed()));
+    const geld = await geldJeKontoLaden(deps, HEUTE);
+    const knapp = geld.konten.find((k) => k.kontoId === "konto-fall-tagesgeld");
+    expect(knapp).toBeDefined();
+    expect(knapp!.belegung.posten.length).toBeGreaterThanOrEqual(2);
+    expect(knapp!.belegung.frei).toBeLessThan(0);
+    // Und mindestens ein zweites Konto traegt Ruecklagen.
+    expect(geld.konten.some((k) => k.kontoId === "konto-tagesgeld")).toBe(true);
+    expect(geld.ohneKonto.map((r) => r.id)).toContain("rue-fall-geschenke");
+  });
+
+  it("zaehlt ein Budget auf der Hauptkategorie ohne die Ruecklage darunter", async () => {
+    halter.setzen(pluginApi(mitSeed()));
+    const { staende } = await budgetuebersichtLaden(deps, HEUTE);
+    const gesundheit = staende.find((s) => s.budget.id === "budget-fall-gesundheit");
+    expect(gesundheit?.abgezogen).toContain("Behandlungen");
   });
 });

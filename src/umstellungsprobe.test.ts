@@ -489,6 +489,25 @@ const FENSTER_C: Fenster = {
  */
 const NEU_IM_SPIELSTAND = ["rue-5", "rue-6"];
 
+/**
+ * Die Fälle des Rücklagen-Umbaus, die der Spielstand seit Paket 5 trägt
+ * (`ruecklagenFaelle` in `seedDaten.ts`): Rücklagen, ihre Buchungen, Abschlüsse und
+ * Ausbuchungen, ein Budget, ein Konto und die Zuordnungen. Aus demselben Grund wie oben
+ * nicht Teil des Bestands, an dem die Erwartung entstand — herausgenommen über ihre Ids,
+ * die alle `fall` tragen. Die Zuordnungen gehen ganz: der Spielstand davor hatte keine.
+ */
+function neueFaelleEntfernen(db: Database): void {
+  db.run("DELETE FROM ruecklage_zuordnung");
+  db.run("DELETE FROM ruecklage_ausbuchung WHERE ruecklage_id LIKE 'rue-fall-%'");
+  db.run("DELETE FROM ruecklage_rate WHERE ruecklage_id LIKE 'rue-fall-%'");
+  db.run("DELETE FROM ruecklage WHERE id LIKE 'rue-fall-%'");
+  db.run("DELETE FROM budget_betrag WHERE budget_id LIKE 'budget-fall-%'");
+  db.run("DELETE FROM budget WHERE id LIKE 'budget-fall-%'");
+  db.run("DELETE FROM ist_buchung WHERE id LIKE 'buchung-fall-%'");
+  db.run("DELETE FROM kontostand_anker WHERE konto_id LIKE 'konto-fall-%'");
+  db.run("DELETE FROM zahlungskonto WHERE id LIKE 'konto-fall-%'");
+}
+
 /** Die Rücklage, die im Spielstand das frühere aufbauende Budget ist. */
 const FRUEHERES_BUDGET = "budget-anschaffung";
 
@@ -513,6 +532,7 @@ function alterSpielstand(bis: number): Database {
   const db = new SQL.Database();
   migrationen(db, (v) => v <= bis);
   seedEinspielen(db, STICHTAG);
+  neueFaelleEntfernen(db);
   db.run(
     `INSERT INTO budget (id, kategorie_id, konto_id, art, start)
        SELECT id, kategorie_id, konto_id, 'aufbauend', beginn FROM ruecklage WHERE id = ?`,
@@ -530,6 +550,9 @@ function alterSpielstand(bis: number): Database {
 }
 
 async function bestandAus(db: Database): Promise<Bestand> {
+  // Auch hier und nicht nur in `alterSpielstand`: der Spielstand, „wie er heute
+  // geschrieben wird", kommt ohne den Umweg dorthin.
+  neueFaelleEntfernen(db);
   halter.setzen(pluginApi(db));
   const [regeln, budgets, ruecklagen, beendete, ausbuchungen, ist, kategorien, kontenListe, zuordnungen] = await Promise.all([
     sqliteZahlungsregelRepository.alle(),
