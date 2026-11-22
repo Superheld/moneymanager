@@ -14,6 +14,8 @@ import {
   ruecklagenrateFehlt,
   monatsanteil,
   monatsErgebnis,
+  monatsErgebnisse,
+  planrechnung,
   type ErgebnisEingabe,
   type ErgebnisSchulden,
   type ErgebnisVorsorge,
@@ -169,6 +171,116 @@ describe("Fixkosten — der Jahresbeitrag", () => {
     const fremd = ist("2025-03-03", -1900, { kategorieId: "absicherung" });
     const r = erwarteAufgang(eingabe({ ist: [fremd], vertragJeBuchung: new Map([[fremd.id, "v9"]]) }), "2025-03");
     expect(zeile(r, "fixkosten")?.posten[0]).toMatchObject({ ist: -1900, plan: 0, status: "ohnePlan" });
+  });
+});
+
+describe("Fixkosten nach Fälligkeit — die Frage der Übersicht", () => {
+  // Ein Quartalsvertrag über 90,00, fällig im Februar, Mai, August, November.
+  const zahlung = ist("2025-02-12", -9000, { kategorieId: "absicherung" });
+  const e = eingabe({
+    regeln: [regel({ id: "r-q", bezeichnung: "Vibora", betrag: -9000, rhythmus: "quartalsweise", startdatum: "2025-02-12", vertragId: "v-q" })],
+    ist: [zahlung],
+    vertragJeBuchung: new Map([[zahlung.id, "v-q"]]),
+    heute: "2025-04-20",
+  });
+  const faellig = (monat: string) => monatsErgebnis(ergebnisbasis(e), `${monat}-01`, { nachFaelligkeit: true });
+
+  it("stellt den Vertrag im Monat seiner Fälligkeit mit dem ganzen Betrag dar", () => {
+    const februar = faellig("2025-02");
+    expect(zeile(februar, "fixkosten")?.plan).toBe(-9000);
+    expect(zeile(februar, "fixkosten")?.ist).toBe(-9000);
+    expect(zeile(februar, "fixkosten")?.posten[0]).toMatchObject({ bezeichnung: "Vibora", status: "gebucht" });
+    expect(zeile(februar, "fixkosten")?.posten[0].teile).toBeUndefined();
+  });
+
+  it("lässt ihn in den Monaten dazwischen weg", () => {
+    for (const monat of ["2025-03", "2025-04"]) {
+      const r = faellig(monat);
+      expect(zeile(r, "fixkosten")?.plan).toBe(0);
+      expect(zeile(r, "fixkosten")?.posten).toEqual([]);
+    }
+  });
+
+  it("plant den nächsten fälligen Monat ganz", () => {
+    const mai = faellig("2025-05");
+    expect(mai.zukunft).toBe(true);
+    expect(zeile(mai, "fixkosten")?.plan).toBe(-9000);
+  });
+
+  it("geht weiter exakt gegen die Buchungen auf, ohne Zeile für die Verteilung", () => {
+    for (const monat of ["2025-02", "2025-03", "2025-04"]) {
+      const r = faellig(monat);
+      const gebucht = e.ist.filter((b) => b.datum.startsWith(monat)).reduce((s, b) => s + b.betrag, 0);
+      expect(r.ueberleitung?.kontoaenderung).toBe(gebucht);
+      expect(posten(r, "periodisierung")).toBe(0);
+    }
+  });
+
+  it("ändert ohne die Angabe nichts: dann ein Drittel je Monat", () => {
+    expect(zeile(rechne(e, "2025-02"), "fixkosten")?.ist).toBe(-3000);
+    expect(zeile(rechne(e, "2025-03"), "fixkosten")?.ist).toBe(-3000);
+    expect(zeile(rechne(e, "2025-04"), "fixkosten")?.plan).toBe(-3000);
+  });
+
+  it("reicht die Angabe über monatsErgebnisse an jeden Monat weiter", () => {
+    const [april, mai, juni] = monatsErgebnisse(ergebnisbasis(e), 3, { nachFaelligkeit: true });
+    expect([april, mai, juni].map((m) => zeile(m, "fixkosten")?.plan)).toEqual([0, -9000, 0]);
+  });
+
+  it("lässt Budgets und Rücklagen bei ihrer Rate", () => {
+    const mit = eingabe({ ...e, budgets: [budget({ rate: 40000 })], ruecklagen: [{ id: "g", bezeichnung: "Gerät", rate: 15000, beginn: "2025-01-01" }] });
+    const r = monatsErgebnis(ergebnisbasis(mit), "2025-03-01", { nachFaelligkeit: true });
+    expect(zeile(r, "laufend")?.plan).toBe(-40000);
+    expect(zeile(r, "abschreibungen")?.plan).toBe(-15000);
+  });
+});
+
+describe("Planrechnung — der Plan über zwölf Monate, Verträge anteilig", () => {
+  const e = eingabe({
+    regeln: [
+      regel({ id: "r-q", bezeichnung: "Kesselmann", betrag: -9000, rhythmus: "quartalsweise", startdatum: "2025-02-12", vertragId: "v-q" }),
+      regel({ id: "r-gehalt", bezeichnung: "Ohlert", betrag: 250000, rhythmus: "monatlich", charakter: "Ertrag", kategorieId: "gehalt", vertragId: "v-gehalt", startdatum: "2025-01-01" }),
+    ],
+    budgets: [budget({ rate: 60000 })],
+    ruecklagen: [{ id: "g", bezeichnung: "Gerät", rate: 10000, beginn: "2025-01-01" }],
+    // Gebucht und ungeplant — die Planrechnung zeigt es nicht.
+    ist: [ist("2025-04-03", -12345, { kategorieId: "haushalt" })],
+    heute: "2025-04-20",
+  });
+  const p = planrechnung(ergebnisbasis(e));
+
+  it("rechnet zwölf Monate ab dem laufenden", () => {
+    expect(p.monate).toHaveLength(12);
+    expect(p.monate[0]).toMatchObject({ label: "2025-04", laufend: true });
+    expect(p.monate[11].label).toBe("2026-03");
+  });
+
+  it("verteilt Verträge anteilig, auch in Monaten ohne Fälligkeit", () => {
+    expect(p.monate.map((m) => m.zeilen.fixkosten)).toEqual(Array(12).fill(-3000));
+  });
+
+  it("nimmt auch im laufenden Monat den Plan und lässt Ungeplantes weg", () => {
+    expect(p.monate[0].ergebnis).toBe(250000 - 3000 - 60000 - 10000);
+    expect(p.zeilen).not.toContain("ungeplant");
+  });
+
+  it("summiert Zeile für Zeile und Stufe für Stufe", () => {
+    expect(p.summe.zeilen).toMatchObject({ einnahmen: 3000000, fixkosten: -36000, laufend: -720000, abschreibungen: -120000 });
+    expect(p.summe.nachPflichten).toBe(3000000 - 36000);
+    expect(p.summe.nachAlltag).toBe(3000000 - 36000 - 720000);
+    expect(p.summe.ergebnis).toBe(p.monate.reduce((s, m) => s + m.ergebnis, 0));
+  });
+
+  it("zeigt die ersten drei Zeilen immer, die übrigen nur mit Plan", () => {
+    expect(p.zeilen).toEqual(["einnahmen", "fixkosten", "laufend", "abschreibungen"]);
+    expect(p.hatPlan).toBe(true);
+    expect(p.ohneEinnahmen).toBe(false);
+  });
+
+  it("sagt, wenn nichts geplant ist", () => {
+    const leer = planrechnung(ergebnisbasis(eingabe({ heute: "2025-04-20" })));
+    expect(leer.hatPlan).toBe(false);
+    expect(leer.ohneEinnahmen).toBe(true);
   });
 });
 

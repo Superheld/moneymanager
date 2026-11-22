@@ -14,7 +14,9 @@
 //     geht für sich exakt auf die Änderung der Kontostände auf; eine Summe von Monaten,
 //     die jeweils aufgehen, geht ebenfalls auf. Ein Jahr eigens zu rechnen (etwa die
 //     Periodisierung über das ganze Jahr) wäre eine zweite Rechnung, die von den
-//     Monatskarten weglaufen könnte — derselbe Monat soll überall dieselbe Zahl tragen.
+//     Monatsergebnissen weglaufen könnte — derselbe Monat soll überall dieselbe Zahl
+//     tragen. (Die Monatskarten der Übersicht zeigen nach Fälligkeit und damit eine
+//     andere Frage; sie rechnen aber nur nach vorn, nie einen Monat des Berichts.)
 //   • NUR VOLL ERFASSTE ZEITRÄUME. Ein Monat vor dem ersten Import kostete in der
 //     Rechnung nichts; ein Bericht darüber sähe glänzend aus und wäre falsch. Wählbar ist
 //     deshalb, was `reichweitenMonate` als voll erfasst kennt, und ein Jahr nur, wenn alle

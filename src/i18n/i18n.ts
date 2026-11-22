@@ -751,7 +751,7 @@ const de = {
       "innerhalb eines Monats kann es früher eng werden, als hier zu sehen ist.",
   },
   ergebnis: {
-    untertitelLaufend: "was der Monat kostet — bisher und geplant",
+    untertitelLaufend: "was im Monat ansteht — bisher und geplant",
     untertitelVorschau: "was der Plan sagt",
     pillLaufend: "läuft",
     pillVorschau: "Vorschau",
@@ -853,7 +853,7 @@ const de = {
   },
   uebersicht: {
     titel: "Übersicht",
-    untertitel: "Wie du gerade dastehst — was dieser Monat und die beiden nächsten kosten, über alle Konten",
+    untertitel: "Wie du gerade dastehst — was in diesem Monat und den beiden nächsten ansteht, über alle Konten",
     fehlerDb: "Laden geht nur in der Desktop-App (tauri dev).",
     vermoegenTitel: "Was da ist",
     vermoegenUntertitel: "Alle Konten nach Klasse — und was davon schon für etwas bestimmt ist",
@@ -878,7 +878,7 @@ const de = {
     budgetsLaufend: "Was in diesem Monat noch da ist",
     budgetsVergangen: "Rückblick auf einen abgeschlossenen Monat",
     budgetsLeer: "Noch keine Budgets. Unter „Budgets“ anlegen — dann steht hier, was noch da ist.",
-    leerOhneBuchungen: "Hier steht, was dieser Monat und die beiden nächsten kosten und was dir frei bleibt. Das rechnet die App aus deinen Buchungen. Was dafür noch fehlt, steht darüber.",
+    leerOhneBuchungen: "Hier steht, was in diesem Monat und den beiden nächsten ansteht und was dir frei bleibt. Das rechnet die App aus deinen Buchungen. Was dafür noch fehlt, steht darüber.",
     monatWaehlen: "Monat",
     monatDieser: "{{monat}} (dieser Monat)",
     vonRahmen: "von {{rahmen}}",
@@ -897,8 +897,20 @@ const de = {
       befunde: "Befunde",
       depot: "Depot",
       bericht: "Bericht",
+      planrechnung: "Planrechnung",
     },
     leerErklaerung: "Hier siehst du, wohin dein Geld über die Monate geflossen ist, wie es weitergeht und was dabei auffällt. Das rechnet die App aus deinen Buchungen.",
+  },
+  // Das Register „Planrechnung": der Plan der nächsten zwölf Monate, Verträge anteilig.
+  // Zeilen und Stufen heissen wie in der Ergebnisrechnung (`ergebnis.*`).
+  planrechnung: {
+    summeTitel: "Zwölf Monate zusammen",
+    summeUntertitel: "{{von}} bis {{bis}} — alles, was geplant ist",
+    spalteSumme: "Zusammen",
+    monateTitel: "Monat für Monat",
+    monateUntertitel: "Der Plan je Monat, ab dem laufenden",
+    hinweis: "Nur was geplant ist: Verträge, Budgets, Rücklagen und Vorsorge. Ungeplante Ausgaben sind nicht eingerechnet. Verträge stehen anteilig — ein Quartalsbeitrag mit einem Drittel in jedem Monat; wann er fällig wird, zeigt die Übersicht.",
+    keineEinnahmen: "In keinem der zwölf Monate sind Einnahmen geplant. Einnahmen kommen aus Verträgen — leg unter Verträge einen mit Charakter „Ertrag“ an, dann rechnet die Planrechnung sie mit.",
   },
   // Das Register „Bericht": ein abgeschlossener Monat oder ein Jahr auf einem Blatt. Die
   // Zeilen, Stufen, die Überleitung und die Teile des Vermögens heissen wie dort, wo sie
@@ -3409,7 +3421,7 @@ const en: typeof de = {
       "within a month it can get tight earlier than shown here.",
   },
   ergebnis: {
-    untertitelLaufend: "what the month costs — so far and planned",
+    untertitelLaufend: "what is due in the month — so far and planned",
     untertitelVorschau: "what the plan says",
     pillLaufend: "current",
     pillVorschau: "preview",
@@ -3509,7 +3521,7 @@ const en: typeof de = {
   },
   uebersicht: {
     titel: "Overview",
-    untertitel: "Where you stand right now — what this month and the next two cost, across all accounts",
+    untertitel: "Where you stand right now — what is due this month and the next two, across all accounts",
     fehlerDb: "Loading only works in the desktop app (tauri dev).",
     vermoegenTitel: "What you have",
     vermoegenUntertitel: "All accounts by class — and how much of it is already earmarked",
@@ -3534,7 +3546,7 @@ const en: typeof de = {
     budgetsLaufend: "What is left in this month",
     budgetsVergangen: "Looking back at a finished month",
     budgetsLeer: "No budgets yet. Create them under “Budgets” — then this shows what is left.",
-    leerOhneBuchungen: "This is where you see what this month and the next two cost and what is left for you to spend. The app works it out from your transactions. What it still needs is listed above.",
+    leerOhneBuchungen: "This is where you see what is due this month and the next two and what is left for you to spend. The app works it out from your transactions. What it still needs is listed above.",
     monatWaehlen: "Month",
     monatDieser: "{{monat}} (this month)",
     vonRahmen: "of {{rahmen}}",
@@ -3552,8 +3564,18 @@ const en: typeof de = {
       befunde: "Findings",
       depot: "Portfolio",
       bericht: "Report",
+      planrechnung: "Plan",
     },
     leerErklaerung: "This is where you see where your money went over the months, where it is heading and what stands out. The app works it out from your transactions.",
+  },
+  planrechnung: {
+    summeTitel: "Twelve months together",
+    summeUntertitel: "{{von}} to {{bis}} — everything that is planned",
+    spalteSumme: "Together",
+    monateTitel: "Month by month",
+    monateUntertitel: "The plan for each month, starting with the current one",
+    hinweis: "Only what is planned: contracts, budgets, reserves and provision. Unplanned spending is not included. Contracts are spread out — a quarterly fee with a third in each month; when it is due is shown in the Overview.",
+    keineEinnahmen: "No income is planned in any of the twelve months. Income comes from contracts — add one with character “Ertrag” under Contracts and the plan will include it.",
   },
   bericht: {
     art: { monat: "Month", jahr: "Year" },

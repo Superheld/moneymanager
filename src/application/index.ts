@@ -267,6 +267,7 @@ export {
   analyseBericht,
   type Bericht,
   type Berichtssicht,
+  analysePlanrechnung,
 } from "./analysesichten";
 export {
   depotsLaden,

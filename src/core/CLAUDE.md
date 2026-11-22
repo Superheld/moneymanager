@@ -160,13 +160,34 @@ auf" ausführbar macht.
 | Datei | beantwortet |
 |---|---|
 | `einordnung.ts` | Was IST diese Buchung — Einnahme, Fixkosten, laufende Kosten, Entnahme aus einer Rücklage, Vorsorge, Umbuchung, ungeplant (auch: wartet auf Zuordnung)? Die eine Stelle dafür; wer auswertet, fragt hier und sortiert nicht selbst. Wer einen Anteil trägt, beantwortet sie über `zustaendigkeit.ts` — dieselbe Funktion, die der Verbrauch eines Budgets fragt. Der Befund „Ungeplant" der Analyse fragt hier (`ungeplantNachKategorie` in `auswertung.ts`). |
-| `ergebnis.ts` | Was kostet der Monat? Baut auf der Einordnung und fügt die Zeit hinzu (Periodisierung, Topfkosten), dazu die Überleitung. |
+| `ergebnis.ts` | Was kostet der Monat? Baut auf der Einordnung und fügt die Zeit hinzu (Periodisierung, Topfkosten), dazu die Überleitung. Auf Wunsch nach Fälligkeit (`ErgebnisOptionen`, unten); dazu die Planrechnung über zwölf Monate (`planrechnung`). |
 | `reichweite.ts` | Wie viele Monate das freie Geld die Kosten trägt. Liest die Zeilen von `ergebnis.ts` nur und steht deshalb daneben, nicht darin. |
 | `bericht.ts` | Ein abgeschlossener Monat oder ein Jahr auf einem Blatt: summiert Monatsergebnisse und ihre Überleitung, stellt den Zeitraum davor daneben, vergleicht das Nettovermögen an zwei Stichtagen. Rechnet nichts Eigenes — ein Jahr ist die Summe seiner Monate, und deshalb geht auch seine Überleitung exakt auf. |
 | `monatsausblick.ts` | Die Aufrechnung nach AUSZAHLUNG: was gebucht ist und was fällig wird. Sie trägt den Saldo-Ausblick der Analyse und ordnet noch über Betragsnähe zu. |
 
 Beide neuen Dateien liegen direkt in `src/core/`, aus demselben Grund wie `monatsausblick.ts`: sie
 rechnen über alle Bereiche.
+
+**Die Übersicht fragt nach Fälligkeit, alles andere nach Kosten** (seit 2026-11-22).
+`monatsErgebnis` nimmt `nachFaelligkeit`: dann stehen Verträge ungeteilt im Monat ihrer
+Fälligkeit bzw. Zahlung, ein Quartalsvertrag mit dem ganzen Betrag in einem Monat und
+in den beiden anderen nicht. Das ist die Frage der Übersicht („was steht an?"), nicht
+die Kostenfrage, und sie ist deshalb eine Angabe beim Aufruf und keine zweite Rechnung.
+Drei Dinge daran:
+
+- **Die Vorgabe bleibt periodisiert.** Kostensicht, Bericht, Reichweite und die
+  Umstellungsprobe (`src/umstellungsprobe.test.ts`) rechnen unverändert; ein vergangener
+  Monat trägt dort dieselbe Zahl wie vorher.
+- **Nur die Verträge ändern sich.** Einnahmen und Daueraufträge in die Vorsorge wurden
+  nie verteilt, Budgets und die Raten von Rücklage und Vorsorgeziel haben keine
+  Fälligkeit. Die Tilgung folgt dem Vertrag, gegen den sie begrenzt wird.
+- **Die Überleitung geht weiter exakt auf**; ihre Zeile `periodisierung` ist null und
+  fällt weg.
+
+Die anteilige Rechnung nach vorn zeigt die **Planrechnung** (`planrechnung`, Register in
+der Analyse): der PLAN der Ergebnisrechnung für zwölf Monate ab dem laufenden, Zeile für
+Zeile und als Summe. „Ungeplant" fehlt dort, weil sein Plan immer null ist — eine Zeile
+voller Nullen läse sich, als sei nichts Ungeplantes zu erwarten.
 
 **Die Einordnung ist abgeleitet, nicht gespeichert.** Sie folgt aus Kategorie, Vertrag,
 Budget, `budgetrelevant` und der Klasse des Gegenkontos. Ein gespeicherter Wert könnte

@@ -8,7 +8,10 @@
 // hinzufügt, ist die ZEIT:
 //
 //   • Fixkosten werden PERIODISIERT. Ein Jahresbeitrag kostet zwölf Monate lang ein
-//     Zwölftel, ab dem Monat seiner Zahlung (vorschüssig).
+//     Zwölftel, ab dem Monat seiner Zahlung (vorschüssig). Das ist die Vorgabe; die
+//     Übersicht fragt NACH FÄLLIGKEIT (`ErgebnisOptionen`): dort steht der Vertrag im
+//     Monat, in dem er fällig wird, mit dem ganzen Betrag. Die anteilige Rechnung zeigt
+//     die Planrechnung der Analyse (`planrechnung` unten).
 //   • Eine RÜCKLAGE kostet ihre Rate. Was aus ihr bezahlt wird, ist eine Entnahme und
 //     zählt nicht noch einmal — ausser sie reicht nicht (`zyklusKosten`, die max-Regel je
 //     Zyklus). Nur ein Zyklus, der vor der Umstellung mit einer verknüpften Buchung
@@ -488,8 +491,27 @@ export function monatsanteil(betrag: Cent, teile: number, index: number): Cent {
   return index === 0 ? betrag - basis * (teile - 1) : basis;
 }
 
+/**
+ * Wie die Verträge in einen Monat fallen.
+ *
+ * `nachFaelligkeit` stellt jeden Vertrag in den Monat, in dem er fällig wird bzw. gezahlt
+ * wurde, mit dem GANZEN Betrag — ein Quartalsbeitrag steht dann in einem Monat mit
+ * allem und in den beiden anderen gar nicht. Das ist die Frage der Übersicht: „was
+ * steht an?". Ohne die Angabe wird periodisiert (oben im Kopf), und das bleibt die
+ * Vorgabe für jede Rechnung über vergangene Monate: Kostensicht, Bericht, Reichweite und
+ * die Umstellungsprobe lesen weiter die Kosten.
+ *
+ * Nur die Verträge ändern sich. Einnahmen und Daueraufträge in die Vorsorge stehen
+ * ohnehin in ihrem Monat, Budgets und die Raten von Rücklagen und Vorsorgeziel haben
+ * keine Fälligkeit, die man verteilen könnte. Die Überleitung geht in beiden Formen
+ * exakt auf: nach Fälligkeit ist ihre Zeile `periodisierung` null und fällt weg.
+ */
+export interface ErgebnisOptionen {
+  readonly nachFaelligkeit?: boolean;
+}
+
 /** Die Ergebnisrechnung eines Monats. `monatAb` ist sein erster Tag („YYYY-MM-01"). */
-export function monatsErgebnis(basis: Ergebnisbasis, monatAb: string): MonatsErgebnis {
+export function monatsErgebnis(basis: Ergebnisbasis, monatAb: string, optionen: ErgebnisOptionen = {}): MonatsErgebnis {
   const e = basis.eingabe;
   const start = parseIso(monatAb);
   const von = toIso({ ...start, d: 1 });
@@ -516,7 +538,7 @@ export function monatsErgebnis(basis: Ergebnisbasis, monatAb: string): MonatsErg
     "fixkosten",
     e.regeln.filter((r) => r.charakter === "Aufwand"),
     basis.einordnungen.filter((x) => x.art === "fixkosten"),
-    { von, zukunft, periodisiert: true },
+    { von, zukunft, periodisiert: !optionen.nachFaelligkeit },
   );
   const { fixkosten, tilgung } = tilgungAbspalten(fixkostenGesamt, e.schulden, { monat, von, zukunft });
   // Mit Ziel ersetzt seine Rate die Zeile ganz, auch die Daueraufträge darin: deren
@@ -868,11 +890,103 @@ export function hochrechnung(zeilen: readonly ErgebnisZeile[]): Cent {
 const VERTRAGSZEILEN: ReadonlySet<ErgebnisZeileId> = new Set(["einnahmen", "fixkosten", "vorsorge", "tilgung"]);
 
 /** Die Ergebnisrechnungen ab dem Monat von `heute` — der laufende und die folgenden. */
-export function monatsErgebnisse(basis: Ergebnisbasis, anzahl = 3): MonatsErgebnis[] {
+export function monatsErgebnisse(basis: Ergebnisbasis, anzahl = 3, optionen: ErgebnisOptionen = {}): MonatsErgebnis[] {
   const start = parseIso(basis.eingabe.heute);
   return Array.from({ length: Math.max(0, Math.floor(anzahl)) }, (_, i) =>
-    monatsErgebnis(basis, toIso({ ...addMonate(start, i), d: 1 })),
+    monatsErgebnis(basis, toIso({ ...addMonate(start, i), d: 1 }), optionen),
   );
+}
+
+// ------------------------------------------------------------------ Planrechnung
+//
+// Der PLAN der Ergebnisrechnung über die nächsten Monate, periodisiert wie die Vorgabe:
+// was ein Monat kostet, wenn alles so kommt, wie es geplant ist. Sie beantwortet „reichen
+// die Einnahmen für alles, was geplant ist, und was bleibt dabei übrig?" — die Frage, die
+// die Monatskarten der Übersicht beantworteten, solange sie anteilig rechneten. Seit sie
+// nach Fälligkeit zeigen, steht die anteilige Rechnung hier.
+
+/**
+ * Wie viele Monate die Planrechnung zeigt: ein Jahr. Darin steht jeder Vertrag bis zum
+ * jährlichen mit allem, was er in einem Jahr kostet, und eine Einnahme, die einmal im
+ * Jahr kommt (sie wird nicht verteilt), steht in genau einem der Monate.
+ */
+export const PLANRECHNUNG_MONATE = 12;
+
+/**
+ * Die Zeilen der Planrechnung — alle ausser „ungeplant": dessen Plan ist immer null, und
+ * eine Zeile voller Nullen sähe aus, als sei nichts Ungeplantes zu erwarten.
+ */
+export const PLANZEILEN = ["einnahmen", "fixkosten", "laufend", "abschreibungen", "vorsorge", "tilgung"] as const;
+export type PlanZeileId = (typeof PLANZEILEN)[number];
+
+/** Die Planzahlen eines Monats oder ihre Summe, vorzeichenbehaftet wie die Ergebnisrechnung. */
+export interface Planwerte {
+  readonly zeilen: Readonly<Record<PlanZeileId, Cent>>;
+  readonly nachPflichten: Cent;
+  readonly nachAlltag: Cent;
+  readonly ergebnis: Cent;
+}
+
+export interface Planmonat extends Planwerte {
+  /** „YYYY-MM". */
+  readonly label: string;
+  readonly jahr: number;
+  readonly monat: number;
+  readonly laufend: boolean;
+}
+
+export interface Planrechnung {
+  /** Ab dem laufenden Monat, ältester zuerst. */
+  readonly monate: readonly Planmonat[];
+  /** Über alle Monate. Eine Summe der Monate, Zeile für Zeile — deshalb geht sie exakt auf. */
+  readonly summe: Planwerte;
+  /**
+   * Die Zeilen, die dastehen: die ersten drei immer (wie in der Ergebnisrechnung), die
+   * übrigen nur, wenn sie in einem der Monate einen Plan tragen.
+   */
+  readonly zeilen: readonly PlanZeileId[];
+  /** Ist in irgendeinem Monat etwas geplant? Ohne Plan gibt es nichts zu zeigen. */
+  readonly hatPlan: boolean;
+  /** Steht in keinem Monat eine Einnahme? Dann ist „bleibt frei" nur die Summe der Kosten. */
+  readonly ohneEinnahmen: boolean;
+}
+
+/**
+ * Der Plan der nächsten `anzahl` Monate ab dem laufenden — aus `monatsErgebnisse`, mit
+ * periodisierten Verträgen. Es zählt je Zeile der PLAN, auch im laufenden Monat: was
+ * schon gebucht ist, beantwortet eine andere Frage, und neben dem Plan der elf Monate
+ * danach mischte ein halbes Ist zwei Rechnungen.
+ */
+export function planrechnung(basis: Ergebnisbasis, anzahl = PLANRECHNUNG_MONATE): Planrechnung {
+  const monate = monatsErgebnisse(basis, anzahl).map((m): Planmonat => {
+    const zeilen = {} as Record<PlanZeileId, Cent>;
+    for (const id of PLANZEILEN) zeilen[id] = m.zeilen.find((z) => z.id === id)?.plan ?? 0;
+    return {
+      label: m.label,
+      jahr: m.jahr,
+      monat: m.monat,
+      laufend: m.laufend,
+      zeilen,
+      nachPflichten: m.nachPflichten.plan,
+      nachAlltag: m.nachAlltag.plan,
+      ergebnis: m.ergebnis.plan,
+    };
+  });
+  const zeilen = {} as Record<PlanZeileId, Cent>;
+  for (const id of PLANZEILEN) zeilen[id] = summe(monate.map((m) => m.zeilen[id]));
+  const gezeigt = PLANZEILEN.filter((id, i) => i < 3 || monate.some((m) => m.zeilen[id] !== 0));
+  return {
+    monate,
+    summe: {
+      zeilen,
+      nachPflichten: summe(monate.map((m) => m.nachPflichten)),
+      nachAlltag: summe(monate.map((m) => m.nachAlltag)),
+      ergebnis: summe(monate.map((m) => m.ergebnis)),
+    },
+    zeilen: gezeigt,
+    hatPlan: monate.some((m) => PLANZEILEN.some((id) => m.zeilen[id] !== 0)),
+    ohneEinnahmen: monate.every((m) => m.zeilen.einnahmen === 0),
+  };
 }
 
 // ------------------------------------------------------------------ über mehrere Monate

@@ -32,6 +32,7 @@ import {
   analyseFenster,
   analyseFensterTaggenau,
   analyseLiquiditaet,
+  analysePlanrechnung,
   analyseReichweite,
   type Analysebasis,
   type Depotdaten,
@@ -52,12 +53,13 @@ import { KATEGORIEN_ANFANG, KategorienRegister, type KategorienZustand } from ".
 import { VERLAUF_ANFANG, VerlaufRegister, type VerlaufZustand } from "./VerlaufRegister";
 import { Filterzeile, ZeitraumWahl } from "./ZeitraumWahl";
 import { BERICHT_ANFANG, BerichtRegister, type BerichtZustand } from "./BerichtRegister";
+import { PlanrechnungRegister } from "./PlanrechnungRegister";
 import { PageHead } from "../bausteine/PageHead";
 import { Registerleiste } from "../bausteine/Registerleiste";
 import { fehlerMelden } from "../bausteine/Meldungen";
 
 /** Die Register in Anzeigereihenfolge — dieselbe, in der sie vorher untereinander standen. */
-type AnalyseRegister = "verlauf" | "kategorien" | "ausblick" | "befunde" | "depot" | "bericht";
+type AnalyseRegister = "verlauf" | "kategorien" | "ausblick" | "planrechnung" | "befunde" | "depot" | "bericht";
 
 /** Heute als ISO — die Uhr wird hier gelesen, gerechnet wird in der Anwendungsschicht. */
 function toIsoHeute(): string {
@@ -146,6 +148,9 @@ export function AnalyseScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => v
    */
   const reichweite = useMemo(() => (basis ? analyseReichweite(basis, heute) : null), [basis, heute]);
 
+  /** Der Plan der nächsten zwölf Monate, Verträge anteilig — fest ab heute wie der Ausblick. */
+  const planrechnung = useMemo(() => (basis ? analysePlanrechnung(basis, heute) : null), [basis, heute]);
+
   const ist = basis?.buchungen ?? [];
 
   /**
@@ -157,6 +162,8 @@ export function AnalyseScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => v
       ["verlauf", true],
       ["kategorien", !!basis && basis.kategorien.length > 0],
       ["ausblick", true],
+      // Nach dem Ausblick: auch sie schaut nach vorn, aber auf den Plan statt aufs Konto.
+      ["planrechnung", !!planrechnung?.hatPlan],
       ["befunde", !!befunde],
       ["depot", !!depotdaten && depotdaten.depots.length > 0],
       // Zuletzt: der Bericht fasst zusammen, was die Register davor einzeln zeigen. Er
@@ -213,6 +220,8 @@ export function AnalyseScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => v
             {/* Dieselbe Frage ohne die Einnahmen und über das Fenster hinaus: wie lange das
                 freie Geld die Kosten eines Monats trägt. */}
             {wirksamesRegister === "ausblick" && reichweite && <ReichweiteKarte sicht={reichweite} />}
+
+            {wirksamesRegister === "planrechnung" && planrechnung && <PlanrechnungRegister sicht={planrechnung} />}
 
             {/* Die Befunde beantworten die Frage nach „wie viel wohin" — ob das so
                 tragfähig ist. */}

@@ -43,8 +43,32 @@ Kern nennt ihn (`naechster` am Einrichtungsstand), die Zeile je Schritt liegt de
 `bausteine/Einrichtungsschritt.tsx`. Einzelheiten in `../CLAUDE.md` unter „Leere Zustände".
 
 **Die Monatskarten sind eine Ergebnisrechnung** (seit 2026-11-15, `ErgebnisKarten.tsx`
-auf `core/ergebnis.ts`): sie zeigen, was der Monat KOSTET, nicht was in ihm vom Konto
-ging. Die Begriffe dazu stehen in `src/core/CLAUDE.md` unter „Auszahlung und Kosten".
+auf `core/ergebnis.ts`), und seit 2026-11-22 **nach Fälligkeit**: sie zeigen, was im
+Monat ANSTEHT. Die Begriffe dazu stehen in `src/core/CLAUDE.md` unter „Auszahlung und
+Kosten".
+
+**Ein Vertrag steht im Monat seiner Fälligkeit mit dem ganzen Betrag** — ein Vertrag
+über 90 € je Quartal mit 90 in einem Monat und in den beiden anderen gar nicht. Bis
+dahin stand er anteilig da, mit 30 in jedem Monat und dem Zusatz „1/3 der Zahlung". Das
+ist die richtige Antwort auf „was kostet ein Monat", aber nicht auf die Frage, mit der
+man die Übersicht öffnet: was steht an, womit muss ich planen. Die anteilige Rechnung
+ist nicht weg, sie steht in der Analyse als Register **Planrechnung** (zwölf Monate,
+`analysePlanrechnung`). Gerechnet wird dafür nichts Eigenes: die Übersicht fragt den
+Kern mit `nachFaelligkeit` (`ErgebnisOptionen` in `core/ergebnis.ts`), jede andere
+Rechnung über Monate — Kostensicht, Bericht, Reichweite — bleibt anteilig.
+
+Was „nach Fälligkeit" je Zeile heisst:
+
+| Zeile | nach Fälligkeit |
+|---|---|
+| Einnahmen | wie bisher — sie wurden nie verteilt |
+| Verträge | ganz im Monat der Fälligkeit (Plan) bzw. der Zahlung (bisher); dazwischen kein Posten |
+| Monatliche Budgets | wie bisher — ein Rahmen je Monat hat keine Fälligkeit |
+| Ungeplant | wie bisher — gebucht ist gebucht |
+| Rücklagen | wie bisher, mit ihrer Rate — sie IST das, was der Monat zurücklegt |
+| Vorsorge | wie bisher: mit Ziel dessen Rate, ohne Ziel die Überweisung im Monat |
+| Tilgung | folgt dem Vertrag: höchstens das, was er im Monat kostet — im Monat dazwischen nichts |
+| Und auf dem Konto? | geht weiter exakt auf; die Zeile „Verträge: gezahlt statt anteilig" fällt weg, weil gezahlt und gezeigt dasselbe sind |
 
 Drei Stufen, jede mit ihrer Zwischensumme, weil jede eine eigene Frage beantwortet:
 
@@ -147,6 +171,7 @@ die Zeile „Tilgung" mit der Schuld als Posten. Der Status folgt dem Vertrag �
 Rate noch offen, ist es auch die Tilgung. Ohne eine solche Schuld gibt es die Zeile
 nicht. Gerechnet wird im Kern (`tilgungAbspalten`, Regeln in `src/core/CLAUDE.md`).
 
-**Was die Karten noch nicht können**, steht im Kopf von `core/ergebnis.ts`: Einnahmen
-werden nicht periodisiert. Der Kauf aus einer Rücklage wird seit Migration 76 gegen das
+**Was die Karten noch nicht können**, steht im Kopf von `core/ergebnis.ts`. Dass
+Einnahmen nicht verteilt werden, ist dort eine Grenze der Kostenrechnung; für die
+Übersicht ist es seit 2026-11-22 genau richtig, weil sie nach Fälligkeit zeigt. Der Kauf aus einer Rücklage wird seit Migration 76 gegen das
 Angesparte geprüft; was darüber hinausgeht, steht als Kosten in der Zeile der Rücklagen.

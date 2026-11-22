@@ -1,5 +1,9 @@
-// Die Monatskarten — der laufende Monat und die beiden folgenden als Ergebnisrechnung:
-// was der Monat KOSTET, nicht was in ihm vom Konto ging.
+// Die Monatskarten — der laufende Monat und die beiden folgenden als Ergebnisrechnung,
+// seit 2026-11-22 NACH FÄLLIGKEIT: was im Monat ansteht. Ein Quartalsvertrag steht im
+// Monat seiner Fälligkeit ganz da und in den beiden anderen nicht; die anteilige Rechnung
+// steht in der Planrechnung der Analyse. Die Karten wissen davon nichts — sie zeigen, was
+// `uebersichtLaden` ihnen gibt, und der Zusatz „1/n der Zahlung" (`teile`) erscheint nur
+// noch, wenn jemand ihnen periodisierte Ergebnisse gibt.
 //
 // Drei Stufen, jede mit ihrer Zwischensumme, weil jede eine eigene Frage beantwortet:
 // was nach den Pflichten bleibt, was der Alltag übrig lässt, was wirklich frei ist.
