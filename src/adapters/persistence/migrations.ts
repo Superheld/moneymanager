@@ -2467,4 +2467,23 @@ export const MIGRATIONS: Migration[] = [
           AND NOT EXISTS (SELECT 1 FROM budget_betrag x WHERE x.budget_id = budget.id)`,
     ],
   },
+  {
+    version: 82, // Ruecklage: Kauf und Nutzungsdauer fuer die Anzeige des Wertverlusts — nur das Schema
+    sql: [
+      // Eine Ruecklage, die einen Gegenstand ersetzen soll, kann sagen, wann er gekauft
+      // wurde, was er kostete und wie lange er haelt. Daraus zeigt die Liste, wie viel er
+      // bis heute an Wert verloren hat — neben dem Stand, nicht statt seiner. GERECHNET
+      // wird damit nichts: Stand, Raten, Kosten, Ergebnis und Kontobelegung bleiben, wie
+      // sie sind.
+      //
+      // Drei Spalten an `ruecklage` und keine eigene Tabelle: es sind Angaben genau einer
+      // Ruecklage, ohne Reihe und ohne Geschichte. Alle drei NULL heisst „nichts
+      // angegeben"; dass es alle drei oder keine sind, prueft die Anwendung, wie bei Ziel
+      // und Frist. Nichts wird ueberfuehrt — es gibt nichts, woraus es kaeme; erfunden
+      // wird kein Kaufdatum.
+      `ALTER TABLE ruecklage ADD COLUMN kauf_datum TEXT`,
+      `ALTER TABLE ruecklage ADD COLUMN kauf_preis INTEGER`,
+      `ALTER TABLE ruecklage ADD COLUMN nutzungsdauer_monate INTEGER`,
+    ],
+  },
 ];

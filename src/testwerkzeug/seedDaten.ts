@@ -1353,8 +1353,18 @@ function ruecklagenFaelle(
   // des Abschnitts, damit die Nummern der Buchungen davor bleiben.
   ruecklage({
     id: "rue-fall-fernseher", bezeichnung: "Fernseher", kategorie: "kat-haushalt", konto: "konto-tagesgeld",
-    art: "abschliessend", beginn: tagIn(-6, 1), findetAb: tagIn(-6, 1), ziel: 120000, frist: 36,
+    art: "abschliessend", beginn: tagIn(-6, 1), findetAb: tagIn(-6, 1), ziel: 108000, frist: 36,
   });
   const fremd = buchung(tagIn(-1, 9), -8900, "konto-giro", "kat-freizeit-hobby", "Wendorff Handel Halterung");
   setzen("INSERT INTO ruecklage_zuordnung (istbuchung_id, kategorie_id, ruecklage_id) VALUES (?, ?, ?)", [fremd, "kat-freizeit-hobby", "rue-fall-fernseher"]);
+
+  // (11) Wertverlust neben dem Stand (Migration 82, nur Anzeige): der Fernseher, den die
+  // Ruecklage einmal ersetzen soll, wurde lange VOR ihrem Beginn gekauft und haelt fuenf
+  // Jahre. Die Liste zeigt neben dem Stand, was er bis heute verloren hat und was fehlt;
+  // im Verlauf beginnt die zweite Linie vor der Ruecklage. Die Umstellungsprobe spielt
+  // diesen Abschnitt auch in Schemata vor Migration 81 ein; sie legt die drei Spalten
+  // deshalb dort mit an (`NUR_SCHEMA_DANACH` in `src/umstellungsprobe.test.ts`).
+  setzen("UPDATE ruecklage SET kauf_datum = ?, kauf_preis = ?, nutzungsdauer_monate = ? WHERE id = ?", [
+    tagIn(-24, 15), 120000, 60, "rue-fall-fernseher",
+  ]);
 }

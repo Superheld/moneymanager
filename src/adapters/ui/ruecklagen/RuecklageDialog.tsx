@@ -16,6 +16,9 @@
 //   • **Die Rate ist eine Reihe mit „gilt ab"**, wie der Budgetbetrag: beim Bearbeiten gilt
 //     eine geänderte Rate ab dem laufenden Monat, eine ältere Version lässt sich antippen
 //     und korrigieren oder entfernen (nie die letzte).
+//   • **Kauf und Nutzungsdauer** (seit Migration 82) stehen eingeklappt unter „Wertverlust
+//     zeigen", nur bei einer, die abgeschlossen wird. Sie ändern keine Rechnung; die Liste
+//     zeigt daraus neben dem Stand den Wertverlust bis heute.
 //
 // Bis 2026-11-10 lag sein Zustand im `RuecklagenScreen`; als eigene Komponente mit eigenem
 // Zustand beginnt jeder Dialog frisch — der Screen sagt nur, für welche Rücklage.
@@ -44,6 +47,7 @@ import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
 import { Datumsfeld } from "../bausteine/Datumsfeld";
 import { IconButton, IconLeiste } from "../bausteine/IconButton";
+import { Klappblock } from "../bausteine/Klappblock";
 import { Modal } from "../bausteine/Modal";
 import { fehlerNachricht, useGeld } from "../bausteine/einstellungenKontext";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
@@ -104,6 +108,12 @@ export function RuecklageDialog({
   const [kategorieId, setKategorieId] = useState(r?.kategorieId ?? vorbelegung?.kategorieId ?? "");
   /** Ab welchem Monat die eingetippte Rate gilt — beim Bearbeiten der laufende. */
   const [rateAb, setRateAb] = useState(laufend);
+  // Kauf und Nutzungsdauer (Migration 82) — nur für die Anzeige des Wertverlusts, nur bei
+  // einer, die abgeschlossen wird. Aufgeklappt, wenn schon etwas eingetragen ist.
+  const [kaufDatum, setKaufDatum] = useState(r?.kauf?.datum ?? "");
+  const [kaufPreis, setKaufPreis] = useState(r?.kauf ? String(minorZuMajor(r.kauf.preis, geld.waehrung)) : "");
+  const [nutzungsdauer, setNutzungsdauer] = useState(r?.kauf ? String(r.kauf.nutzungsdauerMonate) : "");
+  const [kaufOffen, setKaufOffen] = useState(!!r?.kauf);
   const [fehler, setFehler] = useState<string | null>(null);
   const reihe = r?.raten ?? [];
   // Die beiden Hinweise zur Kategorie: eine andere Rücklage daran heisst, dass Buchungen
@@ -146,6 +156,14 @@ export function RuecklageDialog({
       kontoId: kontoId || undefined,
       kategorieId: kategorieId || undefined,
       art,
+      // Nur bei einer, die abgeschlossen wird; leer heisst „nichts angegeben".
+      ...(art === "abschliessend"
+        ? {
+            kaufDatum: kaufDatum || undefined,
+            kaufPreis: kaufPreis.trim() ? (geld.parse(kaufPreis) ?? 0) : undefined,
+            nutzungsdauerMonate: nutzungsdauer.trim() ? Number(nutzungsdauer) || 0 : undefined,
+          }
+        : {}),
     };
     try {
       if (r) await ruecklageAktualisieren(r.id, eingabe, heute);
@@ -288,6 +306,25 @@ export function RuecklageDialog({
           />
         </FormField>
       </div>
+      {/* Kauf und Nutzungsdauer — eingeklappt, weil es die Ausnahme ist (eine Rücklage für
+          etwas, das man schon hat). Nur bei einer, die abgeschlossen wird: sie steht für
+          EINEN Gegenstand (`ruecklagenPflege`, `kaufPruefen`). */}
+      {art === "abschliessend" && (
+        <Klappblock titel={t("ruecklagen.wertverlust.titel")} offen={kaufOffen} onUmschalten={() => setKaufOffen((x) => !x)}>
+          <p className="hinweis" style={{ margin: "0 0 var(--sp-3)" }}>{t("ruecklagen.wertverlust.hinweis")}</p>
+          <div className="form-grid">
+            <FormField label={t("ruecklagen.wertverlust.feldKaufdatum")}>
+              <Datumsfeld ariaLabel={t("ruecklagen.wertverlust.feldKaufdatum")} wert={kaufDatum} aufAenderung={setKaufDatum} />
+            </FormField>
+            <FormField label={`${t("ruecklagen.wertverlust.feldKaufpreis")} ${geld.symbol}`}>
+              <input className="field" inputMode="decimal" value={kaufPreis} onChange={(e) => setKaufPreis(e.target.value)} placeholder={geld.format(0)} />
+            </FormField>
+            <FormField label={t("ruecklagen.wertverlust.feldNutzungsdauer")} hint={t("ruecklagen.wertverlust.feldNutzungsdauerHinweis")}>
+              <input className="field" inputMode="numeric" value={nutzungsdauer} onChange={(e) => setNutzungsdauer(e.target.value)} placeholder="60" />
+            </FormField>
+          </div>
+        </Klappblock>
+      )}
       {loeschfrage.dialog}
     </Modal>
   );

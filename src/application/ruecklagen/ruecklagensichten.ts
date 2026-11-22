@@ -25,6 +25,10 @@ import {
   ruecklagenFortschreibung,
   ruecklagenstand,
   verlaufsfenster,
+  wertverlustNeben,
+  wertverlustVerlauf,
+  type Wertverlust,
+  type Wertverlustpunkt,
   abschliessen,
   abschlussstaende,
   type Abschlussstand,
@@ -302,6 +306,12 @@ export interface Ruecklagenzeile {
    * einer, die weiterläuft.
    */
   readonly abschlussweg?: "abschliessen" | "ausbuchen";
+  /**
+   * Der Wertverlust des Gegenstands bis heute und was der Stand davon nicht deckt — nur,
+   * wenn Kauf und Nutzungsdauer angegeben sind (Migration 82). Eine Anzeige neben dem
+   * Stand; der Stand selbst bleibt, wie er ist.
+   */
+  readonly wertverlust?: Wertverlust;
 }
 
 export interface Ruecklagensicht {
@@ -461,12 +471,14 @@ export async function ruecklagenLaden(
   const zeilen = deckung.posten.map((p): Ruecklagenzeile => {
     const r = p.ruecklage;
     const art = ruecklagenart(r);
+    const stand = ruecklagenstand(r, ausbuchungen, budget.bestand.entnahmen?.get(r.id) ?? [], heute).stand;
     return {
       ruecklage: r,
       art,
       kategorieName: r.kategorieId ? kategorieNamen.get(r.kategorieId) : undefined,
       rate: art === "fortlaufend" ? planrateIm(r, heute.slice(0, 7)) : monatsRuecklage(r),
-      stand: ruecklagenstand(r, ausbuchungen, budget.bestand.entnahmen?.get(r.id) ?? [], heute).stand,
+      stand,
+      ...(r.kauf ? { wertverlust: wertverlustNeben(r.kauf, stand, heute) } : {}),
       soll: p.soll,
       tatsaechlich: p.tatsaechlich,
       kontoName: r.kontoId ? kontoNamen.get(r.kontoId) : undefined,
@@ -529,6 +541,18 @@ export function ruecklagenVerlauf(s: Pick<Ruecklagensicht, "verlaufsicht">, r: R
   const { vonMonat, bisMonat } = verlaufsfenster(heute, anzahl);
   const entnahmen = ruecklagenEntnahmenAus(s.verlaufsicht).get(r.id) ?? [];
   return ruecklagenFortschreibung(r, s.verlaufsicht.ausbuchungen ?? [], entnahmen, vonMonat, bisMonat);
+}
+
+/**
+ * Der Wertverlust im selben Fenster wie `ruecklagenVerlauf`, Monat für Monat ab dem Kauf —
+ * die zweite Linie im Verlauf. Leer ohne Kauf und Nutzungsdauer. Er beginnt beim Kauf und
+ * damit oft VOR der Rücklage: verloren hat der Gegenstand seit dem Kauf, und genau diesen
+ * Abstand zur Linie des Stands soll der Verlauf zeigen.
+ */
+export function ruecklagenWertverlust(r: Ruecklage, heute: string, anzahl = 12): Wertverlustpunkt[] {
+  if (!r.kauf) return [];
+  const { vonMonat, bisMonat } = verlaufsfenster(heute, anzahl);
+  return wertverlustVerlauf(r.kauf, vonMonat, bisMonat, heute);
 }
 
 /**

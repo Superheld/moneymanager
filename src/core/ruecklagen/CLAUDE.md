@@ -213,6 +213,33 @@ Eine Rücklage auf einer Unterkategorie nimmt dem monatlichen Budget darüber ih
 ab, wie ein Unterbudget; das Budget sagt es an seiner Zeile („ohne Rücklage …",
 `herausgerechnet` in `zustaendigkeit.ts`, nur für Rücklagen, deren Fenster den Tag enthält).
 
+## Der Wertverlust neben dem Stand — nur Anzeige
+
+Seit Migration 82 kann eine Rücklage, die **abgeschlossen wird**, sagen, was sie einmal
+ersetzen soll: Kaufdatum, Kaufpreis, Nutzungsdauer in Monaten (`Ruecklage.kauf`, Spalten
+`kauf_datum`, `kauf_preis`, `nutzungsdauer_monate`; alle drei oder keins, geprüft in
+`ruecklagenPflege`). Der Fall: ein Fernseher, vor zwei Jahren gekauft, hält fünf Jahre —
+die Rücklage dafür beginnt erst später bei null, und ihr Stand allein sagt nicht, dass der
+Fernseher schon zwei Fünftel seines Werts verloren hat.
+
+- **Gerechnet wird damit nichts.** Stand, Raten, Kosten, Ergebnis und Kontobelegung lesen
+  `kauf` nicht; die Umstellungsprobe bleibt unverändert grün. Die Zahl ist eine Auskunft
+  neben dem Stand, keine zweite Rechnung.
+- **Linear auf null, in vollen Monaten** (`wertverlustAm` in `wertverlust.ts`): Kaufpreis ×
+  volle Monate seit dem Kauf ÷ Nutzungsdauer, gedeckelt auf den Kaufpreis. Kein Restwert,
+  keine andere Kurve — das wären Annahmen, die niemand getroffen hat.
+- **Die Liste zeigt ihn klein neben dem Stand** („Wertverlust bis heute … · fehlt …", das
+  Fehlende nur, wenn der Stand darunter liegt); die grosse Zahl bleibt der Stand. Schmal
+  eine kleine Zeile unter dem Balken.
+- **Der Verlauf zeichnet ihn als zweite, gestrichelte Linie** (`ruecklagenWertverlust`,
+  `zweiteLinie` an `VerlaufChart`), ab dem Kauf — liegt der vor dem Beginn der Rücklage,
+  stehen davor leere Monate nur mit dieser Linie.
+- **Nur bei einer, die abgeschlossen wird** (`ruecklage.kaufNurAbschliessend`): sie steht
+  für EINEN Gegenstand. Eine, die weiterläuft, trägt eine Art von Ausgaben auf Dauer; ein
+  Kaufdatum hätte dort keinen Gegenstand.
+- **Beim Abschliessen bleibt die Angabe stehen**; wer den neuen Gegenstand einträgt, ändert
+  sie im Dialog. Von selbst wird nichts umgeschrieben.
+
 ## Zwei Kostenregeln, und wo jede gilt
 
 | Regel | gilt für | rechnet |

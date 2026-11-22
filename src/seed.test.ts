@@ -40,7 +40,7 @@ import { sqliteRuecklagenzuordnungRepository } from "./adapters/persistence/sqli
 import { sqliteZahlungsregelRepository } from "./adapters/persistence/sqliteZahlungsregelRepository";
 import { sqliteUmsatzRepository } from "./adapters/persistence/sqliteImportRepositories";
 import { sqliteEinstellungenRepository } from "./adapters/persistence/sqliteEinstellungenRepository";
-import { abschlussvorschau, ruecklagenLaden, ruecklagenVerlauf, type Ruecklagensicht } from "./application/ruecklagen/ruecklagensichten";
+import { abschlussvorschau, ruecklagenLaden, ruecklagenVerlauf, ruecklagenWertverlust, type Ruecklagensicht } from "./application/ruecklagen/ruecklagensichten";
 import { geldJeKontoLaden } from "./application/ruecklagen/geldJeKonto";
 import { ruecklagenvorschlaegeLaden } from "./application/ruecklagen/ruecklagenvorschlaege";
 import { budgetbereichLaden, budgetuebersichtLaden } from "./application/budgets/budgetsichten";
@@ -893,5 +893,18 @@ describe("Spielstand — Ruecklagen zum Durchspielen", () => {
     expect(getragen).toContain(zuordnung.istbuchungId);
     const imBudget = getrageneBuchungen(s.verlaufsicht, "budget-freizeit", vonAnfang, "2100-01-01").map((p) => p.buchung.id);
     expect(imBudget).not.toContain(zuordnung.istbuchungId);
+  });
+
+  it("zeigt neben einer Ruecklage einen Wertverlust seit einem Kauf vor ihrem Beginn — und was fehlt", async () => {
+    const s = await laden();
+    const fernseher = zeile(s, "rue-fall-fernseher");
+    const kauf = fernseher.ruecklage.kauf!;
+    expect(kauf).toBeDefined();
+    expect(kauf.datum < fernseher.ruecklage.beginn).toBe(true);
+    expect(fernseher.wertverlust!.bisHeute).toBeGreaterThan(fernseher.stand);
+    expect(fernseher.wertverlust!.fehlt).toBe(fernseher.wertverlust!.bisHeute - fernseher.stand);
+    // Im Verlauf beginnt die zweite Linie vor dem ersten Monat der Ruecklage.
+    const linie = ruecklagenWertverlust(fernseher.ruecklage, HEUTE);
+    expect(linie[0].monat < ruecklagenVerlauf(s, fernseher.ruecklage, HEUTE)[0].monat).toBe(true);
   });
 });

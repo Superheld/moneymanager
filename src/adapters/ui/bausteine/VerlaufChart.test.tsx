@@ -65,6 +65,23 @@ describe("VerlaufChart — die Linie hinter den Balken", () => {
     expect(container.textContent).toMatch(/Stand/);
   });
 
+  it("zeichnet eine zweite Linie, die vor dem ersten Monat beginnt — davor leere Monate", async () => {
+    const reihe = [monat(2, 10000, 1000), monat(3, 10000, 0)];
+    const punkte = ["2025-12", "2026-01", "2026-02", "2026-03", "2026-04"].map((m, i) => ({ monat: m, betrag: 2000 * (i + 1) }));
+    const geklickt: number[] = [];
+    const { container } = rendere(
+      <VerlaufChart monate={reihe} art="ruecklage" zweiteLinie={{ name: "Wendhausen", punkte }} onMonatClick={(i) => geklickt.push(i)} />,
+    );
+    await waitFor(() => expect(container.querySelector("[data-zweite-linie]")).not.toBeNull());
+    const d = container.querySelector("[data-zweite-linie]")!.getAttribute("d")!;
+    expect(d.match(/M/g)).toHaveLength(1);
+    expect(d.match(/L/g)).toHaveLength(4);
+    // Die drei Monate davor stehen als Beschriftung da, ohne Balken und ohne Punkt.
+    for (const m of ["2025-12", "2026-01", "2026-02"]) expect(container.textContent).toContain(m);
+    expect(container.querySelectorAll("svg circle")).toHaveLength(2);
+    expect(container.textContent).toContain("Wendhausen");
+  });
+
   it("unterbricht die Linie an einem Monat ohne Rahmen", async () => {
     const mitLuecke = [monat(0, 10000, 1000), monat(1, 0, 2000, true), monat(2, 10000, 3000)];
     const { container } = rendere(<VerlaufChart monate={mitLuecke} art="ruecklage" />);

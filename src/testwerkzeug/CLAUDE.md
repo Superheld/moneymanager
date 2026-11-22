@@ -22,7 +22,10 @@ Zwei Regeln dazu:
 - **Die Erwartungsdatei der Umstellungsprobe wird nie neu geschrieben**, auch nicht, wenn
   der Spielstand wächst. Neue Fälle im Spielstand bekommen eigene Ids und werden in
   `alterSpielstand()` wieder herausgenommen (Kopf von `ruecklagenFaelle` in
-  `seedDaten.ts`).
+  `seedDaten.ts`). Beschreibt ein Fall eine Spalte, die eine spätere Migration nur
+  anlegt (Migration 82: Kauf und Nutzungsdauer), trägt diese Migration sich in
+  `NUR_SCHEMA_DANACH` ein — sonst liesse sich der Spielstand nicht in das ältere Schema
+  einspielen. Eine Migration, die Daten umbaut, gehört dort nicht hin.
 
 ## Was der Spielstand zeigt
 
@@ -51,7 +54,7 @@ Die Rücklagen zum Durchspielen (Abschnitt `ruecklagenFaelle` in `seedDaten.ts`)
 | Konto „Tagesgeld 2" | reicht nicht für alle Rücklagen darauf, wird anteilig verteilt |
 | Kategorien „Finanzen" / „Familie & Kinder" | Vorschlag im Bereich Rücklagen bzw. Budgets |
 | Budget „Gesundheit" mit Rücklage „Behandlungen" darunter | ein Budget, das ohne die Rücklage auf seiner Unterkategorie zählt |
-| „Fernseher" (an „Haushalt") | trägt eine Ausgabe unter „Freizeit & Hobby", die ihr ausdrücklich zugeordnet ist — das Budget dort zählt sie nicht |
+| „Fernseher" (an „Haushalt") | trägt eine Ausgabe unter „Freizeit & Hobby", die ihr ausdrücklich zugeordnet ist — das Budget dort zählt sie nicht; dazu Kauf und Nutzungsdauer lange vor ihrem Beginn: Wertverlust neben dem Stand, „fehlt", zweite Linie im Verlauf |
 
 Wer einen Fall ergänzt, trägt ihn in `seedDaten.ts` ein, sichert ihn in `seed.test.ts` zu
 und schreibt ihn in diese Tabelle.

@@ -517,6 +517,16 @@ beforeAll(async () => {
   SQL = await initSqlJs({ locateFile: () => require.resolve("sql.js/dist/sql-wasm.wasm") });
 });
 
+/**
+ * Migrationen NACH dem Umbau, die nur Spalten anlegen, die der Spielstand beschreibt —
+ * sie laufen in `alterSpielstand` mit, damit der Spielstand von heute sich auch in ein
+ * älteres Schema einspielen lässt. Was sie anlegen, liest keine Rechnung, die hier
+ * verglichen wird; eine Migration, die Daten umbaut, gehört NICHT hierher.
+ *
+ *   • 82 — Kauf und Nutzungsdauer an der Rücklage, nur für die Anzeige des Wertverlusts.
+ */
+const NUR_SCHEMA_DANACH = new Set([82]);
+
 function migrationen(db: Database, filter: (version: number) => boolean): void {
   for (const m of MIGRATIONS.filter((x) => filter(x.version))) for (const sql of m.sql) db.run(sql);
 }
@@ -530,7 +540,7 @@ function migrationen(db: Database, filter: (version: number) => boolean): void {
  */
 function alterSpielstand(bis: number): Database {
   const db = new SQL.Database();
-  migrationen(db, (v) => v <= bis);
+  migrationen(db, (v) => v <= bis || NUR_SCHEMA_DANACH.has(v));
   seedEinspielen(db, STICHTAG);
   neueFaelleEntfernen(db);
   db.run(

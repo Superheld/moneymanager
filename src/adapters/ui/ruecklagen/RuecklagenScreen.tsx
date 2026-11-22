@@ -340,6 +340,13 @@ export function RuecklagenScreen() {
               const mitZiel = hatZiel(r);
               const offen = offeneRuecklage === r.id;
               const titelVerlauf = t(offen ? "ruecklagen.verlaufZu" : "ruecklagen.verlaufAuf", { name: r.bezeichnung });
+              /** „Wertverlust bis heute … · fehlt …" — nur mit Kauf und Nutzungsdauer (Migration 82). */
+              const wertverlustText = z.wertverlust
+                ? [
+                    t("ruecklagen.wertverlust.bisHeute", { betrag: geld.formatMitSymbol(z.wertverlust.bisHeute) }),
+                    ...(z.wertverlust.fehlt > 0 ? [t("ruecklagen.wertverlust.fehlt", { betrag: geld.formatMitSymbol(z.wertverlust.fehlt) })] : []),
+                  ].join(" · ")
+                : null;
               const umschalten = () => setOffeneRuecklage(offen ? null : r.id);
 
               /** Sorte und „ohne Konto" — breit neben dem Namen, schmal hinter der Zeile. */
@@ -411,6 +418,8 @@ export function RuecklagenScreen() {
                           style={{ marginTop: 6 }}
                         />
                       )}
+                      {/* Schmal nur als kleine Zeile unter dem Balken — der Stand bleibt die Zahl der Zeile. */}
+                      {wertverlustText && <span className="hinweis ruecklage-kurz-wertverlust">{wertverlustText}</span>}
                     </Collapsible.Trigger>
                     <Collapsible.Panel>
                       <div style={{ marginTop: "var(--sp-2)" }}>
@@ -453,6 +462,9 @@ export function RuecklagenScreen() {
                     <span>
                       {t("ruecklagen.standHeute")}{" "}
                       <b className="num" style={{ color: geldFarbe(z.stand) }}>{geld.formatMitSymbol(z.stand)}</b>
+                      {/* Klein daneben, nicht statt des Stands: was der Gegenstand bis heute
+                          verloren hat und, liegt der Stand darunter, wie viel fehlt. */}
+                      {wertverlustText && <span className="muted"> · {wertverlustText}</span>}
                     </span>
                     {z.tatsaechlich != null && (
                       <span className="muted">
