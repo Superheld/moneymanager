@@ -2,10 +2,11 @@
 // Router-Dep, solange es wenige Screens sind). Aktive Screens sind klickbar; spätere
 // Bereiche (BAUPLAN P2+) sind als deaktiviert sichtbar.
 //
-// **Seit 2026-09-02 mobile first.** Die Grundform ist die schmale: eine Kopfleiste mit
-// einem Griff, und die Navigation liegt als Schublade links AUSSERHALB des Bildes. Erst
-// ab 700 px rückt sie als feste Spalte ins Raster (siehe app.css, „Die Navigation in drei
-// Stufen").
+// **Seit 2026-09-02 mobile first.** Die Grundform ist die schmale: oben eine Kopfleiste mit
+// dem Namen des Bereichs, unten eine Leiste mit vier Bereichen und „Mehr" (seit
+// 2026-11-22), und die ganze Navigation liegt als Schublade links AUSSERHALB des Bildes,
+// bis „Mehr" sie holt. Erst ab 700 px rückt sie als feste Spalte ins Raster, und beide
+// Leisten fallen weg (siehe app.css, „Die Navigation in drei Stufen").
 //
 // **Damit hat die Shell zum ersten Mal einen Zustand**, und das ist ein Bruch mit der
 // Begründung, die hier lange stand: die Einklapp-Stufe kommt ohne JavaScript aus, weil
@@ -99,6 +100,18 @@ function labelKeyVon(id: ScreenId): string {
   return "shell.navUebersicht";
 }
 
+/**
+ * Was schmal in der Leiste unten steht — nur WELCHE Bereiche, nicht wie sie heissen:
+ * Beschriftung und Icon kommen aus `GRUPPEN` bzw. aus der `ScreenId`, wie in der
+ * Schublade. Eine zweite Zuordnung „Bereich → Name" wäre die Stelle, die beim nächsten
+ * Umbenennen vergessen wird.
+ *
+ * Gewählt nach dem, was man unterwegs tut: nachsehen, wie man dasteht (Übersicht),
+ * zuordnen und abhaken (Buchungen), und die beiden Fragen „was ist noch da" (Budgets)
+ * und „was ist zurückgelegt" (Rücklagen). Alles Übrige erreicht „Mehr".
+ */
+const LEISTE: readonly ScreenId[] = ["uebersicht", "konten", "ruecklagen", "budgets"];
+
 export function AppShell({
   current,
   onNavigate,
@@ -119,7 +132,11 @@ export function AppShell({
 }) {
   const { t } = useTranslation();
   const [offen, setOffen] = useState(false);
-  const griff = useRef<HTMLButtonElement>(null);
+  /** „Mehr" in der Leiste unten — der einzige Weg in die Schublade, siehe dort. */
+  const mehr = useRef<HTMLButtonElement>(null);
+  const leiste = LEISTE.filter((id) => !versteckt?.includes(id));
+  /** Steht man in einem Bereich ohne eigenen Eintrag, ist „Mehr" der Weg dorthin. */
+  const mehrAktiv = !leiste.includes(current);
 
   // Escape schliesst die Schublade — aber nur sie: liegt ein Modal darüber, hat der
   // oberste Dialog die Taste schon verbraucht (siehe `Modal`, `defaultPrevented`).
@@ -139,30 +156,24 @@ export function AppShell({
    *
    * Ohne das bliebe auf dem Handy die Schublade über dem Bereich stehen, den sie gerade
    * geöffnet hat — der Erfolg der Handlung wäre unsichtbar. Der Fokus geht dabei zurück
-   * auf den Griff: er ist das Element, das nach dem Schliessen sichtbar an derselben
-   * Stelle steht.
+   * auf „Mehr": es ist das Element, das nach dem Schliessen sichtbar an derselben Stelle
+   * steht.
    */
   const schliessen = () => {
     setOffen(false);
-    griff.current?.focus();
+    mehr.current?.focus();
   };
 
   return (
     <div className="app">
-      {/* Nur schmal sichtbar. Sie trägt den Griff und den Namen des Bereichs — auf einem
-          Handy ist die Marke nicht die Auskunft, die man beim Blick nach oben braucht. */}
+      {/* Nur schmal sichtbar, und nur noch mit dem Namen des Bereichs — auf einem Handy ist
+          die Marke nicht die Auskunft, die man beim Blick nach oben braucht.
+
+          **Der Griff (☰), der hier bis 2026-11-22 stand, ist weg.** „Mehr" in der Leiste
+          unten öffnet dieselbe Schublade, und zwei Wege zum selben Ziel an zwei Enden des
+          Bildschirms lassen fragen, ob sie dasselbe tun. Unten liegt er dort, wo der
+          Daumen ohnehin ist; oben war er nur der gewohnte Ort. */}
       <header className="topbar">
-        <BaseButton
-          ref={griff}
-          type="button"
-          className="topbar-griff"
-          aria-label={t("shell.menueOeffnen")}
-          aria-expanded={offen}
-          aria-controls="hauptnavigation"
-          onClick={() => setOffen(true)}
-        >
-          <Icon name="menue" groesse={20} />
-        </BaseButton>
         <span className="topbar-titel">{t(labelKeyVon(current))}</span>
       </header>
 
@@ -233,6 +244,49 @@ export function AppShell({
       </aside>
 
       <main className="main">{children}</main>
+
+      {/* Die Leiste unten — nur schmal (unter 700 px), breit steht die Spalte daneben.
+          Vier Bereiche und „Mehr", das die Schublade mit ALLEN Bereichen öffnet.
+
+          Eigenbau aus Base-UI-Knöpfen: Base UI hat kein Bedienteil für eine Leiste von
+          Sprungzielen (`NavigationMenu` ist für Menüs, die Unterpunkte aufklappen). Jeder
+          Eintrag ist ein Knopf und kein Link — gewechselt wird ein Zustand, eine Adresse
+          gibt es nicht (dieselbe Begründung wie beim `Zeilenlink`).
+
+          Ein versteckter Bereich fällt hier weg wie in der Schublade; die Leiste hat dann
+          weniger Einträge und wird nicht aufgefüllt — sonst stünde je nach Einstellung an
+          derselben Stelle ein anderer Bereich, und der Daumen träfe das Falsche. */}
+      <nav className="leiste">
+        {leiste.map((id) => (
+          <BaseButton
+            key={id}
+            type="button"
+            className="leiste-eintrag"
+            aria-current={id === current ? "page" : undefined}
+            onClick={() => {
+              onNavigate(id);
+              setOffen(false);
+            }}
+          >
+            <Icon name={id} groesse={20} />
+            <span>{t(labelKeyVon(id))}</span>
+          </BaseButton>
+        ))}
+        {/* `aria-current="true"` und nicht `"page"`: „Mehr" IST nicht der Bereich, in dem
+            man steht — es ist der Eintrag, hinter dem er liegt. */}
+        <BaseButton
+          ref={mehr}
+          type="button"
+          className="leiste-eintrag"
+          aria-current={mehrAktiv ? "true" : undefined}
+          aria-expanded={offen}
+          aria-controls="hauptnavigation"
+          onClick={() => setOffen(true)}
+        >
+          <Icon name="menue" groesse={20} />
+          <span>{t("shell.navMehr")}</span>
+        </BaseButton>
+      </nav>
     </div>
   );
 }
