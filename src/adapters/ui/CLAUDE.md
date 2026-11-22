@@ -652,6 +652,21 @@ Vorschlags), die `DataTable` kürzt jede auf eine Zeile — und ordnet ihre Zell
 CSS in dieselbe Form um (`.inbox-tabelle` in `app.css`). Eine neue Tabelle nimmt die
 `DataTable`; wer davon abweicht, baut die schmale Form selbst mit.
 
+**Was nicht passt, bricht um oder wird kleiner — es läuft nicht seitlich hinaus** (seit
+2026-11-22 in allen Bereichen und Reitern bei 390 px nachgemessen). Drei Stellen taten
+es bis dahin, und jede steht für eine Art:
+
+- **Eine Leiste, deren Knöpfe zusammen zu breit sind** (`Umschalter` in der Analyse):
+  schmal endet sie am Behälter, und die Beschriftung jedes Knopfs bricht um. Ab 700 px
+  wieder einzeilig.
+- **Eine Zahl, die allein breiter ist als die Karte** (die grosse Zahl im Vermögen):
+  `KPIStat` setzt die grosse Zahl auf `min(var(--fs-display), 12vw)`. Die 64 px gelten
+  ab gut 530 px Fensterbreite, breit ändert sich nichts. Eine Zahl umbrechen geht nicht,
+  kürzen darf man sie nicht — bleibt nur die Grösse.
+- **Eine Zeile aus Text und Knöpfen** (Kategorien in den Einstellungen): der Text bricht
+  um (`flex-wrap` und `min-width: 0` am Namen), die Knöpfe schrumpfen nicht
+  (`.katrow-aktionen`). Ohne beides schob der Name die Knöpfe über den Kartenrand.
+
 Vier Dinge, die bei jedem neuen Stück ab jetzt gelten und die man schmal nicht nachholen
 kann:
 

@@ -192,7 +192,8 @@ describe("KPIStat", () => {
       unmount();
       return fs;
     };
-    expect(groesse("hero")).toBe("var(--fs-display)");
+    // Schmal folgt die grosse Zahl der Fensterbreite, breit bleibt es das Token.
+    expect(groesse("hero")).toBe("min(var(--fs-display), 12vw)");
     expect(groesse("tile")).toBe("var(--fs-h1)");
     expect(groesse("chip")).toBe("var(--fs-h2)");
   });

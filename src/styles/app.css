@@ -979,10 +979,20 @@ select.field.tabellenfilter {
   padding: 8px 0;
   border-bottom: 1px solid var(--line-soft);
 }
+/* Name und Pille brechen um, die Knöpfe bleiben ganz: in einer eingerückten Zeile
+   drückten Name, Pille und zwei Knöpfe die Knöpfe schmal über den Kartenrand. Wo Platz
+   ist (breit immer), bricht nichts um, und es sieht aus wie vorher. */
 .katrow .nm {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--sp-2);
+  min-width: 0;
+}
+.katrow-aktionen {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--sp-3);
 }
 .katmain .nm {
   font-weight: var(--fw-bold);
@@ -1172,8 +1182,14 @@ select.field.tabellenfilter {
 /* --- Umschalter (bausteine/Umschalter.tsx) ---
    Masse aus den drei Leisten, die vorher von Hand dastanden. Gedrueckt heisst bei Base UI
    `[data-pressed]`. */
+/* Schmal bricht die Beschriftung eines Knopfs um, statt die Leiste breiter als den
+   Bildschirm zu machen: „Wofür ging Geld raus?" neben „Was hat der Monat gekostet?" lief
+   in der Analyse seitlich aus dem Bild. Die Leiste endet an der Kante ihres Behälters,
+   die Knöpfe teilen sich den Platz und werden dafür zweizeilig. Ab 700 px wieder eine
+   Zeile je Knopf, wie vorher. */
 .umschalter {
   display: inline-flex;
+  max-width: 100%;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   overflow: hidden;
@@ -1188,7 +1204,15 @@ select.field.tabellenfilter {
   background: transparent;
   color: var(--ink-2);
   cursor: pointer;
-  white-space: nowrap;
+  white-space: normal;
+}
+@media (min-width: 700px) {
+  .umschalter {
+    max-width: none;
+  }
+  .umschalter-knopf {
+    white-space: nowrap;
+  }
 }
 .umschalter-knopf + .umschalter-knopf {
   border-left: 1px solid var(--line-soft);
