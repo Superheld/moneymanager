@@ -207,11 +207,17 @@ const REGELN = [
     // daran denken muss, vergisst es, und dann steht die Freigabe irgendwann aus Gewohnheit
     // dort, wo sie nicht hingehört. Eine Ausnahme, die man einmal begründet, ist besser
     // als eine, die man ständig von Hand setzt.
+    //
+    // Dasselbe gilt für Dependabot: GitHub schreibt unter jeden seiner Commits
+    // `Signed-off-by: dependabot[bot] <support@github.com>`, und wer seine Vorschläge
+    // zusammenführt, pusht diese Zeilen mit. Auch hier eng: nur diese eine Adresse, nur in
+    // einer `Signed-off-by:`-Zeile von `dependabot[bot]`.
     pruefe: (t, zeile = "") =>
       !/@(example|test|invalid|localhost|beispiel)\./i.test(t) &&
       !/^(?:git|npm|node)@/i.test(t) &&
       !/\.(png|jpe?g|gif|svg|ico|icns|webp|json|ts|tsx|js|mjs|css|md|html?)$/i.test(t) &&
-      !(/^\s*Co-Authored-By:/i.test(zeile) && /^noreply@/i.test(t)),
+      !(/^\s*Co-Authored-By:/i.test(zeile) && /^noreply@/i.test(t)) &&
+      !(/^\s*Signed-off-by:\s*dependabot\[bot\]\s*</.test(zeile) && t === "support@github.com"),
   },
   {
     id: "jwt",
