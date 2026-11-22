@@ -12,6 +12,7 @@ import {
   reichweiteMonate,
   versorgungsluecke,
   vorsorgestand,
+  vorsorgeposten,
   vorsorgevermoegen,
   type Vorsorgeannahmen,
 } from "./vorsorge";
@@ -164,7 +165,15 @@ describe("vorsorgevermoegen", () => {
       konto("inv", "investment", 2_000_00),
     ],
     buchungen: [],
-    depotwerte: [{ depotId: "d1", stichtag: "2025-05-31", gesamtwert: 4_000_00, waehrung: "EUR" }],
+    depots: [
+      { id: "d1", zugangId: "z", schluessel: "1|", bezeichnung: "Erstdepot", vorsorgezielId: "z1" },
+      // Zählt nicht: ohne Zuordnung steht es nur im Nettovermögen.
+      { id: "d2", zugangId: "z", schluessel: "2|", bezeichnung: "Zweitdepot" },
+    ],
+    depotwerte: [
+      { depotId: "d1", stichtag: "2025-05-31", gesamtwert: 4_000_00 },
+      { depotId: "d2", stichtag: "2025-05-31", gesamtwert: 9_000_00 },
+    ],
     gegenstaende: [
       { id: "police", bezeichnung: "Police", art: "versicherung" as const, vorsorgezielId: "z1" },
       { id: "wagen", bezeichnung: "Wagen", art: "fahrzeug" as const },
@@ -175,7 +184,7 @@ describe("vorsorgevermoegen", () => {
     ],
   };
 
-  it("zählt Vorsorge- und Investmentkonten, alle Depots und die zugeordneten Vermögenswerte", () => {
+  it("zählt Vorsorge- und Investmentkonten, die zugeordneten Depots und die zugeordneten Vermögenswerte", () => {
     const v = vorsorgevermoegen(bestand as never, "z1", "2025-06-15");
     expect(v.konten).toBe(3_000_00);
     expect(v.depots).toBe(4_000_00);
@@ -184,7 +193,81 @@ describe("vorsorgevermoegen", () => {
     expect(v.netto).toBe(15_000_00);
   });
 
-  it("lässt einen Vermögenswert weg, der einem anderen oder keinem Ziel gehört", () => {
-    expect(vorsorgevermoegen(bestand as never, "anderes", "2025-06-15").vermoegenswerte).toBe(0);
+  it("lässt einen Vermögenswert und ein Depot weg, die einem anderen oder keinem Ziel gehören", () => {
+    const v = vorsorgevermoegen(bestand as never, "anderes", "2025-06-15");
+    expect(v.vermoegenswerte).toBe(0);
+    expect(v.depots).toBe(0);
+  });
+});
+
+describe("vorsorgeposten", () => {
+  const konto = (id: string, klasse: Zahlungskonto["klasse"], saldo: number): Zahlungskonto =>
+    ({ id, bezeichnung: `Konto ${id}`, typ: "Giro", klasse, inhaberIds: [], saldo }) as Zahlungskonto;
+  const depot = (id: string, ziel?: string, verrechnung?: string) => ({
+    id, zugangId: "z", schluessel: `${id}|`, bezeichnung: `Depot ${id}`,
+    ...(ziel ? { vorsorgezielId: ziel } : {}),
+    ...(verrechnung ? { verrechnungskontoId: verrechnung } : {}),
+  });
+  const bestand = {
+    konten: [
+      konto("giro", "liquide", 500_00),
+      konto("verr", "investment", 300_00),
+      konto("verr-giro", "liquide", 200_00),
+      konto("vors", "vorsorge", 1_000_00),
+    ],
+    buchungen: [
+      { id: "b", datum: "2025-06-01", betrag: 50_00, kontoId: "verr", charakter: "Umschichtung" as const, quelle: "import" as const },
+    ],
+    depots: [
+      depot("a", "z1", "verr"),
+      // Dasselbe Verrechnungskonto ein zweites Mal: es steht nur unter dem ersten.
+      depot("b", "z1", "verr"),
+      // Ein Verrechnungskonto, dessen Klasse nicht zur Vorsorge zählt.
+      depot("c", "z1", "verr-giro"),
+      // Zählt nicht zum Ziel — und nimmt sein Verrechnungskonto nicht mit hinein.
+      depot("d", undefined, "vors"),
+    ],
+    depotwerte: [
+      { depotId: "a", stichtag: "2025-05-31", gesamtwert: 4_000_00 },
+      { depotId: "b", stichtag: "2025-05-31", gesamtwert: 1_000_00 },
+      { depotId: "c", stichtag: "2025-05-31", gesamtwert: 2_000_00 },
+      { depotId: "d", stichtag: "2025-05-31", gesamtwert: 9_000_00 },
+    ],
+    gegenstaende: [
+      { id: "police", bezeichnung: "Police", art: "versicherung" as const, vorsorgezielId: "z1" },
+      { id: "verkauft", bezeichnung: "Verkauft", art: "beteiligung" as const, vorsorgezielId: "z1", aktiv: false },
+    ],
+    werte: [
+      { gegenstandId: "police", stichtag: "2025-01-31", wert: 8_000_00 },
+      { gegenstandId: "verkauft", stichtag: "2025-01-31", wert: 5_000_00 },
+    ],
+  };
+
+  it("geht auf die Summe von vorsorgevermoegen auf", () => {
+    const posten = vorsorgeposten(bestand as never, "z1", "2025-06-15");
+    const summe = posten.reduce(
+      (s, p) => s + p.betrag + (p.verrechnungskonto?.zaehlt ? p.verrechnungskonto.betrag : 0),
+      0,
+    );
+    expect(summe).toBe(vorsorgevermoegen(bestand as never, "z1", "2025-06-15").netto);
+  });
+
+  it("stellt das Verrechnungskonto unter sein Depot, und jedes Konto steht einmal da", () => {
+    const posten = vorsorgeposten(bestand as never, "z1", "2025-06-15");
+    expect(posten.map((p) => [p.art, p.id, p.betrag])).toEqual([
+      ["depot", "a", 4_000_00],
+      ["depot", "b", 1_000_00],
+      ["depot", "c", 2_000_00],
+      ["konto", "vors", 1_000_00],
+      ["vermoegenswert", "police", 8_000_00],
+    ]);
+    expect(posten[0].verrechnungskonto).toEqual({ id: "verr", bezeichnung: "Konto verr", klasse: "investment", betrag: 350_00, zaehlt: true });
+    expect(posten[1].verrechnungskonto).toBeUndefined();
+  });
+
+  it("zeigt ein Verrechnungskonto, dessen Klasse nicht zählt, ohne es mitzuzählen", () => {
+    const posten = vorsorgeposten(bestand as never, "z1", "2025-06-15");
+    expect(posten[2].verrechnungskonto).toMatchObject({ id: "verr-giro", betrag: 200_00, zaehlt: false });
+    expect(vorsorgevermoegen(bestand as never, "z1", "2025-06-15").konten).toBe(350_00 + 1_000_00);
   });
 });

@@ -50,6 +50,7 @@ const buchung = (id: string, kontoId: string, datum: string, betrag: number): Is
 const LEER: VermoegensEingabe = {
   konten: [],
   buchungen: [],
+  depots: [],
   depotwerte: [],
   gegenstaende: [],
   werte: [],
