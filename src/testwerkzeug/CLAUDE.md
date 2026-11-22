@@ -34,7 +34,7 @@ gegliedert:
 |---|---|
 | „Spielstand" | jeden Bereich gefüllt: Konten jeder Klasse, Budgets, Verträge, Rücklagen, Belege aus mehreren Quellen, Dubletten, offene Buchungen, genug Material für ein Training |
 | „Umbuchungsvertrag" | eine Sparregel mit gebuchten Beinen auf beiden Konten, ein stillgelegtes Konto mit Buchungen |
-| „Vermoegen und Vorsorge" | Nettovermögen mit Verlauf, eine Schuld mit sinkender Restschuld, ein Vorsorgeziel mit Sparrate |
+| „Vermoegen und Vorsorge" | Nettovermögen mit Verlauf, eine Schuld mit sinkender Restschuld, ein Vorsorgeziel mit Sparrate, Depots (Tabelle unten) |
 | „Ruecklagen zum Durchspielen" | die Fälle des Rücklagen-Umbaus, Tabelle unten |
 
 Die Rücklagen zum Durchspielen (Abschnitt `ruecklagenFaelle` in `seedDaten.ts`):
@@ -51,6 +51,16 @@ Die Rücklagen zum Durchspielen (Abschnitt `ruecklagenFaelle` in `seedDaten.ts`)
 | Konto „Tagesgeld 2" | reicht nicht für alle Rücklagen darauf, wird anteilig verteilt |
 | Kategorien „Finanzen" / „Familie & Kinder" | Vorschlag im Bereich Rücklagen bzw. Budgets |
 | Budget „Gesundheit" mit Rücklage „Behandlungen" darunter | ein Budget, das ohne die Rücklage auf seiner Unterkategorie zählt |
+
+Die Depots im Bereich Vermögen (Abschnitt `depotFaelle` in `seedDaten.ts`, seit Migration 83):
+
+| Name im Spielstand | zeigt |
+|---|---|
+| „Wertpapierdepot" mit „Konto Depotbank" | ein Depot, das zum Vorsorgeziel zählt, mit seinem Verrechnungskonto (Klasse Investment) darunter — in Vermögen und in der Liste der Vorsorge |
+| „Zweitdepot" | ein Depot, das nicht zur Vorsorge zählt und kein Verrechnungskonto hat |
+
+Den Fall „Verrechnungskonto zählt nicht mit" zeigt der Spielstand nicht; er entsteht, wenn
+man dem „Konto Depotbank" eine andere Klasse gibt.
 
 Wer einen Fall ergänzt, trägt ihn in `seedDaten.ts` ein, sichert ihn in `seed.test.ts` zu
 und schreibt ihn in diese Tabelle.

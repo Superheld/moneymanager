@@ -746,6 +746,25 @@ describe("Spielstand — Vermoegen und Vorsorge", () => {
     // Und der Vermoegenswert, der dem Ziel zugeordnet ist, zaehlt mit.
     expect(sicht!.vermoegen.vermoegenswerte).toBeGreaterThan(0);
   });
+
+  it("zeigt ein Depot mit Verrechnungskonto, das zur Vorsorge zaehlt, und eines, das nicht zaehlt", async () => {
+    mitSeedAngebunden();
+    const sicht = await vermoegenLaden(bestand, HEUTE);
+    const mitKonto = sicht.depots.filter((d) => d.verrechnungskonto);
+    expect(mitKonto.length).toBeGreaterThan(0);
+    expect(mitKonto.every((d) => d.aktuell && d.summe === d.aktuell.betrag + d.verrechnungskonto!.stand)).toBe(true);
+
+    const vorsorgesicht = await vorsorgeLaden({ ...bestand, vorsorgeRepo: sqliteVorsorgeRepository }, HEUTE);
+    const zielId = vorsorgesicht!.ziel.id;
+    expect(sicht.depots.some((d) => d.depot.vorsorgezielId === zielId && d.verrechnungskonto?.zaehltZurVorsorge)).toBe(true);
+    const ohne = sicht.depots.filter((d) => d.depot.vorsorgezielId !== zielId);
+    expect(ohne.length).toBeGreaterThan(0);
+    // Die Liste der Vorsorge zeigt das Depot mit seinem Verrechnungskonto darunter, nicht
+    // das Depot, das nicht zaehlt.
+    const posten = vorsorgesicht!.posten;
+    expect(posten.some((p) => p.art === "depot" && p.verrechnungskonto?.zaehlt)).toBe(true);
+    expect(posten.some((p) => ohne.some((d) => d.depot.id === p.id))).toBe(false);
+  });
 });
 
 /**

@@ -527,10 +527,14 @@ function migrationen(db: Database, filter: (version: number) => boolean): void {
  * aufbauende Budget steht wieder als Budget in `budget` und `budget_betrag` — mit dem
  * Start, der Kategorie, dem Konto und der Reihe, die der Spielstand heute der Rücklage
  * gibt. Daraus macht Migration 81 genau die Rücklage, die der Spielstand heute schreibt.
+ *
+ * Dazu das Schema ab Migration 83 (Verrechnungskonto und Vorsorgeziel am Depot): der
+ * Spielstand von heute schreibt in diese Spalten, und ohne sie liesse er sich nicht
+ * einspielen. Die Probe rechnet über kein Depot; was 83 anlegt, berührt ihre Zahlen nicht.
  */
 function alterSpielstand(bis: number): Database {
   const db = new SQL.Database();
-  migrationen(db, (v) => v <= bis);
+  migrationen(db, (v) => v <= bis || v >= 83);
   seedEinspielen(db, STICHTAG);
   neueFaelleEntfernen(db);
   db.run(
