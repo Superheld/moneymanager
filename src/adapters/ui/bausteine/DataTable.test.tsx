@@ -219,6 +219,38 @@ describe("DataTable — schmal", () => {
     expect(wertspalte()).toEqual(["−12,90 €", "−84,20 €"]);
   });
 
+  /**
+   * Bis 2026-11-22 stand die Wertspalte schmal fest auf 12ch bei `table-layout: fixed`,
+   * und ein Betrag mit Tausenderstelle stand als `+27.14…` da. Jetzt ist die Wertspalte
+   * so breit wie ihr Wert; den langen Namen hält `contain: inline-size` am Titel klein.
+   * Ob der Browser das so rechnet, kann jsdom nicht zeigen — geprüft wird, dass die
+   * Bedingungen dafür am Markup stehen.
+   */
+  it("schneidet den Wert nicht ab und haelt den Titel aus der Breitenrechnung", () => {
+    schmalStellen(true);
+    const { container } = render(<DataTable columns={spaltenBreit} rows={daten} />);
+    const tabelle = container.querySelector("table") as HTMLElement;
+    expect(tabelle.style.tableLayout).toBe("auto");
+    const [titel, wert] = Array.from(container.querySelectorAll("tbody tr")[0].querySelectorAll("td")) as HTMLElement[];
+    expect(titel.style.width).toBe("100%");
+    expect((titel.firstElementChild as HTMLElement).style.contain).toBe("inline-size");
+    expect(wert.style.whiteSpace).toBe("nowrap");
+    expect(wert.style.width).toBe("");
+    expect((wert.firstElementChild as HTMLElement).style.maxWidth).toBe("50vw");
+  });
+
+  it("laesst einen Spaltenkopf schmal umbrechen, statt ihn zu kuerzen", () => {
+    schmalStellen(true);
+    const { container } = render(<DataTable columns={spaltenBreit} rows={daten} sortable />);
+    const koepfe = Array.from(container.querySelectorAll("thead th")) as HTMLElement[];
+    for (const k of koepfe) {
+      expect(k.style.whiteSpace).toBe("normal");
+      expect(k.style.textOverflow).toBe("");
+    }
+    // Der Pfeil haengt am letzten Wort und steht nach einem Umbruch nicht allein.
+    expect(koepfe[1].textContent).toBe("Betrag ⇅");
+  });
+
   it("laesst die breite Form unberuehrt", () => {
     schmalStellen(false);
     const { container } = render(<DataTable columns={spaltenBreit} rows={daten} />);
