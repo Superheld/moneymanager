@@ -150,6 +150,7 @@ const de = {
         "Zu diesem Stichtag ist schon etwas eingetragen. Stimmt es nicht, entferne es und trag es neu ein.",
       wertUngueltig: "Bitte einen Wert angeben — 0 oder mehr.",
       restschuldUngueltig: "Bitte die Restschuld angeben — 0 oder mehr, ohne Minus.",
+      verrechnungskontoUnbekannt: "Das gewählte Konto gibt es nicht mehr.",
     },
     vorsorge: {
       zielMonatUngueltig: "Bitte angeben, ab wann du das Geld brauchst.",
@@ -342,7 +343,7 @@ const de = {
       kpiFehlt: "Fehlt",
       ohneSparen: "Ohne weiteres Sparen hättest du im Ruhestand {{betrag}} im Monat statt {{wunsch}}.",
       hinweis:
-        "Alle Beträge in heutiger Kaufkraft. Dafür da ist, was auf Konten der Klassen {{vorsorge}} und {{investment}} liegt, dazu alle Depots und die Vermögenswerte, bei denen „zählt zum Vorsorgeziel“ angehakt ist. Schulden sind nicht abgezogen.",
+        "Alle Beträge in heutiger Kaufkraft. Dafür da ist, was auf Konten der Klassen {{vorsorge}} und {{investment}} liegt — auch auf dem Verrechnungskonto eines Depots —, dazu die Depots und Vermögenswerte, bei denen „zählt zum Vorsorgeziel“ angehakt ist. Schulden sind nicht abgezogen.",
       bearbeiten: "Vorsorgeziel bearbeiten",
       loeschen: "Vorsorgeziel löschen",
       loeschenFolgen:
@@ -363,6 +364,37 @@ const de = {
         "Was du im Jahr an Ertrag erwartest, abzüglich der Inflation. Je niedriger du sie ansetzt, desto vorsichtiger die Rechnung.",
       zaehlt: "zählt zum Vorsorgeziel",
       zaehltHinweis: "Mit Haken zählt sein Wert zu dem, was für {{name}} da ist — etwa eine Versicherung mit Rückkaufswert.",
+      spaltePosten: "Was",
+      spalteBetrag: "Betrag",
+      postenArt: {
+        depot: "Depot",
+        konto: "Konto",
+        verrechnungskonto: "Verrechnungskonto",
+        vermoegenswert: "Vermögenswert",
+      },
+      postenLeer:
+        "Noch nichts: kein Konto der Klassen {{vorsorge}} oder {{investment}} und kein Depot oder Vermögenswert, der zum Vorsorgeziel zählt.",
+      zaehltNichtKurz: "zählt nicht mit — Klasse {{klasse}}",
+    },
+    // Die Depots im Bereich Vermögen: abgerufen, nicht angelegt. Gepflegt werden nur
+    // Verrechnungskonto und ob das Depot zum Vorsorgeziel zählt.
+    depots: {
+      titel: "Depots",
+      untertitel: "Von der Bank abgerufen — je Depot mit dem Konto, über das gekauft und verkauft wird",
+      spalteDepot: "Depot",
+      spalteVerrechnungskonto: "Verrechnungskonto",
+      spalteStand: "Stand",
+      spalteDepotwert: "Depotwert",
+      spalteSumme: "Zusammen",
+      keinVerrechnungskonto: "keines gewählt",
+      modalBearbeiten: "Depot bearbeiten",
+      feldVerrechnungskonto: "Verrechnungskonto",
+      feldVerrechnungskontoHinweis:
+        "Das Konto, über das du Wertpapiere kaufst und verkaufst. Sein Stand steht hier neben dem Depotwert.",
+      verrechnungskontoKeines: "kein Verrechnungskonto",
+      zaehltHinweis: "Mit Haken zählt der Depotwert zu dem, was für {{name}} da ist.",
+      zaehltNicht:
+        "{{konto}} hat die Klasse {{klasse}} und zählt deshalb nicht zur Vorsorge. Soll es mitzählen, gib ihm im Bereich Konten die Klasse {{vorsorge}} oder {{investment}}.",
     },
     titel: "Vermögen",
     untertitel: "Was du besitzt und was du schuldest — auch das, was auf keinem Konto liegt",
@@ -2836,6 +2868,7 @@ const en: typeof de = {
         "Something is already recorded for this as-of date. If it is wrong, remove it and enter it again.",
       wertUngueltig: "Please enter a value — 0 or more.",
       restschuldUngueltig: "Please enter the outstanding balance — 0 or more, without a minus.",
+      verrechnungskontoUnbekannt: "The selected account no longer exists.",
     },
     vorsorge: {
       zielMonatUngueltig: "Please enter when you will need the money.",
@@ -3021,7 +3054,7 @@ const en: typeof de = {
       kpiFehlt: "Missing",
       ohneSparen: "Without further saving you would have {{betrag}} per month in retirement instead of {{wunsch}}.",
       hinweis:
-        "All amounts in today's purchasing power. Counted are accounts of the classes {{vorsorge}} and {{investment}}, all securities accounts and the assets marked “counts towards the retirement goal”. Debts are not deducted.",
+        "All amounts in today's purchasing power. Counted are accounts of the classes {{vorsorge}} and {{investment}} — including a portfolio's settlement account —, plus the portfolios and assets marked “counts towards the retirement goal”. Debts are not deducted.",
       bearbeiten: "Edit retirement goal",
       loeschen: "Delete retirement goal",
       loeschenFolgen: "The assumptions go with it. Accounts, securities accounts and assets stay as they are.",
@@ -3041,6 +3074,35 @@ const en: typeof de = {
         "The yearly return you expect, minus inflation. The lower you set it, the more cautious the calculation.",
       zaehlt: "counts towards the retirement goal",
       zaehltHinweis: "When ticked, its value counts towards what is there for {{name}} — a policy with a surrender value, for example.",
+      spaltePosten: "What",
+      spalteBetrag: "Amount",
+      postenArt: {
+        depot: "Portfolio",
+        konto: "Account",
+        verrechnungskonto: "Settlement account",
+        vermoegenswert: "Asset",
+      },
+      postenLeer:
+        "Nothing yet: no account of the classes {{vorsorge}} or {{investment}} and no portfolio or asset that counts towards the retirement goal.",
+      zaehltNichtKurz: "not counted — class {{klasse}}",
+    },
+    depots: {
+      titel: "Portfolios",
+      untertitel: "Fetched from the bank — each with the account used for buying and selling",
+      spalteDepot: "Portfolio",
+      spalteVerrechnungskonto: "Settlement account",
+      spalteStand: "Balance",
+      spalteDepotwert: "Portfolio value",
+      spalteSumme: "Together",
+      keinVerrechnungskonto: "none selected",
+      modalBearbeiten: "Edit portfolio",
+      feldVerrechnungskonto: "Settlement account",
+      feldVerrechnungskontoHinweis:
+        "The account you use to buy and sell securities. Its balance is shown here next to the portfolio value.",
+      verrechnungskontoKeines: "no settlement account",
+      zaehltHinweis: "When ticked, the portfolio value counts towards what is there for {{name}}.",
+      zaehltNicht:
+        "{{konto}} has the class {{klasse}} and therefore does not count towards retirement. To count it, give it the class {{vorsorge}} or {{investment}} under Accounts.",
     },
     titel: "Wealth",
     untertitel: "What you own and what you owe — including what is not in any account",
