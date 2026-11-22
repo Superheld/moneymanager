@@ -620,13 +620,30 @@ select.field {
    einem Bedienteil darin kürzt sich nie — ein abgeschnittener Knopf ist keiner, und
    `overflow: hidden` schnitte auch seinen Fokusrahmen ab. Gibt es nur schmal (das Markup
    entsteht nur dort, siehe `zelleZweitzeile` in `DataTable.tsx`). */
+/* Der Trenner „·" zwischen zwei Stücken steht nie am Rand einer Zeile — ohne dass
+   JavaScript messen muss, wo umgebrochen wurde:
+
+   - Er ist ein `::before` am Anfang jedes Stücks ausser dem ersten, so breit wie der
+     Abstand (`--zweitzeile-abstand`), und das Stück rückt um genau diese Breite nach
+     links (negativer Rand). Mitten in der Zeile liegt er so im Abstand zum Vorgänger.
+   - Beginnt ein Stück eine neue Zeile, liegt sein Trenner links AUSSERHALB der Zeile.
+     `clip-path` schneidet dort ab. Das Polster links (mit gleich grossem negativem Rand)
+     lässt dabei 4 px stehen, damit der Fokusrahmen eines Bedienteils am Zeilenanfang
+     ganz bleibt; der Punkt selbst sitzt mittig im Abstand, also weiter links.
+
+   Bis 2026-11-22 hing der Trenner als Text HINTER dem Stück; brach das nächste Stück
+   um, stand er allein am Ende der oberen Zeile. */
 .datentabelle-zweitzeile {
+  --zweitzeile-abstand: var(--sp-3);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  column-gap: var(--sp-1);
+  column-gap: var(--zweitzeile-abstand);
   row-gap: var(--sp-1);
   margin-top: 2px;
+  margin-left: calc(-1 * var(--sp-1));
+  padding-left: var(--sp-1);
+  clip-path: inset(-1em -1em -1em 0);
   font-size: var(--fs-xs);
   font-weight: var(--fw-regular);
   color: var(--ink-3);
@@ -638,12 +655,28 @@ select.field {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.datentabelle-zweitteil + .datentabelle-zweitteil {
+  margin-left: calc(-1 * var(--zweitzeile-abstand));
+}
+.datentabelle-zweitteil + .datentabelle-zweitteil::before {
+  content: "·" / "";
+  display: inline-block;
+  width: var(--zweitzeile-abstand);
+  text-align: center;
+  opacity: 0.45;
+}
+/* Ein Stück mit Bedienteil wird selbst ein Flex-Behälter: seine Grundlinie ist sonst die
+   Unterkante eines Symbols, und der Trenner davor sässe dort wie ein Schlusspunkt hinter
+   dem vorigen Stück („01.05.2026 ."). So steht er mittig, wie neben Text. */
 .datentabelle-zweitteil:has(button, select, input, [role="combobox"], [role="checkbox"]) {
   flex-shrink: 0;
   overflow: visible;
+  display: inline-flex;
+  align-items: center;
 }
-.datentabelle-trenner {
-  opacity: 0.45;
+/* Im Flex-Behälter fällt das Leerzeichen hinter dem Namen weg; der Abstand ersetzt es. */
+.datentabelle-zweitteil:has(button, select, input, [role="combobox"], [role="checkbox"]) > .zweitzeile-beschriftung {
+  margin-right: 0.25em;
 }
 
 /* Die Beschriftung eines Werts, der schmal in die zweite Zeile wandert: breit sagt der

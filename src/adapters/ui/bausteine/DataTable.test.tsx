@@ -7,6 +7,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { DataTable } from ".";
 
 const zeilen = Array.from({ length: 250 }, (_, i) => ({ id: `z${i}`, name: `Buchung ${i}` }));
@@ -298,6 +300,30 @@ describe("DataTable — schmal", () => {
     const stuecke = container.querySelectorAll(".datentabelle-zweitzeile > .datentabelle-zweitteil");
     expect(stuecke).toHaveLength(2);
     expect(screen.getByRole("combobox", { name: "Wahl" }).closest(".datentabelle-zweitteil")).toBe(stuecke[1]);
+  });
+
+  /**
+   * Der Trenner steht nicht im Markup: hinge er als Text an einem Stück, stünde er beim
+   * Umbruch am Ende oder am Anfang einer Zeile. Er kommt aus `app.css` als `::before`
+   * vor jedem Stück ausser dem ersten, und was am Zeilenanfang links hinausragt, schneidet
+   * `clip-path` ab — beides geprüft am Text der Regeln, weil jsdom kein Layout rechnet.
+   */
+  it("setzt den Trenner per CSS vor das Stueck, nicht als Text dahinter", () => {
+    schmalStellen(true);
+    const spalten = [
+      { key: "name", label: "Name" },
+      { key: "betrag", label: "Betrag", align: "right" as const },
+      { key: "art", label: "Art" },
+      { key: "datum", label: "Datum" },
+    ];
+    const { container } = render(<DataTable columns={spalten} rows={[{ name: "Ohlert", betrag: "12,00", art: "fest", datum: "03.08.2026" }]} />);
+    const zweit = container.querySelector(".datentabelle-zweitzeile") as HTMLElement;
+    expect(zweit.textContent).not.toContain("·");
+    expect(zweit.querySelectorAll(":scope > .datentabelle-zweitteil")).toHaveLength(2);
+
+    const css = readFileSync(join(__dirname, "../../../styles/app.css"), "utf8");
+    expect(css).toMatch(/\.datentabelle-zweitteil \+ \.datentabelle-zweitteil::before \{[^}]*content: "·"/);
+    expect(css).toMatch(/\.datentabelle-zweitzeile \{[^}]*clip-path: inset\(-1em -1em -1em 0\)/);
   });
 
   it("laesst die breite Form unberuehrt", () => {

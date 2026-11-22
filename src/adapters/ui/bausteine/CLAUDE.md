@@ -394,8 +394,17 @@ nur `…` — zuordnen ging am Telefon nicht. Zwei Regeln seitdem:
   einem Bedienteil darin nie (`:has(…)` in `app.css`) — auch `overflow: hidden` bleibt
   dort weg, sonst schnitte es den Fokusrahmen ab. Die Zeile wird dadurch höher, und das
   ist der Preis: eine Zeile, die ihre Höhe hält und dabei den Knopf verliert, wäre der
-  teurere Fehler. Der Trenner „·" hängt hinter seinem Stück, damit er beim Umbruch am
-  Ende der oberen Zeile steht und nicht allein am Anfang der unteren.
+  teurere Fehler.
+- **Der Trenner „·" steht nie am Rand einer Zeile** (seit 2026-11-22). Er hing vorher als
+  Text hinter seinem Stück — und stand, sobald das nächste Stück (oft ein Bedienteil)
+  umbrach, allein am Ende der oberen Zeile. Jetzt ist er ein `::before` VOR jedem Stück
+  ausser dem ersten, so breit wie der Abstand, und das Stück rückt um diese Breite nach
+  links. Mitten in der Zeile liegt er im Abstand; beginnt ein Stück eine neue Zeile,
+  ragt er links hinaus, und `clip-path` an der Zeile schneidet ihn ab. Kein JavaScript
+  muss messen, wo umgebrochen wurde. Zwei Dinge daran: das Polster von 4 px links
+  (mit gleich grossem negativem Rand) hält den Fokusrahmen eines Bedienteils am
+  Zeilenanfang ganz, und ein Stück mit Bedienteil ist selbst ein Flex-Behälter —
+  sonst läge der Punkt auf der Unterkante eines Symbols und läse sich als Schlusspunkt.
 
 **Die Wertspalte ist so breit wie ihr längster Wert, der Titel bekommt den Rest** (seit
 2026-11-22). Davor lag schmal `table-layout: fixed` an und die Wertspalte stand fest auf
