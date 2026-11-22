@@ -305,7 +305,7 @@ Wo es heute steht:
 | `kontenverwaltung/BankSuche` | Vorschlagsliste ohne Rollen | Base UI `Combobox` |
 | Zahlenfeld im `AbrufDialog` | `<input type="number">` | Base UI `NumberField` |
 | `bausteine/Meldungen` | geschluckte Fehler, leere Listen | Base UI `Toast` |
-| `IconButton`, `Zeilenlink`, die Knöpfe in Shell, Kalender, Picker | roher `<button>` | Base UI `Button` |
+| `IconButton`, `Zeilenlink`, die Knöpfe in Shell (auch die Leiste unten), Kalender, Picker | roher `<button>` | Base UI `Button` |
 
 **Was bewusst Eigenbau bleibt** — jede Stelle mit Grund, und `bedienteile.test.ts` lässt
 nur genau diese durch:
@@ -635,8 +635,10 @@ das bedeutet, ist enger als es klingt, und die Grenze gehört benannt:
 
 - **Die Shell ist umgestellt.** In `app.css` steht die schmale Form ohne Medienabfrage da,
   die breiten kommen per `min-width` dazu. Dasselbe gilt für `.main`, `.field` und
-  `.form-grid`.
-- **Die BEREICHE sind es nicht.** Ihre Raster stehen weiter als `max-width`-Abfragen
+  `.form-grid`. Schmal führt eine Leiste unten in die vier häufigsten Bereiche (unten,
+  „Die Navigation in drei Stufen").
+- **Die Übersicht ist schmal eigens geordnet**: der laufende Monat oben, „Damit die
+  Zahlen stimmen" darunter als eine Zeile, die aufklappt (`uebersicht/CLAUDE.md`).- **Die BEREICHE sind es nicht.** Ihre Raster stehen weiter als `max-width`-Abfragen
   (`ausblick-karten`) oder tragen sich über `auto-fit` selbst (`karten-paar`, `kpis`). Sie
   funktionieren schmal, aber sie sind nicht dafür entworfen — eine Tabelle scrollt dort
   waagerecht, ein Registerband ebenso. Das ist der Stand, und die Neuaufteilung kommt
@@ -674,9 +676,42 @@ Der Wert steckt im Bundle, nicht in der laufenden App: nach dem Aendern muss
 
 | Breite | Form |
 |---|---|
-| bis 699 px | **Schublade** — links ausserhalb des Bildes, eine Kopfleiste mit Griff holt sie herein. Beschriftungen vollständig. |
-| ab 700 px | feste Spalte im Raster, 68 px, **nur Icons** |
+| bis 699 px | **Leiste unten** mit Übersicht, Buchungen, Rücklagen, Budgets und „Mehr"; „Mehr" holt die **Schublade** mit allen Bereichen herein. Oben eine Kopfleiste mit dem Namen des Bereichs. |
+| ab 700 px | feste Spalte im Raster, 68 px, **nur Icons**; keine Leiste unten |
 | ab 1100 px | dieselbe Spalte mit 248 px und Beschriftung |
+
+### Schmal: die Leiste unten (seit 2026-11-22)
+
+Am Handy ist der Daumen unten, und die Bereiche, in die man unterwegs geht, sind wenige:
+nachsehen, wie man dasteht (Übersicht), zuordnen und abhaken (Buchungen), was noch da
+ist (Budgets) und was zurückgelegt ist (Rücklagen). Sie stehen unten in einer festen
+Leiste (`LEISTE` in `AppShell.tsx`), alles Übrige hinter „Mehr", das die Schublade öffnet.
+Abrufen bleibt ein Knopf in Übersicht und Buchungen und bekommt keinen Platz in der Leiste.
+
+- **Nur WELCHE Bereiche steht in `LEISTE`, nicht wie sie heissen.** Beschriftung und Icon
+  kommen aus `GRUPPEN` und der `ScreenId`, wie in der Schublade — eine zweite Zuordnung
+  wäre die Stelle, die beim nächsten Umbenennen vergessen wird.
+- **Der aktive Bereich trägt `aria-current="page"`.** Steht man in einem Bereich ohne
+  eigenen Eintrag, trägt „Mehr" die Markierung, mit `aria-current="true"`: es ist nicht
+  der Bereich, sondern der Eintrag, hinter dem er liegt.
+- **Ein versteckter Bereich fällt weg, die Leiste wird nicht aufgefüllt.** Sonst stünde
+  je nach Einstellung an derselben Stelle etwas anderes, und der Daumen träfe das Falsche.
+- **Sie steht IM Raster von `.app`** (dritte Zeile), nicht fixiert über dem Inhalt. Der
+  Scrollbereich `.main` endet deshalb an ihrer Kante, und nichts verschwindet unter ihr,
+  ohne dass ein Abstand ihre Höhe nachrechnen müsste. Die Wischleiste des Telefons
+  polstert sie (`safe-area-inset-bottom`), nicht den Inhalt. Die Meldungen schweben
+  schmal über ihr (`--leiste-hoehe`), Schublade und Dialoge liegen darüber.
+- **Den Griff (☰) oben gibt es nicht mehr.** „Mehr" öffnet dieselbe Schublade, und zwei
+  Wege zum selben Ziel an zwei Enden des Bildschirms lassen fragen, ob sie dasselbe tun.
+  Der gewohnte Ort oben war das einzige, was für ihn sprach. Nach dem Schliessen geht der
+  Fokus deshalb an „Mehr" zurück.
+- **Eigenbau aus Base-UI-Knöpfen**: Base UI hat kein Bedienteil für eine Leiste von
+  Sprungzielen (`NavigationMenu` ist für Menüs mit aufklappenden Unterpunkten). Die
+  Einträge sind Knöpfe, keine Links — gewechselt wird ein Zustand, eine Adresse gibt es
+  nicht.
+
+Geprüft in `bausteine/AppShell.test.tsx` (Einträge, Markierung, „Mehr", versteckte
+Bereiche).
 
 Der Mechanismus der mittleren Stufe ist unverändert eine einzige Klasse: **was `.lbl`
 trägt, verschwindet dort.** Wer der Shell etwas hinzufügt, kapselt die Beschriftung

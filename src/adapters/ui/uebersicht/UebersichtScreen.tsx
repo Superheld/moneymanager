@@ -70,6 +70,7 @@ import { Collapsible } from "@base-ui/react/collapsible";
 import { fehlerMelden } from "../bausteine/Meldungen";
 import { Stapel } from "../bausteine/Anordnung";
 import { LeererZustand } from "../bausteine/LeererZustand";
+import { useSchmal } from "../bausteine/useSchmal";
 
 function heuteIso(): string {
   const n = new Date();
@@ -153,6 +154,22 @@ export function UebersichtScreen({ onNavigate }: { onNavigate?: (id: ScreenId) =
   /** Seit Migration 81 ist jedes Budget monatlich; das frühere aufbauende ist eine Rücklage. */
   const monatliche = staende;
 
+  /**
+   * Schmal steht der laufende Monat ganz oben und „Damit die Zahlen stimmen" darunter,
+   * als eine Zeile, die aufklappt (seit 2026-11-22). Breit steht die Karte vollständig
+   * über den Monaten wie bisher.
+   *
+   * Warum hier `useSchmal` und nicht CSS: es ändert sich das MARKUP — die Karte wird zur
+   * Zeile und rückt zwischen den laufenden und den nächsten Monat. CSS könnte sie nur
+   * umsortieren, nicht einklappen.
+   *
+   * Nach unten rückt sie nur, wenn über ihr ein Monat steht. Ganz am Anfang (kein Plan)
+   * gibt es keinen, und dann trägt sie wie breit den leeren Zustand darunter — offen, mit
+   * ihren Knöpfen; eingeklappt stünde dort eine Zeile über einer Karte ohne Weg.
+   */
+  const schmal = useSchmal();
+  const einrichtungUnten = schmal && !!daten?.hatPlandaten && daten.ergebnisse.length > 0;
+
   return (
     <div className="screen">
       <PageHead
@@ -169,7 +186,7 @@ export function UebersichtScreen({ onNavigate }: { onNavigate?: (id: ScreenId) =
 
       {fehler && <Card style={{ borderColor: "var(--warn)" }}>{t("uebersicht.fehlerDb")} ({fehler})</Card>}
 
-      {daten && <EinrichtungKarte stand={daten.einrichtung} onNavigate={onNavigate} />}
+      {daten && !einrichtungUnten && <EinrichtungKarte stand={daten.einrichtung} onNavigate={onNavigate} />}
 
       {/* Ganz am Anfang — keine Buchung und kein Plan — stand hier der Hinweis auf die
           fehlenden Plan-Daten. Der ist dann der zweite Schritt vor dem ersten: woraus die
@@ -197,6 +214,9 @@ export function UebersichtScreen({ onNavigate }: { onNavigate?: (id: ScreenId) =
             const b = daten.sicht.buchungen.find((x) => x.id === istId);
             if (b) setDetail(b);
           }}
+          unterDemLaufenden={
+            einrichtungUnten ? <EinrichtungKarte stand={daten.einrichtung} onNavigate={onNavigate} alsZeile /> : undefined
+          }
         />
       )}
 

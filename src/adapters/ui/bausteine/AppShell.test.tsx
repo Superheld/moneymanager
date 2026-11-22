@@ -23,10 +23,14 @@ function baue(onNavigate: (id: string) => void = () => {}) {
 }
 
 const leiste = () => document.querySelector(".side") as HTMLElement;
-const griff = () => screen.getByRole("button", { name: i18n.t("shell.menueOeffnen") });
+/**
+ * Der Weg in die Schublade. Bis 2026-11-22 war das der Griff (☰) in der Kopfleiste;
+ * seitdem ist es „Mehr" in der Leiste unten, und den Griff gibt es nicht mehr.
+ */
+const griff = () => screen.getByRole("button", { name: i18n.t("shell.navMehr") });
 
 describe("AppShell — die Schublade", () => {
-  it("ist zu, bis jemand den Griff benutzt", async () => {
+  it("ist zu, bis jemand Mehr benutzt", async () => {
     const nutzer = userEvent.setup();
     baue();
 
@@ -91,7 +95,7 @@ describe("AppShell — die Schublade", () => {
     await nutzer.click(screen.getByRole("button", { name: i18n.t("shell.menueSchliessen") }));
 
     expect(leiste().dataset.offen).toBe("false");
-    // Der Griff steht nach dem Schliessen sichtbar an derselben Stelle — er ist damit
+    // „Mehr" steht nach dem Schliessen sichtbar an derselben Stelle — es ist damit
     // das einzige Element, auf dem der Fokus nicht ins Leere zeigt.
     expect(document.activeElement).toBe(griff());
   });
@@ -100,5 +104,82 @@ describe("AppShell — die Schublade", () => {
   it("nennt in der Kopfleiste den Bereich, in dem man steht", () => {
     baue();
     expect(document.querySelector(".topbar-titel")?.textContent).toBe(i18n.t("shell.navUebersicht"));
+  });
+});
+
+describe("AppShell — die Leiste unten", () => {
+  const eintraege = () =>
+    [...document.querySelectorAll(".leiste .leiste-eintrag")].map((e) => e.textContent);
+
+  function baueIn(current: string, versteckt?: string[], onNavigate: (id: string) => void = () => {}) {
+    return render(
+      <AppShell current={current as never} onNavigate={onNavigate as never} versteckt={versteckt as never}>
+        <p>Inhalt</p>
+      </AppShell>,
+    );
+  }
+
+  /** Beschriftung aus derselben Tabelle wie die Schublade — nicht aus einer zweiten. */
+  it("zeigt vier Bereiche und Mehr, beschriftet wie in der Schublade", () => {
+    baueIn("uebersicht");
+    expect(eintraege()).toEqual([
+      i18n.t("shell.navUebersicht"),
+      i18n.t("shell.navBuchungen"),
+      i18n.t("shell.navRuecklagen"),
+      i18n.t("shell.navBudgets"),
+      i18n.t("shell.navMehr"),
+    ]);
+  });
+
+  it("markiert den Bereich, in dem man steht", () => {
+    baueIn("konten");
+    const leisteNav = document.querySelector(".leiste") as HTMLElement;
+    const aktiv = [...leisteNav.querySelectorAll("[aria-current]")];
+    expect(aktiv.map((e) => [e.textContent, e.getAttribute("aria-current")])).toEqual([
+      [i18n.t("shell.navBuchungen"), "page"],
+    ]);
+  });
+
+  /** Ohne eigenen Eintrag ist „Mehr" der Weg dorthin — und damit das, was leuchtet. */
+  it("markiert Mehr, wenn der Bereich keinen eigenen Eintrag hat", () => {
+    baueIn("analyse");
+    const leisteNav = document.querySelector(".leiste") as HTMLElement;
+    const aktiv = [...leisteNav.querySelectorAll("[aria-current]")];
+    expect(aktiv.map((e) => e.textContent)).toEqual([i18n.t("shell.navMehr")]);
+    expect(griff()).toHaveAttribute("aria-current", "true");
+  });
+
+  it("wechselt den Bereich und laesst die Schublade zu", async () => {
+    const nutzer = userEvent.setup();
+    const gewaehlt: string[] = [];
+    baueIn("uebersicht", undefined, (id) => gewaehlt.push(id));
+
+    await nutzer.click(screen.getByRole("button", { name: i18n.t("shell.navRuecklagen") }));
+
+    expect(gewaehlt).toEqual(["ruecklagen"]);
+    expect(leiste().dataset.offen).toBe("false");
+  });
+
+  it("oeffnet mit Mehr die Schublade mit allen Bereichen", async () => {
+    const nutzer = userEvent.setup();
+    baueIn("uebersicht");
+
+    await nutzer.click(griff());
+
+    expect(leiste().dataset.offen).toBe("true");
+    expect(griff()).toHaveAttribute("aria-controls", "hauptnavigation");
+    // Auch die, die unten keinen Eintrag haben.
+    expect(screen.getByTitle(i18n.t("shell.navEinstellungen"))).toBeInTheDocument();
+  });
+
+  /** Nicht aufgefüllt: an derselben Stelle stuende sonst je nach Einstellung etwas anderes. */
+  it("laesst einen versteckten Bereich weg, statt aufzufuellen", () => {
+    baueIn("uebersicht", ["ruecklagen"]);
+    expect(eintraege()).toEqual([
+      i18n.t("shell.navUebersicht"),
+      i18n.t("shell.navBuchungen"),
+      i18n.t("shell.navBudgets"),
+      i18n.t("shell.navMehr"),
+    ]);
   });
 });

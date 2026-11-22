@@ -175,7 +175,7 @@ const de = {
     brandSub: "deine private Bilanz",
     footLokal: "Lokal · keine Cloud",
     abzeichenVorab: "Vorab",
-    menueOeffnen: "Navigation öffnen",
+    navMehr: "Mehr",
     menueSchliessen: "Navigation schliessen",
     dialogSchliessen: "Dialog schließen",
     spaeterePhase: "kommt in einer späteren Phase",
@@ -805,6 +805,7 @@ const de = {
   einrichtung: {
     titel: "Damit die Zahlen stimmen",
     untertitel: "{{erledigt}} von {{gesamt}} erledigt. Die App rechnet mit dem, was du ihr sagst — das hier fehlt ihr noch.",
+    stand: "{{erledigt}} von {{gesamt}} erledigt",
     erledigt: "erledigt",
     wartet: "kommt danach",
     freiwillig: "wenn du magst",
@@ -2835,7 +2836,7 @@ const en: typeof de = {
     brandSub: "your private balance sheet",
     footLokal: "Local · no cloud",
     abzeichenVorab: "Pre-release",
-    menueOeffnen: "Open navigation",
+    navMehr: "More",
     menueSchliessen: "Close navigation",
     dialogSchliessen: "Close dialog",
     spaeterePhase: "coming in a later phase",
@@ -3447,6 +3448,7 @@ const en: typeof de = {
   einrichtung: {
     titel: "Getting the numbers right",
     untertitel: "{{erledigt}} of {{gesamt}} done. The app works with what you tell it — this is still missing.",
+    stand: "{{erledigt}} of {{gesamt}} done",
     erledigt: "done",
     wartet: "comes next",
     freiwillig: "if you like",
