@@ -74,6 +74,31 @@ mod tests {
         pool.close().await;
     }
 
+    /// **Welches SQLite in SQLCipher steckt, steht nicht in der Nummer von libsqlite3-sys.**
+    ///
+    /// RUSTSEC-2026-0459 (WAL mit fremder Seitengroesse liest fremden Speicher) ist erst ab
+    /// SQLite 3.54.0 behoben. Das Advisory nennt libsqlite3-sys ab 0.39 „gepatcht" — fuer
+    /// `bundled`. In der SQLCipher-Variante buendelte 0.39 aber noch SQLite 3.53.4; cargo-deny
+    /// waere dort gruen gewesen und die Luecke offen. Deshalb fragt dieser Test das gelinkte
+    /// SQLite selbst, statt der Fassungsnummer zu glauben.
+    #[tokio::test]
+    async fn das_gebuendelte_sqlite_ist_gegen_rustsec_2026_0459_gepatcht() {
+        let datei = pfad("fassung");
+        // Mit Schluessel: `cipher_provider` antwortet nur auf einer verschluesselten Verbindung.
+        let pool = oeffnen(&datei, Some(&als_passwort(SCHLUESSEL))).await.expect("oeffnen");
+        let sqlite: String = sqlx::query_scalar("SELECT sqlite_version()").fetch_one(&pool).await.expect("sqlite");
+        let cipher: String = sqlx::query_scalar("PRAGMA cipher_version").fetch_one(&pool).await.expect("cipher");
+        let anbieter: String = sqlx::query_scalar("PRAGMA cipher_provider").fetch_one(&pool).await.expect("provider");
+        println!("SQLite {sqlite}, SQLCipher {cipher}, Krypto {anbieter}");
+        pool.close().await;
+
+        let teile: Vec<u32> = sqlite.split('.').map(|t| t.parse().expect("Fassungsteil")).collect();
+        assert!(
+            teile[..2] >= [3, 54][..],
+            "SQLite {sqlite} ist vor 3.54.0 und damit von RUSTSEC-2026-0459 betroffen."
+        );
+    }
+
     #[tokio::test]
     async fn eine_verschluesselte_datei_traegt_keinen_sqlite_kopf() {
         let datei = pfad("kopf");

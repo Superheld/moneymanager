@@ -5,6 +5,14 @@ Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 
 ## [Unveröffentlicht]
 
+### Behoben
+
+**SQLite ist auf 3.54.1 gehoben, SQLCipher auf 4.20.0** (libsqlite3-sys 0.40.0, sqlx 0.9.1).
+Damit ist RUSTSEC-2026-0459 behoben: eine untergeschobene `-wal`-Datei mit fremder
+Seitengrösse konnte Speicher des Prozesses in Abfragen zurückgeben. Das Dateiformat bleibt
+dasselbe — ein mit der bisherigen Fassung verschlüsselter Bestand geht unverändert auf,
+geprüft an einer mit ihr geschriebenen Datei samt WAL.
+
 ## [0.31.0-pre.1] — 2026-11-22
 
 Die Übersicht rechnet jetzt, was ein Monat kostet, statt nur, was vom Konto geht; Rücklagen
