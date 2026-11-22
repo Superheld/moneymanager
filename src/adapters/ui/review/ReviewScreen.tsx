@@ -349,7 +349,6 @@ export function ReviewScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => vo
   }
 
   const td = { padding: "8px 10px", borderBottom: "1px solid var(--line-soft)", color: "var(--ink)" } as const;
-  const select = { padding: "5px 8px", borderRadius: "var(--r-md)", border: "1px solid var(--line)", background: "var(--surface)", fontSize: "var(--fs-tabelle)", fontFamily: "var(--font-ui)" } as const;
 
   return (
     <>
@@ -418,7 +417,10 @@ export function ReviewScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => vo
               value={suche}
               onChange={(e) => { setSuche(e.target.value); setSeite(0); }}
               placeholder={t("review.suche")}
-              style={{ ...select, flex: "1 1 200px", minWidth: 160 }}
+              // Die Form der Tabellenfilter statt eines eigenen Inline-Stils: der kannte
+              // keine Breite, stand schmal in 13 px (iOS zoomt beim Antippen) und 28 px hoch.
+              className="field tabellenfilter"
+              style={{ flex: "1 1 200px", minWidth: 160 }}
             />
             <span className="hinweis" style={{ alignSelf: "center" }}>{t("review.treffer", { n: gefiltert.length })}</span>
             <Kaestchen

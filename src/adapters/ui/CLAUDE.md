@@ -483,6 +483,12 @@ einmal, ein einzelner Monatswähler in einer Kartenkopfzeile braucht dafür kein
 es sonst nicht gäbe. Die Masse sind nicht erfunden — die Filterleiste der Import-Durchsicht
 trug sie längst als eigenen Inline-Stil und sah als einzige richtig aus.
 
+**Seit 2026-11-22 trägt auch deren Suchfeld die Klasse** (`field tabellenfilter`) statt
+des Inline-Stils. Der kannte keine Breite: schmal stand das Feld in 13 px — iOS zoomte
+beim Antippen — und 28 px hoch. Breit verschiebt sich dadurch die Polsterung um einen
+Pixel (5/9 statt 5/8), bewusst in Kauf genommen: ein Filter, der als einziger anders
+aussieht, ist genau das, was die Klasse abschaffen sollte.
+
 Die Regel dahinter ist dieselbe wie bei `Zeilenauswahl`: **die Grösse eines Bedienteils
 folgt dem, wo es steht, nicht dem, was es tut.**
 
