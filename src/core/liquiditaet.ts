@@ -56,6 +56,25 @@ export interface Verlaufsbefund {
   readonly minusAb?: string;
 }
 
+/** Ein datierter Posten im Fenster — eine Fälligkeit aus einer Zahlungsregel. */
+export interface Liquiditaetsposten {
+  readonly datum: string;
+  /** Die Regel, aus der er stammt — die beiden Seiten einer Umbuchung teilen sie. */
+  readonly regelId: string;
+  readonly bezeichnung: string;
+  /** Vorzeichenbehaftet, aus Sicht des Kontos (Abfluss negativ). */
+  readonly betrag: Cent;
+}
+
+/** Der Stand am ENDE eines Tages, auf beiden Linien. */
+export interface Tagesstand {
+  readonly datum: string;
+  readonly fest: Cent;
+  readonly erwartet: Cent;
+  /** Was an diesem Tag aus den Budgets erwartet abfliesst, positiv — ohne Datum verteilt. */
+  readonly budgetanteil: Cent;
+}
+
 export interface Kontovorschau {
   readonly kontoId: string;
   /** Der reale Stand heute — Ausgangspunkt beider Linien. */
@@ -64,6 +83,10 @@ export interface Kontovorschau {
   readonly fest: Verlaufsbefund;
   /** Zusätzlich der anteilige Budgetrest. */
   readonly erwartet: Verlaufsbefund;
+  /** Die Reihe selbst, Tag für Tag ab heute — aus ihr kommen die beiden Befunde. */
+  readonly tage: readonly Tagesstand[];
+  /** Die datierten Posten im Fenster, nach Tag. */
+  readonly posten: readonly Liquiditaetsposten[];
 }
 
 export interface LiquiditaetsEingabe {
@@ -106,18 +129,18 @@ function feste(
   regeln: readonly Zahlungsregel[],
   heute: string,
   monate: number,
-): Ereignis[] {
-  const raus: Ereignis[] = [];
+): Liquiditaetsposten[] {
+  const raus: Liquiditaetsposten[] = [];
   for (const r of regeln) {
     if (r.kontoId === kontoId) {
       for (const p of projiziereRegel(r, heute, monate)) {
-        raus.push({ datum: p.datum, betrag: p.betrag });
+        raus.push({ datum: p.datum, regelId: r.id, bezeichnung: p.bezeichnung, betrag: p.betrag });
       }
     }
     // Die Gegenseite einer geplanten Umbuchung.
     if (r.gegenkontoId === kontoId && r.charakter === "Umschichtung") {
       for (const p of projiziereRegel(r, heute, monate)) {
-        raus.push({ datum: p.datum, betrag: Math.abs(p.betrag) });
+        raus.push({ datum: p.datum, regelId: r.id, bezeichnung: p.bezeichnung, betrag: Math.abs(p.betrag) });
       }
     }
   }
@@ -222,15 +245,18 @@ export function liquiditaetsvorschau(e: LiquiditaetsEingabe): Kontovorschau[] {
 
     const festeReihe: Ereignis[] = [];
     const erwarteteReihe: Ereignis[] = [];
+    const tage: Tagesstand[] = [];
     let standFest = start;
     let standErwartet = start;
     for (let i = 0; i <= e.tage; i++) {
       const datum = toIso(addTage(parseIso(e.heute), i));
       const termin = jeTag.get(datum) ?? 0;
+      const budgetanteil = proTag(datum);
       standFest += termin;
-      standErwartet += termin - proTag(datum);
+      standErwartet += termin - budgetanteil;
       festeReihe.push({ datum, betrag: standFest });
       erwarteteReihe.push({ datum, betrag: standErwartet });
+      tage.push({ datum, fest: standFest, erwartet: standErwartet, budgetanteil });
       // Hier stand bis 2026-11-16 ein „Sicherheitsnetz", das die Schleife abbrach, sobald
       // `ord(datum)` nicht mehr `ord(heute) + i` war. `ord` ist aber ein Sortierschlüssel
       // (YYYYMMDD) und kein Tageszähler: am ersten Monatswechsel sprang er, und die
@@ -243,8 +269,63 @@ export function liquiditaetsvorschau(e: LiquiditaetsEingabe): Kontovorschau[] {
       start,
       fest: befund(festeReihe),
       erwartet: befund(erwarteteReihe),
+      tage,
+      posten: [...ereignisse].sort((a, b) => a.datum.localeCompare(b.datum)),
     };
   });
+}
+
+/** Ein Tag der Kurve über mehrere Konten — mit den Posten, die an ihm fallen. */
+export interface Kurventag extends Tagesstand {
+  /** Ohne `regelId`: über die Konten zusammengefasst, je Regel einer. */
+  readonly posten: readonly { readonly bezeichnung: string; readonly betrag: Cent }[];
+}
+
+/**
+ * Die Summe mehrerer Kontovorschauen, Tag für Tag — der Stand ALLER gerechneten Konten
+ * zusammen, wie ihn eine Kurve zeigt.
+ *
+ * **Eine Umbuchung zwischen zwei gerechneten Konten fällt heraus**, als Stufe und als
+ * Posten: sie steht auf beiden Konten mit derselben Regel, einmal ab und einmal zu, und
+ * ändert die Summe nicht. Zusammengefasst wird deshalb je Tag und Regel; was sich dabei
+ * zu null aufhebt, ist kein Posten dieses Tages. Eine Umbuchung auf ein Konto AUSSERHALB
+ * der Auswahl bleibt dagegen stehen — für die Summe ist sie ein Abfluss.
+ *
+ * Alle Vorschauen müssen dasselbe Fenster haben (sie kommen aus EINEM Aufruf von
+ * `liquiditaetsvorschau`); die Tage werden über ihr Datum zusammengeführt.
+ */
+export function liquiditaetskurve(vorschauen: readonly Kontovorschau[]): Kurventag[] {
+  const tage = new Map<string, { fest: Cent; erwartet: Cent; budgetanteil: Cent }>();
+  for (const v of vorschauen) {
+    for (const t of v.tage) {
+      const x = tage.get(t.datum) ?? { fest: 0, erwartet: 0, budgetanteil: 0 };
+      x.fest += t.fest;
+      x.erwartet += t.erwartet;
+      x.budgetanteil += t.budgetanteil;
+      tage.set(t.datum, x);
+    }
+  }
+
+  const jeTagUndRegel = new Map<string, Map<string, { bezeichnung: string; betrag: Cent }>>();
+  for (const v of vorschauen) {
+    for (const p of v.posten) {
+      const tag = jeTagUndRegel.get(p.datum) ?? new Map<string, { bezeichnung: string; betrag: Cent }>();
+      const x = tag.get(p.regelId) ?? { bezeichnung: p.bezeichnung, betrag: 0 };
+      x.betrag += p.betrag;
+      tag.set(p.regelId, x);
+      jeTagUndRegel.set(p.datum, tag);
+    }
+  }
+
+  return [...tage.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([datum, x]): Kurventag => ({
+      datum,
+      ...x,
+      posten: [...(jeTagUndRegel.get(datum)?.values() ?? [])]
+        .filter((p) => p.betrag !== 0)
+        .sort((a, b) => a.betrag - b.betrag),
+    }));
 }
 
 /**

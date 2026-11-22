@@ -627,12 +627,13 @@ const de = {
           "Soll gegen Ist, und die Spanne dazwischen. Ein Ist weit unter dem Soll ist " +
           "kein Sparerfolg, sondern eine Erkennung, die zu eng greift.",
       },
-      blind: {
-        name: "Ohne Budget und ohne Vertrag",
+      ungeplant: {
+        name: "Ungeplant",
         untertitel:
-          "Was abgeflossen ist, ohne in einer Planung vorzukommen. Der Befund, der von " +
-          "selbst nie auffällt: wer auf seine Budgets schaut, sieht nur, was er schon " +
-          "geplant hat — man kann jedes Budget halten und trotzdem im Minus landen.",
+          "Was abgeflossen ist, ohne zu einem Vertrag, einem Budget oder einer Rücklage zu " +
+          "gehören — dieselben Buchungen wie in der Zeile „Ungeplant“ der Übersicht. Der " +
+          "Befund, der von selbst nie auffällt: wer auf seine Budgets schaut, sieht nur, was " +
+          "er schon geplant hat — man kann jedes Budget halten und trotzdem im Minus landen.",
       },
       ausreisser: {
         name: "Ausreißer",
@@ -670,7 +671,13 @@ const de = {
     gehaltenVon: "{{gehalten}} von {{monate}}",
     keineBudgets: "Noch kein Budget angelegt — es gibt nichts, wogegen zu messen wäre.",
     keineVertraege: "Noch kein Vertrag angelegt.",
-    blindKeine: "Alles, was abgeflossen ist, war entweder budgetiert oder vertraglich gebunden.",
+    ungeplantKeine: "Alles, was abgeflossen ist, gehörte zu einem Vertrag, einem Budget oder einer Rücklage.",
+    ungeplantWartend_one: "{{count}} wartet auf Zuordnung",
+    ungeplantWartend_other: "{{count}} warten auf Zuordnung",
+    ungeplantOeffnen: "Buchungen in „{{name}}“ zeigen",
+    ungeplantBuchungen: "Ungeplant in „{{name}}“",
+    ungeplantHinweis:
+      "Eine Buchung, die auf die Wahl einer Rücklage wartet, zählt hier mit — so wie in der Übersicht, bis du wählst.",
   },
   // Monatsausblick — die drei Karten oben in der Übersicht.
   // Der Verlauf über die Gegenwart hinaus — Analyse, eigene Karte.
@@ -713,6 +720,11 @@ const de = {
         "„Fest“ rechnet nur mit dem, was ein Datum hat: Vertragsraten und geplante Umbuchungen. Ein Minus dort ist sicher — daran ändert Sparsamkeit nichts. „Erwartet“ zieht zusätzlich ab, was von den monatlichen Budgets noch offen ist, gleichmäßig über die Tage verteilt. Ein Minus nur dort lässt dir noch die Wahl.",
       hinweis:
         "Was hier nicht im Minus steht, läuft bis zum {{bis}} nicht ins Minus — geprüft ist damit nicht mehr. Gerechnet wird ab dem Kontostand, den die App kennt: was seit dem letzten Abruf passiert ist, fehlt.",
+      kurveName: "Stand je Tag. Mit den Pfeiltasten von Tag zu Tag.",
+      kurveSumme: "alle Konten der Tabelle zusammen",
+      kurveWaehlen: "Fahr über die Kurve oder tipp darauf: dann stehen hier der Tag, der Stand und was an ihm fällig wird.",
+      kurveBudgets: "Monatliche Budgets, anteilig",
+      kurveNichts: "An diesem Tag ist nichts mit Datum fällig.",
     },
     // „Wie lange reicht es ohne Einnahmen?" — das freie Geld gegen die Kosten eines Monats.
     // Die Zeilennamen folgen der Ergebnisrechnung (`ergebnis.zeile`) und `metaSparquote`.
@@ -3277,12 +3289,13 @@ const en: typeof de = {
           "Planned against actual, and the spread between. An actual far below plan is " +
           "not a saving, it is recognition that matches too narrowly.",
       },
-      blind: {
-        name: "No budget, no contract",
+      ungeplant: {
+        name: "Unplanned",
         untertitel:
-          "What went out without appearing in any plan. The finding that never surfaces " +
-          "on its own: looking at your budgets only shows what you already planned — you " +
-          "can hold every budget and still end up short.",
+          "What went out without belonging to a contract, a budget or a reserve — the same " +
+          "transactions as in the “Unplanned” row of the overview. The finding that never " +
+          "surfaces on its own: looking at your budgets only shows what you already planned — " +
+          "you can hold every budget and still end up short.",
       },
       ausreisser: {
         name: "Outliers",
@@ -3320,7 +3333,13 @@ const en: typeof de = {
     gehaltenVon: "{{gehalten}} of {{monate}}",
     keineBudgets: "No budget yet — there is nothing to measure against.",
     keineVertraege: "No contract yet.",
-    blindKeine: "Everything that went out was either budgeted or tied to a contract.",
+    ungeplantKeine: "Everything that went out belonged to a contract, a budget or a reserve.",
+    ungeplantWartend_one: "{{count}} awaiting assignment",
+    ungeplantWartend_other: "{{count}} awaiting assignment",
+    ungeplantOeffnen: "Show transactions in “{{name}}”",
+    ungeplantBuchungen: "Unplanned in “{{name}}”",
+    ungeplantHinweis:
+      "A transaction waiting for a reserve to be chosen counts here — as in the overview, until you choose.",
   },
   kategorienAuswertung: {
     titel: "Categories over time",
@@ -3361,6 +3380,11 @@ const en: typeof de = {
         "“Fixed” only counts what has a date: contract payments and planned transfers. Going negative there is certain — spending less will not help. “Expected” additionally deducts what is still open in the monthly budgets, spread evenly across the days. Going negative only there still leaves you a choice.",
       hinweis:
         "What is not shown as negative here does not go negative before {{bis}} — that is all that has been checked. The computation starts from the balance the app knows: whatever has happened since the last retrieval is missing.",
+      kurveName: "Balance per day. Use the arrow keys to move from day to day.",
+      kurveSumme: "all accounts in the table together",
+      kurveWaehlen: "Hover over the curve or tap it: the day, the balance and what is due on it appear here.",
+      kurveBudgets: "Monthly budgets, pro rata",
+      kurveNichts: "Nothing with a date is due on this day.",
     },
     reichweite: {
       titel: "How long would it last without income?",

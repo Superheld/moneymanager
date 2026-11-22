@@ -213,7 +213,14 @@ Gezeigt wird die Vorschau seit 2026-11-15 im Register „Ausblick" der Analyse (
 Geld?", `analyseLiquiditaet`) — für die liquiden Konten, als Tabelle, die immer dasteht.
 Warum dort und nicht mehr in der Übersicht, steht in `src/adapters/ui/uebersicht/CLAUDE.md`.
 
-Eine kleine Verlaufslinie stand hier vom 31.08. bis zum 01.09. daneben — sie ist wieder
+Eine kleine Verlaufslinie stand hier vom 31.08. bis zum 01.09. daneben — sie war wieder
 weg: über den Tiefstand und den Tag hinaus, die schon in der Zeile stehen, verriet sie
-nichts. Deshalb gibt `liquiditaetsvorschau` auch nur den BEFUND heraus und nicht den
-Tagesverlauf: was niemand anzeigt, muss auch niemand mitschleppen.
+nichts. **Seit 2026-11-22 gibt es den Tagesverlauf trotzdem**, und der Unterschied ist das,
+was damals fehlte: die Kurve über der Tabelle (`analyse/LiquiditaetKurve.tsx`) zeigt die
+SUMME der Konten der Tabelle als Treppe und zu jedem Tag die Posten, die an ihm fallen —
+also nicht nur wie tief, sondern woran es liegt. Dafür trägt jede `Kontovorschau` ihre
+Reihe (`tage`, mit dem Budgetanteil je Tag) und ihre datierten Posten (`posten`, je Regel
+benannt); die beiden Befunde sind der niedrigste Punkt genau dieser Reihe.
+`liquiditaetskurve` summiert über die Konten und lässt eine geplante Umbuchung zwischen
+zwei von ihnen heraus — sie steht auf beiden mit derselben Regel und hebt sich auf; eine
+auf ein Konto ausserhalb der Auswahl bleibt ein Abfluss.

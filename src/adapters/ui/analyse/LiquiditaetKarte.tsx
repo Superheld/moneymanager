@@ -7,6 +7,11 @@
 // Saldo, den sie verfeinert — der Ausblick darüber rechnet monatsweise und über alle
 // liquiden Konten zusammen, das hier Tag für Tag und je Konto.
 //
+// **Über der Tabelle steht seit 2026-11-22 eine Kurve** (`LiquiditaetKurve`): der Stand
+// aller Konten der Tabelle zusammen, Tag für Tag, als Treppe an den Tagen, an denen etwas
+// Datiertes fällt — und beim Darüberfahren oder Antippen, was an dem Tag fällig ist. Die
+// Tabelle sagt, wie tief es je Konto geht; die Kurve, wann und woran.
+//
 // Drei Dinge unterscheiden sie von der alten Karte, und alle drei folgen aus „leiser":
 //
 //   • Sie zeigt JEDES liquide Konto, nicht nur die mit Minus. Eine Fläche, die nur
@@ -33,6 +38,7 @@ import type { Liquiditaetssicht, Liquiditaetszeile, Verlaufsbefund } from "../..
 import { Card, DataTable, Pill } from "../bausteine";
 import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { warnFarbe } from "../bausteine/geldFarbe";
+import { LiquiditaetKurve } from "./LiquiditaetKurve";
 
 export function LiquiditaetKarte({ sicht }: { sicht: Liquiditaetssicht }) {
   const { t } = useTranslation();
@@ -72,6 +78,9 @@ export function LiquiditaetKarte({ sicht }: { sicht: Liquiditaetssicht }) {
 
   return (
     <Card title={t("blickNachVorn.reicht.titel")} subtitle={t("blickNachVorn.reicht.untertitel", { bis })}>
+      {/* Die Kurve zuerst: sie zeigt, WANN es eng wird und woran es liegt; die Tabelle
+          darunter sagt je Konto, wie tief. Beide aus derselben Rechnung (`tage` je Konto). */}
+      <LiquiditaetKurve kurve={sicht.kurve} />
       <DataTable<Liquiditaetszeile>
         columns={[
           { key: "name", label: t("blickNachVorn.reicht.spalteKonto"), schmal: "titel" },

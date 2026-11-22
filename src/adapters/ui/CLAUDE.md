@@ -1006,7 +1006,7 @@ anderen vorbeiscrollte. Drei Dinge daran sind Entscheidungen:
 Die Register davor beantworten **„wie viel und wohin"** — Verlauf (in zwei Fragen, unten;
 zur Ausgabenfrage darunter die Aufschlüsselung eines angeklickten Monats), die Kategorien über die
 Zeit und der **Blick nach vorn** (`AusblickKarte.tsx`, darunter „Reicht das Geld?" und „Wie lange reicht es ohne Einnahmen?"). Die Befunde (`BefundeBereich.tsx`) beantworten **„und wie tragfähig ist das"**:
-fest gegen frei, Budget-Treue, Ausgaben ohne Budget und ohne Vertrag, Verträge Soll gegen
+fest gegen frei, Budget-Treue, Ungeplantes (unten), Verträge Soll gegen
 Ist, Empfänger, Nutzung der Kategorien, Ausreißer.
 
 ### Der Verlauf beantwortet zwei Fragen
@@ -1105,6 +1105,27 @@ taggenau, wie tief es geht und wann. Was daran Entscheidung ist:
   dem gerechnet wurde.
 - **Schmal bleiben Konto, der erwartete Tiefstand und „im Minus ab".** Die erwartete
   Linie ist die tiefere; an ihr sieht man zuerst, ob es eng wird.
+- **Über der Tabelle steht die Kurve** (seit 2026-11-22, `LiquiditaetKurve.tsx`): die
+  Summe der Konten der Tabelle, Tag für Tag, beide Linien als Treppe — die Stufe fällt
+  auf den Tag des Postens. Beim Darüberfahren, Antippen oder mit den Pfeiltasten stehen
+  UNTER ihr Tag, beide Stände, die Posten des Tages und der Budgetanteil; keine
+  schwebende Blase, die ein Finger verdeckt. Ein eigener Chart und nicht
+  `SaldoVerlaufChart`: der zeichnet Monate als schräge Linie und kennt Werte nur über
+  `<title>`, also nicht am Handy. Er misst seine Breite und zeichnet in echten Pixeln —
+  über eine feste `viewBox` stünde die Achsenschrift am Telefon in vier Pixeln da. Die
+  Null ist immer im Bild. Die Reihe kommt fertig aus `analyseLiquiditaet` (`kurve`).
+
+### In den Befunden: „Ungeplant"
+
+Die Karte rechnet seit 2026-11-22 über die Einordnung (`ungeplantNachKategorie` in
+`core/auswertung.ts`, über `einordnen`): die Anteile der Art `ungeplant`, dieselben wie in
+der Zeile „Ungeplant" der Monatskarten, für den Zeitraum des Registers. Bis dahin hiess sie
+„Ohne Budget und ohne Vertrag" und rechnete über `blindeFlecken` eine eigene Menge, in der
+eine Ausgabe, die eine Rücklage trug, als ungeplant stand. Was auf die Wahl einer Rücklage
+wartet, zählt mit (so rechnet die Übersicht) und steht als Pille an der Kategorie, mit dem
+Satz darunter, sobald es vorkommt. Je Kategorie Summe und Anzahl; ein Klick auf die Zeile
+zeigt die Buchungen darunter als `Buchungsliste` (`UngeplantTabelle.tsx`), aus der der
+Buchungsdialog aufgeht.
 
 ### Darunter: „Wie lange reicht es ohne Einnahmen?"
 

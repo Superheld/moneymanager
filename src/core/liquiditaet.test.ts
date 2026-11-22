@@ -1,7 +1,7 @@
 // Läuft ein Konto ins Minus? Die eine Frage, aus der Handlungsbedarf entsteht.
 
 import { describe, expect, it } from "vitest";
-import { handlungsbedarf, liquiditaetsvorschau } from "./liquiditaet";
+import { handlungsbedarf, liquiditaetskurve, liquiditaetsvorschau } from "./liquiditaet";
 import type { Zahlungskonto } from "./konten/konto";
 import type { Zahlungsregel } from "./basis/zahlungsregel";
 import type { Budget } from "./budgets/budget";
@@ -220,9 +220,9 @@ describe("liquiditaetsvorschau — die erwartete Linie", () => {
 });
 
 describe("handlungsbedarf", () => {
-  const ok = { kontoId: "a", start: 0, fest: { tiefstand: 100, tiefstandAm: HEUTE }, erwartet: { tiefstand: 50, tiefstandAm: HEUTE }  };
-  const weich = { kontoId: "b", start: 0, fest: { tiefstand: 100, tiefstandAm: HEUTE }, erwartet: { tiefstand: -10, tiefstandAm: "2026-06-20", minusAb: "2026-06-20" }  };
-  const hart = { kontoId: "c", start: 0, fest: { tiefstand: -50, tiefstandAm: "2026-06-25", minusAb: "2026-06-25" }, erwartet: { tiefstand: -80, tiefstandAm: "2026-06-25", minusAb: "2026-06-25" }  };
+  const ok = { kontoId: "a", start: 0, fest: { tiefstand: 100, tiefstandAm: HEUTE }, erwartet: { tiefstand: 50, tiefstandAm: HEUTE }, tage: [], posten: [] };
+  const weich = { kontoId: "b", start: 0, fest: { tiefstand: 100, tiefstandAm: HEUTE }, erwartet: { tiefstand: -10, tiefstandAm: "2026-06-20", minusAb: "2026-06-20" }, tage: [], posten: [] };
+  const hart = { kontoId: "c", start: 0, fest: { tiefstand: -50, tiefstandAm: "2026-06-25", minusAb: "2026-06-25" }, erwartet: { tiefstand: -80, tiefstandAm: "2026-06-25", minusAb: "2026-06-25" }, tage: [], posten: [] };
 
   it("nennt nur Konten, die ins Minus laufen", () => {
     expect(handlungsbedarf([ok, weich]).map((v) => v.kontoId)).toEqual(["b"]);
@@ -269,5 +269,65 @@ describe("liquiditaetsvorschau — stillgelegte Konten", () => {
       konten: [konto()], buchungen: [], regeln: [], heute: HEUTE, tage: 30,
     });
     expect(zeilen).toHaveLength(1);
+  });
+});
+
+describe("liquiditaetskurve — die Summe Tag fuer Tag", () => {
+  it("fuehrt die Reihe, aus der die Befunde kommen, und die Posten mit Namen", () => {
+    const [v] = liquiditaetsvorschau({
+      konten: [konto()], buchungen: [], regeln: [regel({ bezeichnung: "Ohlert" })], heute: HEUTE, tage: 10,
+    });
+    expect(v.tage).toHaveLength(11);
+    expect(v.tage[0]).toEqual({ datum: HEUTE, fest: 100000, erwartet: 100000, budgetanteil: 0 });
+    // Die Stufe faellt auf den Tag der Faelligkeit, nicht davor.
+    expect(v.tage[3].fest).toBe(100000);
+    expect(v.tage[4]).toMatchObject({ datum: "2026-06-05", fest: 20000 });
+    expect(v.posten).toEqual([{ datum: "2026-06-05", regelId: "r1", bezeichnung: "Ohlert", betrag: -80000 }]);
+    // Der Tiefstand ist der niedrigste Punkt DIESER Reihe — beide stammen aus einer Rechnung.
+    expect(Math.min(...v.tage.map((t) => t.fest))).toBe(v.fest.tiefstand);
+  });
+
+  it("weist den Budgetanteil je Tag aus — er ist der Abstand der beiden Linien", () => {
+    const [v] = liquiditaetsvorschau({
+      konten: [konto()], buchungen: [], regeln: [], budgetsicht: sicht([budget()]), heute: HEUTE, tage: 3,
+    });
+    // 300,00 auf 30 Junitage.
+    expect(v.tage[0].budgetanteil).toBe(1000);
+    expect(v.tage[2].fest - v.tage[2].erwartet).toBe(3000);
+  });
+
+  it("summiert die Konten und laesst eine Umbuchung zwischen ihnen heraus", () => {
+    const vorschauen = liquiditaetsvorschau({
+      konten: [konto(), konto({ id: "tagesgeld", bezeichnung: "Tagesgeld", saldo: 50000 })],
+      buchungen: [],
+      regeln: [
+        regel({ id: "r-miete", bezeichnung: "Kesselmann" }),
+        regel({
+          id: "r-um", bezeichnung: "Vibora", betrag: -10000, charakter: "Umschichtung",
+          kontoId: "giro", gegenkontoId: "tagesgeld", startdatum: "2026-06-05",
+        }),
+      ],
+      heute: HEUTE,
+      tage: 10,
+    });
+    const kurve = liquiditaetskurve(vorschauen);
+    expect(kurve).toHaveLength(11);
+    expect(kurve[0].fest).toBe(150000);
+    const tag = kurve.find((t) => t.datum === "2026-06-05")!;
+    // Nur die Miete aendert die Summe; die Umbuchung hebt sich auf.
+    expect(tag.fest).toBe(70000);
+    expect(tag.posten).toEqual([{ bezeichnung: "Kesselmann", betrag: -80000 }]);
+  });
+
+  it("behaelt eine Umbuchung auf ein Konto ausserhalb der Auswahl", () => {
+    const vorschauen = liquiditaetsvorschau({
+      konten: [konto()],
+      buchungen: [],
+      regeln: [regel({ id: "r-um", bezeichnung: "Brandauer", betrag: -10000, charakter: "Umschichtung", gegenkontoId: "depot" })],
+      heute: HEUTE,
+      tage: 10,
+    });
+    const tag = liquiditaetskurve(vorschauen).find((t) => t.datum === "2026-06-05")!;
+    expect(tag.posten).toEqual([{ bezeichnung: "Brandauer", betrag: -10000 }]);
   });
 });
