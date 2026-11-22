@@ -58,9 +58,13 @@
 // Finanz-App eine gekürzte Auskunft, die niemand entschieden hat. Weggeräumt wird je
 // Tabelle von Hand, über `column.schmal` — ist das an EINER Spalte gesetzt, gilt nur noch,
 // was ausdrücklich dasteht, und der Rest fällt weg.
+//
+// **In der zweiten Zeile trägt eine Zahl ihren Namen** (rechtsbündige Spalten, siehe
+// `zweitzeileName`), und jeder Wert bricht als Ganzes um — ein Bedienteil dort wird nie
+// abgeschnitten. Einzelheiten in `bausteine/CLAUDE.md`, „`DataTable` schmal".
 
 import { NumberField } from "@base-ui/react/number-field";
-import { Fragment, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { Button } from "./Button";
 import { useSchmal } from "./useSchmal";
 
@@ -87,6 +91,17 @@ export interface DataColumn<T = unknown> {
    * wirft nichts weg.
    */
   schmal?: "titel" | "wert" | "zweitzeile";
+  /**
+   * Der Name, mit dem der Wert dieser Spalte schmal in der ZWEITEN Zeile steht — dort
+   * gibt es ihren Spaltenkopf nicht mehr.
+   *
+   * Ohne Angabe tragen rechtsbündige Spalten ihre Beschriftung (`label`), linksbündige
+   * keine: rechts steht eine Zahl, und „30,00" sagt nicht, ob es die Rate ist oder der
+   * Stand; links steht, was für sich spricht — eine Pille, ein Datum, ein Name.
+   * `true` erzwingt die Beschriftung, `false` unterdrückt sie, ein Text ersetzt sie (für
+   * Köpfe, die eine Einheit tragen, die der Wert schon zeigt).
+   */
+  zweitzeileName?: ReactNode;
   /**
    * Diese Spalte trägt den Bezeichner einer klickbaren Zeile (den Link-Stil) — statt der
    * ersten. Für Tabellen, deren erste Spalte kein Name ist: im Kontoauszug steht vorn das
@@ -159,6 +174,15 @@ const STANDARD_MAX = "32ch";
 const SCHMAL_WERT_HOECHSTENS = "50vw";
 
 /**
+ * Mindestbreite des Wertkopfes in der schmalen Form, in seiner eigenen Schrift.
+ *
+ * Ohne sie bräche ein Kopf über einer kurzen Zahl Wort für Wort um — „Bisher / Monat €"
+ * stand über „39,58" in vier Zeilen. Mit ihr sind es höchstens zwei. Der Titel verliert
+ * dabei nichts gegen früher: bis 2026-11-22 war die Wertspalte fest so breit.
+ */
+const SCHMAL_KOPF_MINDESTENS = "12ch";
+
+/**
  * Schmal hält diese Hülle den Titel aus der Breitenrechnung der Tabelle heraus.
  *
  * Bis 2026-11-22 lag schmal `table-layout: fixed` an und die Wertspalte stand fest auf
@@ -197,6 +221,15 @@ function schmalRollen<T>(columns: readonly DataColumn<T>[]) {
   const titel = mitIndex[0];
   const wert = mitIndex.slice(1).find((e) => e.c.align === "right") ?? null;
   return { titel, wert, zweit: mitIndex.filter((e) => e !== titel && e !== wert) };
+}
+
+/** Der Name, der einem Wert schmal in der zweiten Zeile vorangeht — oder keiner. */
+function zweitzeilenName<T>(c: DataColumn<T>): ReactNode {
+  const n = c.zweitzeileName;
+  if (n === false) return null;
+  if (n !== undefined && n !== null && n !== true) return n;
+  if (n === true || c.align === "right") return c.label === "" ? null : c.label;
+  return null;
 }
 
 /** Der rohe Wert einer Spalte — für Spalten ohne `render`. */
@@ -273,26 +306,40 @@ export function DataTable<T>({
     ? [rollen.titel, rollen.wert].filter((e): e is MitIndex<T> => !!e)
     : columns.map((c, i) => ({ c, i }));
 
+  /**
+   * Die zweite Zeile der schmalen Form: die übrigen Werte, je einer ein Stück, das als
+   * Ganzes umbricht (`.datentabelle-zweitzeile` in `app.css`).
+   *
+   * Bis 2026-11-22 war sie EINE Zeile, die am Rand abgeschnitten wurde. Für Text war das
+   * verschmerzbar, für ein Bedienteil nicht: die Auswahl unter „Wartet auf Zuordnung"
+   * stand nur noch als `…` da, und zuordnen ging am Telefon nicht. Jetzt wandert, was
+   * nicht mehr passt, in eine weitere Zeile — ein Bedienteil ganz, nur ein einzelner Text,
+   * der allein breiter ist als die Zeile, wird gekürzt. Die Zeile wird dadurch höher; das
+   * ist der Preis, und ein abgeschnittener Knopf wäre der teurere.
+   */
   function zelleZweitzeile(row: T) {
     if (!rollen) return null;
-    const teile: ReactNode[] = [];
+    const teile: { n: number; name: ReactNode; v: ReactNode }[] = [];
     const texte: string[] = [];
     rollen.zweit.forEach((e, n) => {
       const v = zellwert(e.c, row);
       if (v === null || v === undefined || v === "") return;
-      if (teile.length) teile.push(<span key={"t" + n} style={{ opacity: 0.45 }}> · </span>);
-      teile.push(<Fragment key={"v" + n}>{v}</Fragment>);
+      teile.push({ n, name: zweitzeilenName(e.c), v });
       const s = alsText(v);
       if (s) texte.push(s);
     });
     if (!teile.length) return null;
     return (
-      <div
-        title={texte.length ? texte.join(" · ") : undefined}
-        style={{ marginTop: 2, fontSize: "var(--fs-xs)", fontWeight: "var(--fw-regular)", color: "var(--ink-3)",
-          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-      >
-        {teile}
+      <div className="datentabelle-zweitzeile" title={texte.length ? texte.join(" · ") : undefined}>
+        {teile.map((teil, k) => (
+          <span key={teil.n} className="datentabelle-zweitteil">
+            {teil.name !== null && <span className="zweitzeile-beschriftung">{teil.name} </span>}
+            {teil.v}
+            {/* Der Trenner hängt HINTER dem Stück: bricht die Zeile um, steht er am Ende
+                der oberen, nicht allein am Anfang der unteren. */}
+            {k < teile.length - 1 && <span className="datentabelle-trenner" aria-hidden="true"> ·</span>}
+          </span>
+        ))}
       </div>
     );
   }
@@ -353,8 +400,10 @@ export function DataTable<T>({
                       userSelect: "none", whiteSpace: schmal ? "normal" : "nowrap",
                       verticalAlign: schmal ? "bottom" : undefined }}
                   >
-                    {c.label}
-                    <span style={{ opacity: aktiv ? 0.9 : 0.35 }}>{pfeil}</span>
+                    <span style={schmal && rechts ? { display: "inline-block", minWidth: SCHMAL_KOPF_MINDESTENS } : undefined}>
+                      {c.label}
+                      <span style={{ opacity: aktiv ? 0.9 : 0.35 }}>{pfeil}</span>
+                    </span>
                   </th>
                 );
               })}

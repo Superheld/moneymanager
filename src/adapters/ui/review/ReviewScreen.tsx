@@ -348,7 +348,6 @@ export function ReviewScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => vo
     }
   }
 
-  const th = { textAlign: "left", fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: ".04em", color: "var(--ink-3)", padding: "8px 10px", borderBottom: "1px solid var(--line)" } as const;
   const td = { padding: "8px 10px", borderBottom: "1px solid var(--line-soft)", color: "var(--ink)" } as const;
   const select = { padding: "5px 8px", borderRadius: "var(--r-md)", border: "1px solid var(--line)", background: "var(--surface)", fontSize: "var(--fs-tabelle)", fontFamily: "var(--font-ui)" } as const;
 
@@ -460,11 +459,18 @@ export function ReviewScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => vo
             </div>
           )}
 
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--fs-tabelle)" }}>
+          {/* Kein `DataTable`, und deshalb fiel diese Tabelle schmal nicht auf zwei Spalten
+              zusammen, sondern lief seitlich aus dem Bild: ihre Zellen brechen um (Gründe
+              einer Dublette, die Herkunft eines Vorschlags), und die DataTable kürzt jede
+              Zelle auf eine Zeile — breit ginge dabei Auskunft verloren. Die schmale Form
+              steht deshalb in CSS (`.inbox-tabelle` in `app.css`) und ordnet dieselben
+              Zellen um, so wie die DataTable es tut: Empfänger und Betrag oben, der Rest
+              darunter. */}
+          <table className="inbox-tabelle" style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--fs-tabelle)" }}>
             <thead>
               <tr>
                 {sammel.modus && (
-                  <th style={{ ...th, width: 32 }}>
+                  <th className="inbox-auswahl" style={{ width: 32 }}>
                     <Kaestchen
                       an={sammel.alleGewaehlt}
                       label={t("review.sammel.alleWaehlen")}
@@ -472,19 +478,19 @@ export function ReviewScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => vo
                     />
                   </th>
                 )}
-                <th style={th}>{t("review.spalteDatum")}</th>
-                <th style={th}>{t("review.spalteKonto")}</th>
-                <th style={th}>{t("review.spalteGegenpartei")}</th>
-                <th style={{ ...th, textAlign: "right" }}>{t("review.spalteBetrag")} {geld.symbol}</th>
-                <th style={{ ...th, minWidth: 220 }}>{t("review.spalteKategorie")}</th>
-                <th style={{ ...th, width: 76 }} />
+                <th className="inbox-datum">{t("review.spalteDatum")}</th>
+                <th className="inbox-konto">{t("review.spalteKonto")}</th>
+                <th className="inbox-gegenpartei">{t("review.spalteGegenpartei")}</th>
+                <th className="inbox-betrag" style={{ textAlign: "right" }}>{t("review.spalteBetrag")} {geld.symbol}</th>
+                <th className="inbox-kategorie" style={{ minWidth: 220 }}>{t("review.spalteKategorie")}</th>
+                <th className="inbox-aktionen" style={{ width: 76 }} />
               </tr>
             </thead>
             <tbody>
               {zeilen.map((u) => (
                 <tr key={u.id}>
                   {sammel.modus && (
-                    <td style={td}>
+                    <td className="inbox-auswahl">
                       <Kaestchen
                         an={sammel.istGewaehlt(u.id)}
                         label={t("review.sammel.zeileWaehlen")}
@@ -492,9 +498,9 @@ export function ReviewScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => vo
                       />
                     </td>
                   )}
-                  <td style={td}>{datum.mitJahr(u.buchungstag)}</td>
-                  <td style={{ ...td, color: "var(--ink-3)" }}>{kontoName.get(u.zahlungskontoId) ?? "—"}</td>
-                  <td style={td}>
+                  <td className="inbox-datum">{datum.mitJahr(u.buchungstag)}</td>
+                  <td className="inbox-konto" style={{ color: "var(--ink-3)" }}>{kontoName.get(u.zahlungskontoId) ?? "—"}</td>
+                  <td className="inbox-gegenpartei">
                     <div style={{ fontWeight: "var(--fw-bold)" }}>{u.gegenpartei}</div>
                     <div style={{ fontSize: "var(--fs-2xs)", color: "var(--ink-3)" }}>{u.verwendungszweck.length > 50 ? u.verwendungszweck.slice(0, 50) + "…" : u.verwendungszweck}</div>
                     {/* Der Verdacht steht AN der Zeile, nicht in einem eigenen Bereich:
@@ -522,8 +528,8 @@ export function ReviewScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => vo
                       );
                     })()}
                   </td>
-                  <td style={{ ...td, textAlign: "right", fontVariantNumeric: "tabular-nums", color: geldFarbe(u.betrag) }}>{geld.format(u.betrag, { mitVorzeichen: true })}</td>
-                  <td style={td}>
+                  <td className="inbox-betrag" style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: geldFarbe(u.betrag) }}>{geld.format(u.betrag, { mitVorzeichen: true })}</td>
+                  <td className="inbox-kategorie">
                     {u.vorschlag?.quelle === "umbuchung" ? (
                       <span style={{ color: "var(--ink-2)" }}>{t("review.umbuchung")}</span>
                     ) : (
@@ -531,7 +537,7 @@ export function ReviewScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => vo
                     )}
                     {u.vorschlag && <Herkunft umsatz={u} kontext={kontext} katById={katById} />}
                   </td>
-                  <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>
+                  <td className="inbox-aktionen" style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                     <IconButton
                       icon="bearbeiten"
                       label={t("review.zeileOeffnen")}

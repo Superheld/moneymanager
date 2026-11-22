@@ -373,6 +373,25 @@ tragen (noch) keine Angabe.
 Sobald EINE Spalte das setzt, gilt nur noch das Gesetzte und der Rest fällt weg. Der
 Mechanismus ermöglicht das Wegräumen, er nimmt es nicht vorweg.
 
+**In der zweiten Zeile trägt eine Zahl ihren Namen, ein Bedienteil bleibt ganz** (seit
+2026-11-22). Vorher stand dort eine abgeschnittene Kette ohne Namen: bei den
+Rücklagenvorschlägen `— · 30,00 · 5 ✓ ✕`, unter „Wartet auf Zuordnung" statt der Auswahl
+nur `…` — zuordnen ging am Telefon nicht. Zwei Regeln seitdem:
+
+- **Rechtsbündig heisst beschriftet.** Eine rechtsbündige Spalte trägt eine Zahl, und
+  „30,00" sagt nicht, ob es die Rate ist oder der Stand; ihr Spaltenkopf geht ihr deshalb
+  voran (`.zweitzeile-beschriftung`). Eine linksbündige trägt, was für sich spricht —
+  Pille, Datum, Name — und bleibt ohne. Weil das aus `align` folgt, wurde der Bestand
+  ohne Zutun lesbarer; wer es je Spalte anders will, setzt `zweitzeileName` (`true`,
+  `false` oder ein eigener Name, etwa ohne das € des Kopfes wie im Bericht).
+- **Jeder Wert ist ein Stück, das als Ganzes umbricht** (`.datentabelle-zweitteil`).
+  Gekürzt wird nur ein einzelner Text, der allein breiter ist als die Zeile; ein Stück mit
+  einem Bedienteil darin nie (`:has(…)` in `app.css`) — auch `overflow: hidden` bleibt
+  dort weg, sonst schnitte es den Fokusrahmen ab. Die Zeile wird dadurch höher, und das
+  ist der Preis: eine Zeile, die ihre Höhe hält und dabei den Knopf verliert, wäre der
+  teurere Fehler. Der Trenner „·" hängt hinter seinem Stück, damit er beim Umbruch am
+  Ende der oberen Zeile steht und nicht allein am Anfang der unteren.
+
 **Die Wertspalte ist so breit wie ihr längster Wert, der Titel bekommt den Rest** (seit
 2026-11-22). Davor lag schmal `table-layout: fixed` an und die Wertspalte stand fest auf
 `12ch`: ein langer Name konnte die Tabelle so nicht aus dem Bild ziehen, aber jeder Betrag

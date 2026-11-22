@@ -644,6 +644,14 @@ das bedeutet, ist enger als es klingt, und die Grenze gehört benannt:
   waagerecht, ein Registerband ebenso. Das ist der Stand, und die Neuaufteilung kommt
   danach.
 
+**Eine Tabelle von Hand fällt schmal nicht zusammen.** Die zwei Spalten der schmalen Form
+gibt es nur in der `DataTable`; eine eigene `<table>` behält alle Spalten und läuft
+seitlich aus dem Bild. So stand es bis 2026-11-22 in der Inbox. Sie bleibt trotzdem eine
+eigene Tabelle — ihre Zellen müssen umbrechen (Gründe einer Dublette, Herkunft eines
+Vorschlags), die `DataTable` kürzt jede auf eine Zeile — und ordnet ihre Zellen schmal per
+CSS in dieselbe Form um (`.inbox-tabelle` in `app.css`). Eine neue Tabelle nimmt die
+`DataTable`; wer davon abweicht, baut die schmale Form selbst mit.
+
 Vier Dinge, die bei jedem neuen Stück ab jetzt gelten und die man schmal nicht nachholen
 kann:
 
@@ -1083,8 +1091,8 @@ Zeitraum und an seinem letzten Tag. Was daran Entscheidung ist:
   Nettovermögen addiert und eine sinkende Schuld als Zuwachs dasteht. Gedreht wird das an
   einer Stelle, in `vermoegensvergleich`; gespeichert bleibt die Restschuld positiv.
 - **Schmal** bleiben Name und Betrag des Zeitraums; die Veränderung wandert in die zweite
-  Zeile und trägt dort ihren Namen (`.zweitzeile-beschriftung` in `app.css`, breit
-  ausgeblendet, weil dort der Spaltenkopf ihn trägt).
+  Zeile und trägt dort ihren Namen (`zweitzeileName` an der Spalte — wie jede
+  rechtsbündige Spalte der `DataTable`, hier nur ohne das € des Kopfes).
 
 Kein Export und kein Druck — das Blatt ist so gebaut, dass es sich wie eines lesen lässt.
 Geprüft in `analyse/bericht.test.tsx`.

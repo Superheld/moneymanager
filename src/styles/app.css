@@ -615,10 +615,41 @@ select.field {
   color: var(--ink-3);
 }
 
-/* Die Beschriftung eines Werts, der schmal in die zweite Zeile wandert (`schmal:
-   "zweitzeile"` an der Spalte): breit sagt der Spaltenkopf, was die Zahl ist; schmal steht
-   dieser Kopf nicht mehr da, und eine Zahl ohne Namen ist keine Auskunft. Eine Frage des
-   Aussehens, nicht des Markups — deshalb CSS und nicht `useSchmal`. */
+/* Die zweite Zeile der schmalen DataTable: jeder Wert ein Stück, das als Ganzes
+   umbricht. Ein Text, der allein breiter ist als die Zeile, kürzt sich; ein Stück mit
+   einem Bedienteil darin kürzt sich nie — ein abgeschnittener Knopf ist keiner, und
+   `overflow: hidden` schnitte auch seinen Fokusrahmen ab. Gibt es nur schmal (das Markup
+   entsteht nur dort, siehe `zelleZweitzeile` in `DataTable.tsx`). */
+.datentabelle-zweitzeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--sp-1);
+  row-gap: var(--sp-1);
+  margin-top: 2px;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-regular);
+  color: var(--ink-3);
+}
+.datentabelle-zweitteil {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.datentabelle-zweitteil:has(button, select, input, [role="combobox"], [role="checkbox"]) {
+  flex-shrink: 0;
+  overflow: visible;
+}
+.datentabelle-trenner {
+  opacity: 0.45;
+}
+
+/* Die Beschriftung eines Werts, der schmal in die zweite Zeile wandert: breit sagt der
+   Spaltenkopf, was die Zahl ist; schmal steht dieser Kopf nicht mehr da, und eine Zahl
+   ohne Namen ist keine Auskunft. Die DataTable setzt sie selbst (`zweitzeileName` an der
+   Spalte); breit ausgeblendet für Stellen, die dasselbe Markup in beiden Breiten zeigen. */
 @media (min-width: 700px) {
   .zweitzeile-beschriftung {
     display: none;
@@ -649,6 +680,107 @@ tr.datentabelle-zeile--klickbar:focus-visible {
   background: var(--surface);
   color: var(--ink-2);
   font-family: inherit;
+}
+
+/* --- Die Tabelle der Inbox (review/ReviewScreen.tsx) ---
+   Sie ist keine DataTable, weil ihre Zellen umbrechen müssen (Gründe einer Dublette, die
+   Herkunft eines Vorschlags) — die DataTable kürzt jede Zelle auf eine Zeile. Damit fiel
+   sie schmal auch nicht auf deren zwei Spalten zusammen und lief seitlich aus dem Bild.
+
+   Schmal ordnet CSS dieselben Zellen deshalb so an, wie die DataTable es mit ihren tut:
+   oben Empfänger und Betrag, darunter Datum, Konto, Kategorie und die Aktionen. Die Zeile
+   wird dafür ein Flex-Behälter; `::after` und `::before` mit voller Breite erzwingen Umbrüche nach dem
+   Betrag und vor der Kategorie. Die Abfrage steht als `max-width`, nicht als Grundform: die Tabelle aus einem
+   Flex-Stapel breit wieder zur Tabelle zu machen hiesse, jede Regel einzeln
+   zurückzunehmen — dieselbe Ausnahme wie bei der `h1` des `PageHead`. */
+.inbox-tabelle th {
+  text-align: left;
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.inbox-tabelle td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--ink);
+}
+@media (max-width: 699.98px) {
+  .inbox-tabelle,
+  .inbox-tabelle thead,
+  .inbox-tabelle tbody {
+    display: block;
+  }
+  .inbox-tabelle tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: var(--sp-2);
+    row-gap: var(--sp-1);
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .inbox-tabelle thead tr {
+    border-bottom-color: var(--line);
+    padding: 8px 0;
+  }
+  /* Zwei erzwungene Umbrüche: nach dem Betrag und nach Datum und Konto. */
+  .inbox-tabelle tbody tr::after,
+  .inbox-tabelle tbody tr::before {
+    content: "";
+    order: 3;
+    flex-basis: 100%;
+  }
+  .inbox-tabelle tbody tr::before {
+    order: 5;
+  }
+  .inbox-tabelle th,
+  .inbox-tabelle td {
+    display: block;
+    padding: 0;
+    border-bottom: 0;
+  }
+  /* Schmal stehen nur die Köpfe der beiden Spalten, die oben stehen — wie in der
+     DataTable. Die Auswahl aller bleibt, sie ist eine Handlung. */
+  .inbox-tabelle th.inbox-datum,
+  .inbox-tabelle th.inbox-konto,
+  .inbox-tabelle th.inbox-kategorie,
+  .inbox-tabelle th.inbox-aktionen {
+    display: none;
+  }
+  .inbox-tabelle .inbox-auswahl {
+    order: 0;
+    align-self: center;
+  }
+  .inbox-tabelle .inbox-gegenpartei {
+    order: 1;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .inbox-tabelle .inbox-betrag {
+    order: 2;
+    white-space: nowrap;
+  }
+  .inbox-tabelle td.inbox-datum,
+  .inbox-tabelle td.inbox-konto {
+    order: 4;
+    font-size: var(--fs-xs);
+    color: var(--ink-3);
+  }
+  .inbox-tabelle td.inbox-konto::before {
+    content: "· ";
+  }
+  .inbox-tabelle td.inbox-kategorie {
+    order: 6;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .inbox-tabelle td.inbox-aktionen {
+    order: 7;
+  }
 }
 
 /* In `Aufklapptabelle` ist die Zeile ein `tr` und kann kein Knopf sein — sie traegt
