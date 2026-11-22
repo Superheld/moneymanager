@@ -42,7 +42,7 @@ ein Baustein; was einer benutzt, gehört in dessen Ordner** — auch wenn es all
 | Ordner | was |
 |---|---|
 | `uebersicht/` | „wie stehe ich gerade da": Monatskarten, Budgets, Was da ist, Depotstand (Regeln in `uebersicht/CLAUDE.md`) |
-| `analyse/` | „wie war es über einen Zeitraum": Register Verlauf, Kategorien, Ausblick, Befunde, Depot, Bericht |
+| `analyse/` | „wie war es über einen Zeitraum": Register Verlauf, Kategorien, Ausblick, Planrechnung, Befunde, Depot, Bericht |
 | `budgets/` | die monatlichen Budgets: Tabelle, Dialog, Verlauf, Vorschläge |
 | `ruecklagen/` | Rücklagen beider Sorten in EINER Liste und ihr Verlauf (`RuecklageVerlauf`), Abschliessen (`AbschlussDialog`), „Wartet auf Zuordnung" (`WartetKarte`), Vorschläge (`VorschlaegeKarte`), Fluss, Tacho, „Wo das Geld liegt" (je Konto, `GeldJeKontoKarte`) |
 | `vermoegen/` | Nettovermögen mit Verlauf, Vermögenswerte und Schulden als Werte zum Stichtag |
@@ -844,7 +844,7 @@ Zwei Dinge, die daran hängen:
   keine Gliederung mehr, und die Kopfleiste trägt einen `span`, keine Überschrift.
 - **Der Untertitel bleibt sichtbar.** Er trägt an mehreren Stellen die Einschränkung, die
   die Zahlen darunter ehrlich hält — in der Übersicht etwa, dass die Karten zeigen, was
-  der Monat KOSTET, und nicht, was vom Konto ging.
+  im Monat ANSTEHT, über alle Konten.
 
 Die Regel steht ausnahmsweise als `max-width` und nicht als Grundform: die sichtbare `h1`
 aus der versteckten zurückzuholen kostet sieben Rücknahmen, und genau davor warnt die Regel
@@ -980,8 +980,8 @@ Gesteuert über `zugangId`. Ohne den Parameter gilt das erste, mit ihm das zweit
 ## Die Analyse steht in Registern
 
 **Seit 2026-11-08** stehen die Abschnitte nicht mehr untereinander, sondern in Reitern
-(`bausteine/Registerleiste.tsx`): **Verlauf · Kategorien · Ausblick · Befunde · Depot ·
-Bericht**.
+(`bausteine/Registerleiste.tsx`): **Verlauf · Kategorien · Ausblick · Planrechnung ·
+Befunde · Depot · Bericht**.
 Untereinander war die Seite so lang, dass man für die Befunde oder ein Depot an allem
 anderen vorbeiscrollte. Drei Dinge daran sind Entscheidungen:
 
@@ -1137,6 +1137,32 @@ FREIE Geld der liquiden Konten die Kosten eines Monats trägt. Was daran Entsche
 
 Geprüft in `analyse/reichweite.test.tsx`, `application/analysesichten.test.ts` und
 `core/reichweite.test.ts`.
+
+### Die Planrechnung — zwölf Monate Plan, Verträge anteilig
+
+Seit 2026-11-22 steht nach dem Ausblick das Register **Planrechnung**
+(`PlanrechnungRegister.tsx`, gerechnet von `analysePlanrechnung` über `planrechnung` in
+`core/ergebnis.ts`): der Plan der Ergebnisrechnung für zwölf Monate ab dem laufenden.
+Die Frage des Nutzers dahinter: reichen die Einnahmen in Summe für alles Geplante, was
+bleibt, und reicht es für das Zurücklegen? Was daran Entscheidung ist:
+
+- **Sie ist die anteilige Rechnung, die die Übersicht abgegeben hat.** Die Monatskarten
+  zeigen seit demselben Tag nach Fälligkeit (`uebersicht/CLAUDE.md`); ein Quartalsvertrag
+  steht hier mit einem Drittel in jedem Monat, dort ganz in einem.
+- **Oben die Summe, darunter Monat für Monat.** Die Summe mit den Stufen der
+  Ergebnisrechnung beantwortet die Frage; die Monate zeigen, wo es eng wird. Eine
+  Zwischensumme steht nur, wenn danach noch etwas abgeht, wie in den Monatskarten.
+- **Nur Plan, auch im laufenden Monat.** „Ungeplant" hat keinen Plan und fehlt; dass
+  Ungeplantes nicht eingerechnet ist und Verträge verteilt sind, ist eine Einschränkung
+  und steht offen unter der Summe.
+- **Ohne Plan kein Reiter** (`hatPlan`), wie beim Depot.
+- **Schmal** bleiben Monat und „Bleibt wirklich frei"; die Zeilen rücken beschriftet in
+  die zweite Zeile. Den Namen setzt die Zelle selbst (`zweitzeile-beschriftung`), damit
+  ein Stück zwischen Name und Betrag umbrechen darf statt gekürzt zu werden. Breit
+  brechen die Spaltenköpfe um, sonst rollte die Tabelle bei der letzten Spalte aus dem
+  Bild.
+
+Geprüft in `analyse/planrechnung.test.tsx` und `core/ergebnis.test.ts`.
 
 ### Der Bericht — ein Zeitraum auf einem Blatt
 

@@ -352,6 +352,35 @@ describe("Übersicht — Monatskarten am echten Schema", () => {
     expect(screen.getByText((inhalt) => inhalt.includes(ueberwiesen))).toBeInTheDocument();
   });
 
+  it("zeigt einen Quartalsvertrag im Monat seiner Fälligkeit ganz und in den anderen gar nicht", async () => {
+    for (const k of KATEGORIEN) await sqliteKategorieRepository.speichern(k);
+    await sqliteZahlungskontoRepository.speichern({ ...KONTEN[0], saldo: 100000 });
+    // Fällig im nächsten Monat; der laufende und der übernächste liegen dazwischen.
+    const jetzt = new Date();
+    const monatsname = (n: number) => {
+      const d = new Date(Date.UTC(jetzt.getFullYear(), jetzt.getMonth() + n, 1));
+      return { iso: d.toISOString().slice(0, 10), name: `${text(`ergebnis.monat.${d.getUTCMonth() + 1}`)} ${d.getUTCFullYear()}` };
+    };
+    await sqliteZahlungsregelRepository.speichern({
+      id: "r-quartal", bezeichnung: "Vibora", betrag: -9000, rhythmus: "quartalsweise", startdatum: monatsname(1).iso.replace(/01$/, "15"),
+      charakter: "Aufwand", kategorieId: "wohnen",
+    });
+
+    rendere(<UebersichtScreen />);
+    await waitFor(() => expect(screen.getAllByText(text("ergebnis.stufe.ergebnis"))).toHaveLength(3));
+
+    const vertraege = async (n: number) => {
+      const k = await karte(monatsname(n).name);
+      return within(k).getByText(text("ergebnis.zeile.fixkosten")).closest(".aufklappzeile")?.textContent ?? "";
+    };
+    // Nach Fälligkeit: 90,00 ganz im nächsten Monat, nicht ein Drittel in jedem.
+    expect(await vertraege(1)).toContain("−90,00");
+    expect(await vertraege(0)).not.toContain("30,00");
+    expect(await vertraege(0)).toContain("+0,00");
+    expect(await vertraege(2)).toContain("+0,00");
+    expect(screen.queryByText(i18n.t("ergebnis.anteil", { teile: 3 }))).toBeNull();
+  });
+
   it("liest die Schuld zum Kreditvertrag aus der Datenbank und teilt seine Rate in jeder Karte", async () => {
     for (const k of KATEGORIEN) await sqliteKategorieRepository.speichern(k);
     await sqliteZahlungskontoRepository.speichern({ ...KONTEN[0], saldo: 100000 });

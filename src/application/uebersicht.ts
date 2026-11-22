@@ -75,8 +75,9 @@ export interface UebersichtDeps {
 
 export interface Uebersichtsdaten {
   /**
-   * Die drei Monatskarten: was der laufende Monat und die beiden folgenden KOSTEN, mit
-   * der Überleitung zum Kontostand (`core/ergebnis.ts`).
+   * Die drei Monatskarten: was im laufenden Monat und den beiden folgenden ANSTEHT, mit
+   * der Überleitung zum Kontostand (`core/ergebnis.ts`). Verträge stehen nach Fälligkeit
+   * — im Monat, in dem sie fällig werden, mit dem ganzen Betrag (`nachFaelligkeit`).
    */
   readonly ergebnisse: readonly MonatsErgebnis[];
   /** Die Budgetstände des laufenden Monats, in Baumordnung. */
@@ -177,8 +178,8 @@ export async function uebersichtLaden(
   /**
    * DIE GANZE ÜBERSICHT RECHNET ÜBER ALLE KONTEN (seit 2026-11-15).
    *
-   * Die Monatskarten zeigen, was der Monat KOSTET, und Kosten hängen nicht daran, von
-   * welchem Konto bezahlt wurde. Bis dahin rechneten sie über die liquiden Konten und
+   * Die Monatskarten zeigen, was im Monat ansteht, und das hängt nicht daran, von
+   * welchem Konto bezahlt wird. Bis dahin rechneten sie über die liquiden Konten und
    * die Budgetliste darunter über alle — dasselbe Budget zeigte in Karte und Liste
    * verschiedene Zahlen, und der Untertitel musste es erklären.
    *
@@ -205,8 +206,14 @@ export async function uebersichtLaden(
   const belegung = belegungssicht({ konten, buchungen, ruecklagen, sicht }, heute);
 
   return {
+    // NACH FÄLLIGKEIT (seit 2026-11-22): ein Quartalsvertrag steht im Monat seiner
+    // Fälligkeit mit dem ganzen Betrag und in den beiden anderen nicht. Die Übersicht
+    // soll zeigen, was ansteht, damit man planen kann; was ein Monat anteilig kostet,
+    // steht in der Planrechnung der Analyse (`analysePlanrechnung`).
     ergebnisse: monatsErgebnisse(
       ergebnisbasis({ regeln, budgets, ruecklagen, beendete, ausbuchungen, ruecklagenzuordnungen, ist: buchungen, kategorien, konten, vertragJeBuchung, heute, vorsorge, schulden }),
+      3,
+      { nachFaelligkeit: true },
     ),
     staende: budgetstaende(sicht, `${dieserMonat}-28`),
     sicht,

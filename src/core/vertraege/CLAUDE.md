@@ -15,8 +15,11 @@ Ergebnisrechnung, über die Verträge als Plan: Fixkosten, geplante Einnahmen, u
 **nach den Pflichten** bleibt. Drei Dinge daran:
 
 - **Sortiert wird nach dem Charakter der Regel**, wie in `core/ergebnis.ts`: Aufwand sind
-  Fixkosten, Ertrag Einnahmen. Das Wort „nach den Pflichten" steht auch in der Übersicht,
-  und zwei Bereiche, die darunter Verschiedenes rechnen, wären zwei Wahrheiten.
+  Fixkosten, Ertrag Einnahmen. Das Wort „nach den Pflichten" steht auch in der
+  Planrechnung der Analyse, anteilig wie hier, und zwei Bereiche, die darunter
+  Verschiedenes rechnen, wären zwei Wahrheiten. Die Übersicht trägt dieselbe Stufe seit
+  2026-11-22 nach Fälligkeit — dort steht ein einzelner Monat, wie er ansteht, hier die
+  Dauerrate; das ist eine andere Frage und kein Widerspruch.
 - **Ein Umbuchungsvertrag zählt in keine der beiden Summen.** Er bewegt eigenes Geld und
   kostet nichts. Eine Summe „pro Monat" über alle Regeln — die hier lange stand — mischte
   Einnahmen, Ausgaben und Sparraten und beantwortete keine Frage.

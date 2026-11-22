@@ -107,6 +107,7 @@ import type { Umsatz } from "./import";
 import { vertragsbindungLaden } from "./vertraege/vertragszuordnung";
 import { vermoegensbestandLaden } from "./vermoegen/vermoegensichten";
 import { ergebnisvorsorgeLaden, type VorsorgeDeps } from "./vorsorge/vorsorge";
+import { planrechnung, PLANRECHNUNG_MONATE, type Planrechnung } from "../core";
 import type {
   BudgetRepository,
   KategorieRepository,
@@ -586,9 +587,10 @@ export function analyseAusblick(
 // ---------------------------------------------------------------- Kostensicht
 
 /**
- * Die Eingabe der Ergebnisrechnung aus der Analysebasis — EINE Stelle für Kostensicht und
- * Reichweite. Dieselbe Eingabe wie die Monatskarten der Übersicht (`uebersichtLaden`):
- * derselbe Monat muss überall dieselben Kosten tragen.
+ * Die Eingabe der Ergebnisrechnung aus der Analysebasis — EINE Stelle für Kostensicht,
+ * Reichweite, Bericht und Planrechnung. Dieselbe Eingabe wie die Monatskarten der
+ * Übersicht (`uebersichtLaden`): derselbe Monat muss überall dieselben Kosten tragen. Die
+ * Übersicht fragt den Kern nur anders (nach Fälligkeit), nicht mit anderen Daten.
  */
 function kostenbasis(basis: Analysebasis, heute: string) {
   return ergebnisbasis({
@@ -648,8 +650,10 @@ export interface Kostenverlauf {
  * Die Ergebnisrechnung je Monat des Fensters — „Was hat der Monat gekostet?".
  *
  * Gerechnet wird über ALLE Konten, mit derselben Eingabe wie die Monatskarten der
- * Übersicht (`uebersichtLaden`): der laufende Monat trägt hier dieselbe Zahl wie dort
- * unter „bisher". Die Ausgabensicht daneben rechnet über die liquiden Konten; das ist
+ * Übersicht (`uebersichtLaden`). Dieselbe Zahl wie dort unter „bisher" trägt der laufende
+ * Monat aber nur ohne Vertrag mit längerem Rhythmus: die Übersicht stellt Verträge nach
+ * Fälligkeit in den Monat (`ErgebnisOptionen`), hier stehen sie anteilig — ein Rückblick
+ * fragt, was die Monate gekostet haben. Die Ausgabensicht daneben rechnet über die liquiden Konten; das ist
  * kein Widerspruch, sondern der Unterschied der Fragen — Kosten hängen nicht daran, von
  * wo bezahlt wurde.
  *
@@ -890,8 +894,8 @@ export interface Berichtssicht {
  * Der Bericht über einen abgeschlossenen Zeitraum — Ergebnis, Weg zum Konto, Vermögen.
  *
  * **Dieselbe Eingabe wie Kostensicht und Reichweite** (`kostenbasis`): derselbe Monat
- * trägt im Bericht dieselben Kosten wie in der Analyse und in den Monatskarten der
- * Übersicht. Das Jahr ist die Summe seiner Monate, nicht eine eigene Rechnung.
+ * trägt im Bericht dieselben Kosten wie in der Analyse. Das Jahr ist die Summe seiner
+ * Monate, nicht eine eigene Rechnung.
  *
  * **Wählbar ist nur Abgeschlossenes und voll Erfasstes** (`berichtszeitraeume`). Ohne
  * Wahl — oder mit einer, die nicht (mehr) wählbar ist — gilt der jüngste Zeitraum: der
@@ -937,4 +941,18 @@ export function analyseBericht(
       mitBeobachtungen: bestand.gegenstaende.length > 0 || bestand.verbindlichkeiten.length > 0,
     },
   };
+}
+
+// ---------------------------------------------------------------- Planrechnung
+
+/**
+ * Die Planrechnung — der Plan der Ergebnisrechnung für die nächsten zwölf Monate ab dem
+ * laufenden, Verträge anteilig (`planrechnung` im Kern).
+ *
+ * Dieselbe Eingabe wie Kostensicht, Reichweite und Bericht (`kostenbasis`): ein Vertrag,
+ * eine Rücklage, ein Budget trägt hier denselben Plan wie dort. Sie hängt an keinem
+ * Zeitraum — wie der Blick nach vorn steht sie fest ab heute.
+ */
+export function analysePlanrechnung(basis: Analysebasis, heute: string): Planrechnung {
+  return planrechnung(kostenbasis(basis, heute), PLANRECHNUNG_MONATE);
 }
