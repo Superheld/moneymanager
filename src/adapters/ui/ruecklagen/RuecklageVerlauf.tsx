@@ -13,6 +13,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ruecklagenVerlauf,
+  ruecklagenWertverlust,
   ruecklagenzeilenImMonat,
   type IstBuchung,
   type Ruecklage,
@@ -43,6 +44,9 @@ export function RuecklageVerlauf({
   const { t } = useTranslation();
   const geld = useGeld();
   const monate = useMemo(() => ruecklagenVerlauf(sicht, ruecklage, heute, 12), [sicht, ruecklage, heute]);
+  // Der Wertverlust als zweite Linie — nur mit Kauf und Nutzungsdauer, und ab dem Kauf,
+  // auch wenn der vor dem Beginn der Rücklage liegt.
+  const wertverlust = useMemo(() => ruecklagenWertverlust(ruecklage, heute, 12), [ruecklage, heute]);
   // Vorbelegt ist der letzte Monat — derselbe, den die Zeile darüber zeigt.
   const [gewaehlt, setGewaehlt] = useState(monate.length - 1);
   const monat = monate[Math.min(gewaehlt, monate.length - 1)];
@@ -61,7 +65,8 @@ export function RuecklageVerlauf({
   return (
     <Card
       title={titel}
-      subtitle={t("ruecklagen.verlaufUntertitel", { monate: monate.length })}
+      // Mit Wertverlust stehen vor dem Beginn weitere Monate im Bild — gezählt wird, was zu sehen ist.
+      subtitle={t("ruecklagen.verlaufUntertitel", { monate: new Set([...monate.map((m) => m.monat), ...wertverlust.map((p) => p.monat)]).size })}
       action={
         <span className="tabellenfilter" style={{ display: "inline-flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
           <Auswahl
@@ -74,7 +79,13 @@ export function RuecklageVerlauf({
         </span>
       }
     >
-      <VerlaufChart monate={monate} art="ruecklage" aktivIndex={gewaehlt} onMonatClick={setGewaehlt} />
+      <VerlaufChart
+        monate={monate}
+        art="ruecklage"
+        aktivIndex={gewaehlt}
+        onMonatClick={setGewaehlt}
+        zweiteLinie={wertverlust.length > 0 ? { name: t("ruecklagen.wertverlust.legende"), punkte: wertverlust } : undefined}
+      />
       <div
         style={{
           display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "var(--sp-3)", flexWrap: "wrap",

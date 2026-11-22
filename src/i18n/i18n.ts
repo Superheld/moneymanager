@@ -110,6 +110,12 @@ const de = {
       unbekannt: "Diese Rücklage gibt es nicht (mehr).",
       ohneKategorie: "Diese Rücklage hängt an keiner Kategorie. Trag erst eine ein.",
       nichtAnKategorie: "Diese Rücklage hängt nicht an der Kategorie dieser Buchung.",
+      nurAusgaben: "Einer Rücklage zuordnen lässt sich nur eine Ausgabe, die keine Umbuchung ist.",
+      zuordnungVorBeginn: "Die Buchung liegt vor dem Beginn dieser Rücklage.",
+      kaufUnvollstaendig: "Für den Wertverlust braucht es Kaufdatum, Kaufpreis und Nutzungsdauer — alle drei oder keins.",
+      kaufNurAbschliessend: "Einen Wertverlust zeigt nur eine Rücklage, die abgeschlossen wird.",
+      kaufpreisGroesserNull: "Der Kaufpreis muss größer als 0 sein.",
+      nutzungsdauerGroesserNull: "Die Nutzungsdauer (Monate) muss größer als 0 sein.",
       kategorieFehlt: "Eine Rücklage braucht eine Kategorie.",
       laeuftWeiter: "Eine Rücklage, die weiterläuft, wird nicht ausgebucht.",
       laeuftWeiterAbschluss: "Eine Rücklage, die weiterläuft, wird nicht abgeschlossen.",
@@ -1243,6 +1249,19 @@ const de = {
     ohneKategorie: "keine Kategorie",
     standHeute: "Stand heute",
     davonDa: "davon da auf {{konto}}: {{betrag}}",
+    // Neben dem Stand, nur Anzeige (Migration 82): was der Gegenstand seit dem Kauf an
+    // Wert verloren hat, und wie viel der Stand davon nicht deckt.
+    wertverlust: {
+      bisHeute: "Wertverlust bis heute {{betrag}}",
+      fehlt: "fehlt {{betrag}}",
+      legende: "Wertverlust seit dem Kauf",
+      titel: "Wertverlust zeigen",
+      hinweis: "Für etwas, das du schon hast und das diese Rücklage einmal ersetzen soll. Die Liste zeigt dann neben dem Stand, wie viel es bis heute an Wert verloren hat. An Stand und Rate ändert das nichts.",
+      feldKaufdatum: "Kaufdatum",
+      feldKaufpreis: "Kaufpreis",
+      feldNutzungsdauer: "Nutzungsdauer (Monate)",
+      feldNutzungsdauerHinweis: "Wie lange es hält — danach ist sein Wert null",
+    },
     fortschritt: "Stand / Ziel",
     verlaufAuf: "Verlauf von {{name}} zeigen",
     verlaufZu: "Verlauf von {{name}} schliessen",
@@ -1926,8 +1945,9 @@ const de = {
       wartet: "Wartet auf Zuordnung: an der Kategorie hängen mehrere Rücklagen. Bis du wählst, welche sie trägt, zählt sie als ungeplant.",
     },
   },
-  // Die Wahl im Buchungsdialog, welche Rücklage eine Ausgabe trägt — nur da, wo mehrere
-  // an ihrer Kategorie hängen oder schon entschieden ist.
+  // Die Wahl im Buchungsdialog, welche Rücklage eine Ausgabe trägt — offen, wo mehrere
+  // an ihrer Kategorie hängen oder schon entschieden ist; sonst hinter „Aus einer
+  // Rücklage bezahlt?", für eine Rücklage von ausserhalb der Kategorie (seit 2026-11-22).
   buchungRuecklage: {
     titel: "Rücklage",
     feld: "Rücklage",
@@ -1936,6 +1956,10 @@ const de = {
     keine: "keine Rücklage",
     loesen: "Wahl lösen",
     wartetHinweis: "An der Kategorie hängen mehrere Rücklagen. Wähl, welche diese Ausgabe trägt.",
+    ausRuecklage: "Aus einer Rücklage bezahlt?",
+    weitereHinweis: "Die gewählte Rücklage trägt diese Ausgabe, auch wenn sie an einer anderen Kategorie hängt. Zur Wahl stehen Rücklagen, die abgeschlossen werden.",
+    gruppeKategorie: "An der Kategorie",
+    gruppeWeitere: "Andere Rücklagen",
   },
   buchungsliste: {
     datum: "Datum",
@@ -2799,6 +2823,12 @@ const en: typeof de = {
       unbekannt: "This reserve no longer exists.",
       ohneKategorie: "This reserve has no category. Add one first.",
       nichtAnKategorie: "This reserve is not attached to this transaction's category.",
+      nurAusgaben: "Only an expense that is not a transfer can be assigned to a reserve.",
+      zuordnungVorBeginn: "The transaction is before this reserve began.",
+      kaufUnvollstaendig: "The loss in value needs purchase date, purchase price and useful life — all three or none.",
+      kaufNurAbschliessend: "Only a reserve that is closed shows a loss in value.",
+      kaufpreisGroesserNull: "The purchase price must be greater than 0.",
+      nutzungsdauerGroesserNull: "The useful life (months) must be greater than 0.",
       kategorieFehlt: "A reserve needs a category.",
       laeuftWeiter: "A reserve that keeps running is not booked out.",
       laeuftWeiterAbschluss: "A reserve that keeps running is not closed.",
@@ -3901,6 +3931,17 @@ const en: typeof de = {
     ohneKategorie: "no category",
     standHeute: "Balance today",
     davonDa: "of which on {{konto}}: {{betrag}}",
+    wertverlust: {
+      bisHeute: "Loss in value to date {{betrag}}",
+      fehlt: "missing {{betrag}}",
+      legende: "Loss in value since purchase",
+      titel: "Show loss in value",
+      hinweis: "For something you already own that this reserve is meant to replace one day. The list then shows next to the balance how much value it has lost so far. Balance and rate stay as they are.",
+      feldKaufdatum: "Purchase date",
+      feldKaufpreis: "Purchase price",
+      feldNutzungsdauer: "Useful life (months)",
+      feldNutzungsdauerHinweis: "How long it lasts — afterwards its value is zero",
+    },
     fortschritt: "Balance / target",
     verlaufAuf: "Show history of {{name}}",
     verlaufZu: "Close history of {{name}}",
@@ -4548,6 +4589,10 @@ const en: typeof de = {
     keine: "no reserve",
     loesen: "clear choice",
     wartetHinweis: "Several reserves are attached to the category. Choose which one carries this expense.",
+    ausRuecklage: "Paid from a reserve?",
+    weitereHinweis: "The chosen reserve carries this expense, even if it is attached to another category. You can choose reserves that are closed.",
+    gruppeKategorie: "In this category",
+    gruppeWeitere: "Other reserves",
   },
   buchungsliste: {
     datum: "Date",

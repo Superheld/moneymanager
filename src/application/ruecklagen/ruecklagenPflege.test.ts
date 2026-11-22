@@ -399,3 +399,34 @@ describe("ruecklageLoeschen", () => {
     expect(daten).toHaveLength(0);
   });
 });
+
+describe("Kauf und Nutzungsdauer (Migration 82, nur für die Anzeige)", () => {
+  const kauf = { kaufDatum: "2024-03-15", kaufPreis: 120000, nutzungsdauerMonate: 60 };
+
+  it("speichert alle drei an einer Rücklage, die abgeschlossen wird — das Kaufdatum darf vor dem Beginn liegen", async () => {
+    const { repo, daten } = memRuecklagen();
+    await ruecklageAnlegen(repo, { ...mitZiel, ...kauf, art: "abschliessend" });
+    expect(daten[0].kauf).toEqual({ datum: "2024-03-15", preis: 120000, nutzungsdauerMonate: 60 });
+    // Ziel, Frist und Beginn bleiben, was sie sind — gerechnet wird mit dem Kauf nichts.
+    expect(daten[0]).toMatchObject({ ziel: 60000, fristMonate: 120, beginn: "2024-01-01" });
+  });
+
+  it("behält sie beim Bearbeiten, nimmt sie weg, wenn alle drei leer sind", async () => {
+    const { repo, daten } = memRuecklagen();
+    const r = await ruecklageAnlegen(repo, { ...mitZiel, ...kauf });
+    await ruecklageAktualisieren(repo, r.id, { ...mitZiel, ...kauf, kaufPreis: 130000 }, "2026-05-10");
+    expect(daten[0].kauf?.preis).toBe(130000);
+    await ruecklageAktualisieren(repo, r.id, { ...mitZiel, kaufDatum: "" }, "2026-05-10");
+    expect(daten[0].kauf).toBeUndefined();
+  });
+
+  it("weist eine halbe Angabe ab, eine an einer Rücklage, die weiterläuft, und unsinnige Werte", async () => {
+    const { repo } = memRuecklagen();
+    await expect(ruecklageAnlegen(repo, { ...mitZiel, kaufDatum: "2024-03-15" })).rejects.toThrow("ruecklage.kaufUnvollstaendig");
+    await expect(ruecklageAnlegen(repo, { ...frei, ...kauf, art: "fortlaufend" })).rejects.toThrow("ruecklage.kaufNurAbschliessend");
+    await expect(ruecklageAnlegen(repo, { ...mitZiel, ...kauf, kaufDatum: "15.03.2024" })).rejects.toThrow("ruecklage.datumUngueltig");
+    await expect(ruecklageAnlegen(repo, { ...mitZiel, ...kauf, kaufPreis: -5 })).rejects.toThrow("ruecklage.kaufpreisGroesserNull");
+    await expect(ruecklageAnlegen(repo, { ...mitZiel, ...kauf, kaufPreis: 10.5 })).rejects.toThrow("ruecklage.kaufpreisGroesserNull");
+    await expect(ruecklageAnlegen(repo, { ...mitZiel, ...kauf, nutzungsdauerMonate: -12 })).rejects.toThrow("ruecklage.nutzungsdauerGroesserNull");
+  });
+});

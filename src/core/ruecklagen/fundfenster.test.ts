@@ -167,6 +167,65 @@ describe("Wirkung 3: der Anspruch auf dem Konto sinkt um die gefundenen Entnahme
   });
 });
 
+// ------------------------------------------------------------------ Wirkung 4
+
+describe("Wirkung 4: eine Zuordnung ausserhalb der Kategorie (Nachtrag zu ADR-0006, 2026-11-22)", () => {
+  // Der Fall des Nutzers: Fernseher und Rechner stehen beide unter „Elektronik", an der ein
+  // monatliches Budget hängt. Der Fernseher gehört der Rücklage „Fernseher", die an einer
+  // anderen Kategorie hängt. Alle drei Rechnungen — Budgetverbrauch, Ergebnis, Anspruch auf
+  // dem Konto — müssen dieselbe Buchung gleich behandeln: der Rücklage gehört sie, dem
+  // Budget nicht. ADR-0006 nennt einen Unterschied zwischen den Wegen bei einer
+  // ausdrücklichen Zuordnung auf einer nicht budgetrelevanten Buchung; beide Fälle stehen hier.
+  const kategorien: Kategorie[] = [
+    { id: "k-konsum", name: "Konsum", defaultCharakter: "Aufwand" },
+    { id: "k-elektro", name: "Elektronik", elternId: "k-konsum", defaultCharakter: "Aufwand" },
+    { id: "k-wohnen", name: "Wohnen", defaultCharakter: "Aufwand" },
+  ];
+  const elektro: Budget = { id: "b-elektro", kategorieId: "k-elektro", kontoId: "giro", art: "monatlich", start: "2026-01-01", betraege: [{ abMonat: "2026-01", betrag: 10000 }] };
+  const tv: Ruecklage = {
+    id: "r-tv", bezeichnung: "Rendsburg", ziel: 120000, fristMonate: 12, beginn: "2026-01-01",
+    kategorieId: "k-wohnen", kontoId: "tg", art: "abschliessend", findetAb: "2026-01-01",
+  };
+
+  for (const budgetrelevant of [undefined, false] as const) {
+    const fernseher = buchung("2026-05-10", -90000, { kategorieId: "k-elektro", budgetrelevant });
+    const rechner = buchung("2026-05-12", -30000, { kategorieId: "k-elektro" });
+    const zuordnung = [{ istbuchungId: fernseher.id, kategorieId: "k-elektro", ruecklageId: "r-tv" }];
+    const e = eingabe({ kategorien, budgets: [elektro], ruecklagen: [tv], ruecklagenzuordnungen: zuordnung, ist: [fernseher, rechner] });
+    const sicht: Zustaendigkeitssicht = {
+      buchungen: e.ist, kategorien, budgets: [elektro], vertragsBuchungen: new Set(), ruecklagen: [tv], ruecklagenzuordnungen: zuordnung,
+    };
+    const fall = budgetrelevant === false ? "nicht budgetrelevant" : "budgetrelevant";
+
+    it(`${fall}: die Einordnung gibt den Fernseher der Rücklage, den Rechner dem Budget`, () => {
+      const x = einordnen(e.ist, einordnungskontext(e));
+      expect(x.find((y) => y.buchung.id === fernseher.id)).toMatchObject({ art: "ruecklage", ruecklageId: "r-tv" });
+      expect(x.find((y) => y.buchung.id === rechner.id)).toMatchObject({ art: "laufend", budgetId: "b-elektro" });
+    });
+
+    it(`${fall}: das Budget zählt nur den Rechner — dieselbe Zuständigkeit wie im Ergebnis`, () => {
+      expect(budgetBuchungen(sicht, elektro, "2026-05-01", "2026-06-01").map((p) => p.buchung.id)).toEqual([rechner.id]);
+      expect(ruecklagenEntnahmenAus(sicht).get("r-tv")).toEqual([{ datum: "2026-05-10", betrag: -90000 }]);
+    });
+
+    it(`${fall}: das Ergebnis führt ihn als Entnahme, das Ungedeckte kostet den Monat, die Überleitung geht auf`, () => {
+      // Raten Januar bis Mai 50000, entnommen 90000 → Mai kostet die Rate plus 40000.
+      const posten = zeile(e, "2026-05", "abschreibungen")!.posten.find((p) => p.ruecklageId === "r-tv")!;
+      expect(posten).toMatchObject({ plan: -10000, ist: -50000, entnahme: -90000 });
+      expect(zeile(e, "2026-05", "laufend")!.posten.find((p) => p.budgetId === "b-elektro")!.ist).toBe(-30000);
+      expect(zeile(e, "2026-05", "ungeplant")?.posten ?? []).toEqual([]);
+      gehtAuf(e, "2026-05");
+    });
+
+    it(`${fall}: der Anspruch auf dem Konto fällt um dieselbe Entnahme — im Minus auf null`, () => {
+      const bestand = { entnahmen: ruecklagenEntnahmenAus(sicht), abschluesse: [] };
+      const konto = new Map([["tg", 1000000]]);
+      expect(ruecklagenDeckung([tv], "2026-05-09", konto, bestand).posten[0].soll).toBe(40000);
+      expect(ruecklagenDeckung([tv], "2026-05-20", konto, bestand).posten[0].soll).toBe(0);
+    });
+  }
+});
+
 // ------------------------------------------------------------------ Befunde
 
 describe("Befunde, die bewusst nachgebildet sind", () => {

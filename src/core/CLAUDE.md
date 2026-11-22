@@ -148,6 +148,14 @@ auf" ausführbar macht.
   eine eigene Unterkategorie zu verlangen (viele kleine Kategorien, nur um der Rechnung
   willen). Ein monatliches Budget und eine Rücklage an derselben Kategorie lässt die App
   nicht neu anlegen; im Altfall gewinnt das Budget.
+  **Seit 2026-11-22 klärt die Zuordnung auch eine zweite Frage** (Nachtrag zu ADR-0006):
+  eine Ausgabe darf einer Rücklage gehören, die an einer ANDEREN Kategorie hängt — der
+  Fernseher unter „Elektronik" der Rücklage „Fernseher". Zur Wahl steht dafür nur eine,
+  die abgeschlossen wird, noch läuft und am Tag der Buchung schon begonnen hat
+  (`fremdeRuecklagen`, Begründung in `ruecklagen/CLAUDE.md`). Es bleibt dieselbe Zeile in
+  `ruecklage_zuordnung` und dieselbe Regel in `zustaendigkeit.ts`: die Zuordnung kommt
+  vor der Kategorie. Ein Feld „woraus bezahlt" an der Buchung ist das weiterhin nicht —
+  der Normalweg bleibt die Kategorie, die Zuordnung die Ausnahme.
 - **Vorsorge ist Kosten, keine Verwendung des Überschusses.** Als Verwendung sähe ein
   Monat, in dem nichts zurückgelegt wurde, BESSER aus. Gerechnet wird die Rate, die das
   Ziel verlangt; ob sie überwiesen wurde, zeigt die Überleitung.

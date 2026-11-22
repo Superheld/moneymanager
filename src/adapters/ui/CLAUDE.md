@@ -146,7 +146,10 @@ Was das für den Code hier heisst:
 - **EINE Liste, EIN Dialog für beide Sorten.** Der Bereich Rücklagen zeigt jede Rücklage
   in derselben Liste (`RuecklagenScreen`, Zeilen fertig aus `Ruecklagenzeile`): Name,
   Sorte als Pille, Kategorie, Rate, Stand (auch im Minus), mit Ziel der Fortschritt, das
-  Konto oder dass keines da ist. Der Name öffnet den Verlauf (`RuecklageVerlauf`). An
+  Konto oder dass keines da ist; mit Kauf und Nutzungsdauer klein neben dem Stand der
+  Wertverlust bis heute und was fehlt (seit Migration 82, nur Anzeige,
+  `src/core/ruecklagen/CLAUDE.md`), im Verlauf als zweite, gestrichelte Linie ab dem
+  Kauf. Der Name öffnet den Verlauf (`RuecklageVerlauf`). An
   einer, die abgeschlossen wird, steht „abschließen" (`AbschlussDialog`, ohne
   Buchungswahl, seit Paket 5) — nur beim Altbestand ohne Kategorie weiter „ausgebucht"
   (`AusbuchungDialog`, mit Buchungswahl). Welcher Knopf, sagt die Sicht (`abschlussweg`). `RuecklageDialog` legt beide an:
@@ -370,7 +373,7 @@ und wurde deshalb 2026-08-25 herausgezogen:
 | `DublettenBlock` | steht sie womöglich schon ein zweites Mal da? |
 | `BuchungsHerkunft` | woher sie kommt — reine Anzeige |
 | `EinordnungsBlock` | was sie kaufmännisch ist, und WARUM — reine Anzeige (unten, „Die Einordnung an der Zeile") |
-| `RuecklagenwahlBlock` | welche Rücklage sie trägt — nur, wo mehrere an ihrer Kategorie hängen oder schon entschieden ist; speichert sofort |
+| `RuecklagenwahlBlock` | welche Rücklage sie trägt — offen, wo mehrere an ihrer Kategorie hängen oder schon entschieden ist; sonst hinter „Aus einer Rücklage bezahlt?" für eine Rücklage von ausserhalb der Kategorie (seit 2026-11-22, eigene Gruppe in der Auswahl); speichert sofort |
 | `JournalBlock` | was daran geändert wurde — und der Weg zurück |
 | `Richtungswahl` | Höhe und Richtung des Betrags, samt der Zerlegung dahinter |
 | `SplitModal` · `ZurUmbuchungModal` | die beiden Folge-Dialoge (S-7, S-1) |
@@ -656,7 +659,7 @@ das bedeutet, ist enger als es klingt, und die Grenze gehört benannt:
     leeren Zustand); auch über einem Depot steht der Kopf, sonst käme man vom Depot nur
     über die eingeklappte Liste weg.
   - **Rücklagen:** „Wartet auf Zuordnung" ganz oben, dann je Rücklage eine Zeile (Name,
-    Stand bzw. Stand / Ziel, Balken), die ganze Zeile öffnet Sorte, Rate, Knöpfe und den
+    Stand bzw. Stand / Ziel, Balken, mit Kauf darunter klein der Wertverlust), die ganze Zeile öffnet Sorte, Rate, Knöpfe und den
     Verlauf. Eingeklappt darunter: Stand, Faustformel und „Diesen Monat" (eine Zeile mit
     den Überschriften der Karten darin), „Wo das Geld liegt", die Vorschläge, „Schon
     abgeschlossen"; der Erklärtext hinter „Wie funktioniert eine Rücklage?". Ohne eine

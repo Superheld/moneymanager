@@ -11,6 +11,12 @@
 //   • lösen — `loesen: true`: die Entscheidung fällt weg, und die Kategorie entscheidet
 //     wieder.
 //
+// **Seit 2026-11-22 auch ausserhalb der Kategorie** (Nachtrag zu ADR-0006): eine Ausgabe
+// darf jeder laufenden Rücklage zugeordnet werden, die abgeschlossen wird
+// (`fremdeRuecklagen`). Der Fernseher unter „Elektronik" gehört dann der Rücklage
+// „Fernseher", nicht mehr dem, was an „Elektronik" hängt — das sagt `zustaendigkeit`,
+// in der die Zuordnung schon immer vor allem anderen kam.
+//
 // Der Anteil wird über seine KATEGORIE benannt, auch bei einer ungeteilten Buchung: die
 // Aufteilungen bekommen bei jedem Speichern neue IDs, die Kategorie bleibt. Ändert
 // jemand sie, passt die Zuordnung zu keinem Anteil mehr, und die Buchung wird neu
@@ -18,6 +24,7 @@
 
 import {
   FachlicherFehler,
+  fremdeRuecklagen,
   kategorieAnteile,
   waehlbareRuecklagen,
   type IstBuchung,
@@ -43,8 +50,12 @@ export type RuecklagenzuordnenEingabe =
  *
  * Geprüft wird, dass die Buchung einen Anteil mit dieser Kategorie hat und dass die
  * Rücklage an genau dieser Kategorie oder einem ihrer Vorfahren hängt
- * (`waehlbareRuecklagen`). Eine Rücklage ohne Kategorie nimmt keine Zuordnung an: sie
- * findet nur über ihre Ausbuchung, wie vor der Umstellung.
+ * (`waehlbareRuecklagen`) — oder, seit 2026-11-22, zu denen gehört, die auch ausserhalb
+ * ihrer Kategorie etwas tragen dürfen (`fremdeRuecklagen`). Dann muss die Buchung eine
+ * Ausgabe ohne Gegenbein sein: eine Umbuchung ordnet die Einordnung vorher als Umbuchung
+ * ein, der Stand der Rücklage zählte sie trotzdem — zwei Antworten auf dieselbe Buchung.
+ * Eine Rücklage ohne Kategorie nimmt keine Zuordnung an: sie findet nur über ihre
+ * Ausbuchung, wie vor der Umstellung.
  */
 export async function ruecklageZuordnen(deps: RuecklagenzuordnenDeps, e: RuecklagenzuordnenEingabe): Promise<void> {
   const [buchungen, kategorien, ruecklagen] = await Promise.all([
@@ -67,7 +78,13 @@ export async function ruecklageZuordnen(deps: RuecklagenzuordnenDeps, e: Rueckla
     if (!ruecklage) throw new FachlicherFehler("ruecklage.unbekannt");
     if (!ruecklage.kategorieId) throw new FachlicherFehler("ruecklage.ohneKategorie");
     if (!waehlbareRuecklagen(kategorien, ruecklagen, e.kategorieId).some((r) => r.id === ruecklage.id)) {
-      throw new FachlicherFehler("ruecklage.nichtAnKategorie");
+      // Eine Rücklage, die weiterläuft (oder beendet ist), nimmt nichts von ausserhalb
+      // ihrer Kategorie an; die Meldung von vorher stimmt für sie weiter.
+      if (ruecklage.beendetAm || ruecklage.art === "fortlaufend") throw new FachlicherFehler("ruecklage.nichtAnKategorie");
+      if (buchung.transferId || buchung.charakter !== "Aufwand") throw new FachlicherFehler("ruecklage.nurAusgaben");
+      if (!fremdeRuecklagen(kategorien, ruecklagen, e.kategorieId, buchung.datum).some((r) => r.id === ruecklage.id)) {
+        throw new FachlicherFehler("ruecklage.zuordnungVorBeginn");
+      }
     }
   }
   const zuordnung: Ruecklagenzuordnung = {
@@ -82,8 +99,21 @@ export async function ruecklageZuordnen(deps: RuecklagenzuordnenDeps, e: Rueckla
 export interface Ruecklagenwahl {
   /** Die Kategorie des Anteils — mit ihr wird zugeordnet. */
   readonly kategorieId: string;
-  /** Die Rücklagen, die zur Wahl stehen, nächste Ebene zuerst. */
+  /** Die Rücklagen an der Kategorie (oder darüber), die zur Wahl stehen, nächste Ebene zuerst. */
   readonly ruecklagen: readonly { readonly id: string; readonly bezeichnung: string }[];
+  /**
+   * Die Rücklagen, die auch ausserhalb ihrer Kategorie etwas tragen dürfen
+   * (`fremdeRuecklagen`), nach Name — im Dialog eine eigene Gruppe. Steht die gewählte in
+   * keiner der beiden Listen mehr (inzwischen beendet), steht sie hier mit, damit die
+   * Wahl ihren Namen zeigt.
+   */
+  readonly weitere: readonly { readonly id: string; readonly bezeichnung: string }[];
+  /**
+   * Gibt es an der Kategorie selbst etwas zu entscheiden — mehrere Rücklagen, oder es ist
+   * schon entschieden? Dann steht die Wahl offen da, wie vor 2026-11-22. Sonst hinter
+   * einer Zeile, die aufklappt: eine Rücklage von ausserhalb ist die Ausnahme.
+   */
+  readonly noetig: boolean;
   /**
    * Was entschieden ist: eine Rücklage, `null` für „ausdrücklich keine", fehlt, solange
    * nichts entschieden ist. Vorbelegt wird nichts — eine Vorbelegung sähe aus wie eine
@@ -95,9 +125,16 @@ export interface Ruecklagenwahl {
 }
 
 /**
- * Je Buchung die Anteile, für die es etwas zu wählen gibt: mehr als eine Rücklage kommt
- * in Frage, oder es ist schon etwas entschieden (dann lässt es sich ändern oder lösen).
- * Hängt nur eine Rücklage an der Kategorie, entfällt der Klick — sie findet von selbst.
+ * Je Buchung die Anteile, für die es etwas zu wählen gibt: eine Rücklage an der Kategorie
+ * oder eine, die auch ausserhalb ihrer Kategorie etwas tragen darf. `noetig` sagt, ob an
+ * der Kategorie selbst etwas zu entscheiden ist (mehrere Rücklagen, oder schon
+ * entschieden). Hängt dort nur eine und gibt es keine andere, entfällt die Wahl — sie
+ * findet von selbst.
+ *
+ * `ruecklagen` darf beendete enthalten: sie stehen nie zur Wahl, geben aber einer
+ * Zuordnung, die auf sie zeigt, ihren Namen. Eine Buchung mit Vertrag
+ * (`vertragsBuchungen`) bekommt keine Wahl — sie zählt als Fixkosten, und eine Zuordnung
+ * änderte daran nichts; die Wahl versprach eine Wirkung, die es nicht gibt.
  */
 export function ruecklagenwahlJeBuchung(
   buchungen: readonly IstBuchung[],
@@ -105,21 +142,31 @@ export function ruecklagenwahlJeBuchung(
   ruecklagen: readonly Ruecklage[],
   zuordnungen: readonly Ruecklagenzuordnung[],
   wartend: ReadonlySet<string>,
+  vertragsBuchungen: ReadonlySet<string> = new Set(),
 ): ReadonlyMap<string, readonly Ruecklagenwahl[]> {
   const entschieden = new Map(zuordnungen.map((z) => [`${z.istbuchungId}\u0000${z.kategorieId ?? ""}`, z]));
+  const namen = new Map(ruecklagen.map((r) => [r.id, r.bezeichnung]));
+  const kurz = (r: Ruecklage) => ({ id: r.id, bezeichnung: r.bezeichnung });
   const raus = new Map<string, Ruecklagenwahl[]>();
   for (const b of buchungen) {
-    if (b.transferId || b.charakter !== "Aufwand") continue;
+    if (b.transferId || b.charakter !== "Aufwand" || vertragsBuchungen.has(b.id)) continue;
     const liste: Ruecklagenwahl[] = [];
     for (const a of kategorieAnteile(b)) {
       if (!a.kategorieId || liste.some((w) => w.kategorieId === a.kategorieId)) continue;
       const wahl = waehlbareRuecklagen(kategorien, ruecklagen, a.kategorieId);
+      const weitere = fremdeRuecklagen(kategorien, ruecklagen, a.kategorieId, b.datum).map(kurz);
       const z = entschieden.get(`${b.id}\u0000${a.kategorieId}`) ?? entschieden.get(`${b.id}\u0000`);
-      if (wahl.length < 2 && !z) continue;
+      const noetig = wahl.length >= 2 || !!z;
+      if (!noetig && weitere.length === 0) continue;
+      const gewaehlt = z ? (z.ruecklageId ?? null) : undefined;
+      const fehlt = gewaehlt != null && !wahl.some((r) => r.id === gewaehlt) && !weitere.some((r) => r.id === gewaehlt);
+      const name = gewaehlt != null ? namen.get(gewaehlt) : undefined;
       liste.push({
         kategorieId: a.kategorieId,
-        ruecklagen: wahl.map((r) => ({ id: r.id, bezeichnung: r.bezeichnung })),
-        gewaehlt: z ? (z.ruecklageId ?? null) : undefined,
+        ruecklagen: wahl.map(kurz),
+        weitere: fehlt && gewaehlt != null && name != null ? [...weitere, { id: gewaehlt, bezeichnung: name }] : weitere,
+        noetig,
+        gewaehlt,
         wartet: wartend.has(`${b.id}\u0000${a.kategorieId}`),
       });
     }

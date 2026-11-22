@@ -112,7 +112,10 @@ Zwei Dinge, die man wissen muss:
   Knopf den WERT an, und der ist bei uns fast überall eine UUID.
 - **Die Optionen kommen als Liste, nicht als Kinder.** An den meisten Stellen entstanden
   die `<option>` ohnehin aus einem `map` über Konten, Kategorien oder Verträge — eine
-  Liste hereinzureichen ist dort weniger Code als vorher, nicht mehr.
+  Liste hereinzureichen ist dort weniger Code als vorher, nicht mehr. **Gruppen** gehen
+  über dieselbe Liste (seit 2026-11-22): `gruppe` an der Option, aufeinander folgende mit
+  derselben Überschrift stehen in einem Base-UI-`Select.Group`. Zuerst gebraucht im
+  `RuecklagenwahlBlock` (an der Kategorie / andere Rücklagen).
 
 **Nicht verwechseln mit `Zeilenauswahl`.** Die ist für eine kleine Entscheidung IN einer
 Tabellenzeile und so gross wie eine Pille daneben; `Auswahl` ist das Formularfeld über die

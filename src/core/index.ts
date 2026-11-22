@@ -27,6 +27,7 @@ export * from "./ruecklagen/ruecklage";
 export * from "./ruecklagen/fluss";
 export * from "./ruecklagen/topf";
 export * from "./ruecklagen/zuordnung";
+export * from "./ruecklagen/wertverlust";
 export * from "./zustaendigkeit";
 export * from "./fortschreibung";
 export * from "./depot/depot";

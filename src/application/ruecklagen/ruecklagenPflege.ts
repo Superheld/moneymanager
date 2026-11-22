@@ -17,7 +17,7 @@
 //     ist eine neue Frage — sie gehört ins Abschliessen (`ruecklageAbschliessen`), nicht
 //     in diesen Dialog.
 
-import { FachlicherFehler, freieRate, hatZiel, istCent, type Cent, type Ruecklage, type Ruecklagenart } from "../../core";
+import { FachlicherFehler, freieRate, hatZiel, istCent, type Cent, type Kaufangabe, type Ruecklage, type Ruecklagenart } from "../../core";
 import type { BudgetRepository, LedgerPort, RuecklagenAusbuchung, RuecklagenRepository } from "../ports";
 
 /**
@@ -58,6 +58,38 @@ export interface RuecklagenEingabe {
   kontoId?: string;
   /** Die Sorte; nur beim Anlegen gelesen, Vorgabe `abschliessend`. */
   art?: Ruecklagenart;
+  /**
+   * Kauf und Nutzungsdauer des Gegenstands, den sie ersetzen soll (seit Migration 82) —
+   * alle drei oder keins, nur bei einer, die abgeschlossen wird (`kaufPruefen`). Nur für
+   * die Anzeige des Wertverlusts; gerechnet wird damit nichts.
+   */
+  kaufDatum?: string;
+  /** Kaufpreis in Minor Units. */
+  kaufPreis?: Cent;
+  nutzungsdauerMonate?: number;
+}
+
+/**
+ * Prüft Kauf und Nutzungsdauer und baut daraus die Angabe an der Rücklage.
+ *
+ * **Nur bei einer, die abgeschlossen wird** — konservativ entschieden (2026-11-22). Eine,
+ * die abgeschlossen wird, steht für EINEN Gegenstand (je Gegenstand eine Rücklage,
+ * ADR-0006); mit dem Kauf schliesst man sie ab und beginnt neu. Eine, die weiterläuft,
+ * trägt eine Art von Ausgaben auf Dauer (Reparaturen) — ein Kaufdatum hätte dort keinen
+ * Gegenstand, an dem es hängt, und der Wertverlust stiege nur bis zu einem Tag, nach dem
+ * die Rücklage ohne Ende weiterläuft.
+ */
+function kaufPruefen(e: RuecklagenEingabe, art: Ruecklagenart): Kaufangabe | undefined {
+  const datum = e.kaufDatum?.trim() || undefined;
+  const preis = e.kaufPreis || undefined;
+  const monate = e.nutzungsdauerMonate == null || Number.isNaN(e.nutzungsdauerMonate) ? undefined : Math.round(Number(e.nutzungsdauerMonate)) || undefined;
+  if (datum == null && preis == null && monate == null) return undefined;
+  if (datum == null || preis == null || monate == null) throw new FachlicherFehler("ruecklage.kaufUnvollstaendig");
+  if (art !== "abschliessend") throw new FachlicherFehler("ruecklage.kaufNurAbschliessend");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datum)) throw new FachlicherFehler("ruecklage.datumUngueltig");
+  if (!(preis > 0) || !istCent(preis)) throw new FachlicherFehler("ruecklage.kaufpreisGroesserNull");
+  if (!(monate > 0)) throw new FachlicherFehler("ruecklage.nutzungsdauerGroesserNull");
+  return { datum, preis, nutzungsdauerMonate: monate };
 }
 
 /**
@@ -121,6 +153,7 @@ export async function ruecklageAnlegen(
     ...gebaut,
     rate: undefined,
     art: e.art ?? "abschliessend",
+    kauf: kaufPruefen(e, e.art ?? "abschliessend"),
     findetAb: gebaut.beginn,
     raten: gebaut.rate ? [{ abMonat: gebaut.beginn.slice(0, 7), betrag: gebaut.rate }] : [],
   };
@@ -176,6 +209,7 @@ export async function ruecklageAktualisieren(
     ...gebaut,
     rate: undefined,
     art: vorher?.art ?? "abschliessend",
+    kauf: kaufPruefen(e, vorher?.art ?? "abschliessend"),
     findetAb,
     raten,
   };

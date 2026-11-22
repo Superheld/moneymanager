@@ -44,7 +44,7 @@ import type {
   RuecklagenRepository,
   RuecklagenzuordnungRepository,
 } from "./ports";
-import { ruecklagenbestandLaden } from "./ruecklagen/ruecklagenbestand";
+import { alleRuecklagen, ruecklagenbestandLaden } from "./ruecklagen/ruecklagenbestand";
 import { ruecklagenwahlJeBuchung, type Ruecklagenwahl } from "./ruecklagen/ruecklageZuordnen";
 
 export interface BuchungsdetailDeps {
@@ -161,6 +161,13 @@ export async function buchungsdetailLaden(
     freigaben,
     einordnungen,
     onlineKonten: new Set(zuordnungen_online.map((z) => z.zahlungskontoId)),
-    ruecklagenwahl: ruecklagenwahlJeBuchung(buchungen, kategorien, rb.ruecklagen, rb.ruecklagenzuordnungen, wartend),
+    // Alle Rücklagen, beendete eingeschlossen: zur Wahl stehen nur laufende, aber eine
+    // Zuordnung auf eine beendete soll ihren Namen zeigen. Ohne Wahl bleibt, was einem
+    // Vertrag gehört — dort entscheidet die Zuordnung nichts (dieselbe Regel wie in der
+    // Einordnung, `vertragId` zählt).
+    ruecklagenwahl: ruecklagenwahlJeBuchung(
+      buchungen, kategorien, alleRuecklagen(rb), rb.ruecklagenzuordnungen, wartend,
+      new Set(zuordnungen.filter((z) => z.vertragId).map((z) => z.istbuchungId)),
+    ),
   };
 }

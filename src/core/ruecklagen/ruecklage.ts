@@ -104,6 +104,23 @@ export interface Ruecklage {
    * (ein Bestand vor der Migration rechnet so weiter wie zuvor).
    */
   readonly raten?: readonly Ruecklagenrate[];
+  /**
+   * Was die Rücklage ersetzen soll, wenn sie einen Gegenstand ersetzt (seit Migration 82):
+   * wann er gekauft wurde, was er kostete, wie lange er hält. Nur für die ANZEIGE des
+   * Wertverlusts (`wertverlustAm` in `wertverlust.ts`) — keine Rechnung über Stand, Raten
+   * oder Kosten liest es. Fehlt es, ist nichts angegeben.
+   */
+  readonly kauf?: Kaufangabe;
+}
+
+/** Kauf und Nutzungsdauer eines Gegenstands — alle drei oder keins (`ruecklagenPflege`). */
+export interface Kaufangabe {
+  /** ISO-Datum des Kaufs; darf vor dem Beginn der Rücklage liegen. */
+  readonly datum: string;
+  /** Kaufpreis, positiv, in Cent. */
+  readonly preis: Cent;
+  /** Wie viele Monate er hält; danach ist sein Wert null. */
+  readonly nutzungsdauerMonate: number;
 }
 
 /**

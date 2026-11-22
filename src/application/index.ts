@@ -318,6 +318,8 @@ export {
   // Verlauf und Buchungen EINER Rücklage aus der schon geladenen Sicht — wie `budgetVerlauf`.
   ruecklagenVerlauf,
   ruecklagenzeilenImMonat,
+  // Die zweite Linie im Verlauf: der Wertverlust seit dem Kauf, nur Anzeige.
+  ruecklagenWertverlust,
   // Was ein Abschluss an einem Tag ergäbe — rein, aus der schon geladenen Sicht.
   abschlussvorschau,
   type Abschlussvorschau,
@@ -382,7 +384,7 @@ export type { AbrufBefund, Abrufergebnis, DepotBefund } from "./abrufAusfuehren"
 export type { Abrufstand, Zugangsstand } from "./fints/abrufstand";
 export type { Belegungssicht } from "./kontobelegung";
 export type { GeldAufKonto, GeldJeKonto, RuecklageOhneKonto } from "./ruecklagen/geldJeKonto";
-export type { Anspruch, Belegungsposten, Kontobelegung, Ruecklagenart } from "../core";
+export type { Anspruch, Belegungsposten, Kaufangabe, Kontobelegung, Ruecklagenart, Wertverlust, Wertverlustpunkt } from "../core";
 // Was das Bankprofil hergibt, wird GERECHNET — also nicht in der Oberfläche: welcher
 // Speicherzeitraum gilt, wenn zwei Formate verschiedene nennen, und ob ein Konto einen
 // Vorfall überhaupt darf, sind Entscheidungen mit genau einer richtigen Antwort.

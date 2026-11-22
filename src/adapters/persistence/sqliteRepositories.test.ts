@@ -432,6 +432,16 @@ describe("Rücklagen-Repository", () => {
     expect(g.kontoId).toBeUndefined();
   });
 
+  it("speichert Kauf und Nutzungsdauer und nimmt sie beim nächsten Speichern ohne wieder weg (Migration 82)", async () => {
+    const r = { id: "g1", bezeichnung: "Wellmers", beginn: "2026-01-01", ziel: 120000, fristMonate: 36, art: "abschliessend" as const };
+    await ruecklagenRepository.speichern({ ...r, kauf: { datum: "2024-03-15", preis: 120000, nutzungsdauerMonate: 60 } });
+    expect((await ruecklagenRepository.alle())[0].kauf).toEqual({ datum: "2024-03-15", preis: 120000, nutzungsdauerMonate: 60 });
+    // Die anderen Felder bleiben, wie sie waren.
+    expect((await ruecklagenRepository.alle())[0]).toMatchObject({ ziel: 120000, fristMonate: 36, art: "abschliessend" });
+    await ruecklagenRepository.speichern(r);
+    expect((await ruecklagenRepository.alle())[0].kauf).toBeUndefined();
+  });
+
   it("löscht eine Rücklage", async () => {
     await ruecklagenRepository.speichern({
       id: "g1", bezeichnung: "X", beginn: "2024-01-01",

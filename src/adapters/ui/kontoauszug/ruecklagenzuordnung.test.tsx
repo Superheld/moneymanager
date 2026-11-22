@@ -107,7 +107,7 @@ describe("Zuordnung zu einer Rücklage", () => {
     expect(await einordnung.findByText(i18n.t("einordnung.grund.ungeplant"))).toBeInTheDocument();
   });
 
-  it("bietet keine Wahl an, wo nur eine Rücklage an der Kategorie hängt", async () => {
+  it("stellt keine Wahl offen hin, wo nur eine Rücklage an der Kategorie hängt", async () => {
     await bestand();
     const nutzer = userEvent.setup();
     rendere(<KontenScreen onNavigate={() => {}} />);
@@ -115,5 +115,35 @@ describe("Zuordnung zu einer Rücklage", () => {
     const dialog = within(await screen.findByRole("dialog"));
     await dialog.findByRole("group", { name: i18n.t("einordnung.titel") });
     expect(dialog.queryByRole("group", { name: i18n.t("buchungRuecklage.titel") })).toBeNull();
+    // Nur die Zeile, die aufklappt — für eine Rücklage von ausserhalb der Kategorie.
+    expect(dialog.getByRole("button", { name: new RegExp(i18n.t("buchungRuecklage.ausRuecklage").replace("?", "\\?")) })).toBeInTheDocument();
+  });
+
+  it("ordnet über die Zeile, die aufklappt, einer Rücklage ausserhalb der Kategorie zu (Nachtrag zu ADR-0006)", async () => {
+    await bestand();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    await nutzer.click(await screen.findByText("Bestellung Merzdorf"));
+    const dialog = within(await screen.findByRole("dialog"));
+    await nutzer.click(dialog.getByRole("button", { name: new RegExp(i18n.t("buchungRuecklage.ausRuecklage").replace("?", "\\?")) }));
+    const wahl = within(await dialog.findByRole("group", { name: i18n.t("buchungRuecklage.titel") }));
+    expect(wahl.getByText(i18n.t("buchungRuecklage.weitereHinweis"))).toBeInTheDocument();
+
+    // Beide Gruppen stehen in der Liste: die eine an der Kategorie, die beiden anderen darunter.
+    await nutzer.click(wahl.getByRole("combobox", { name: i18n.t("buchungRuecklage.feld") }));
+    expect(await screen.findByText(i18n.t("buchungRuecklage.gruppeKategorie"))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t("buchungRuecklage.gruppeWeitere"))).toBeInTheDocument();
+    await nutzer.keyboard("{Escape}");
+
+    await auswahlWaehlen(nutzer, i18n.t("buchungRuecklage.feld"), "Hallgrimsen", wahl);
+    await waitFor(async () => {
+      expect(await zuordnungRepo.alle()).toEqual([{ istbuchungId: "b-werk", kategorieId: "kat-werk", ruecklageId: "r-norden" }]);
+    });
+    const einordnung = within(await dialog.findByRole("group", { name: i18n.t("einordnung.titel") }));
+    expect(await einordnung.findByText(i18n.t("einordnung.grund.ruecklageBenannt", { budget: "Hallgrimsen" }))).toBeInTheDocument();
+    // Entschieden steht die Wahl offen da und lässt sich lösen.
+    const offen = within(await dialog.findByRole("group", { name: i18n.t("buchungRuecklage.titel") }));
+    await nutzer.click(offen.getByRole("button", { name: i18n.t("buchungRuecklage.loesen") }));
+    await waitFor(async () => expect(await zuordnungRepo.alle()).toEqual([]));
   });
 });

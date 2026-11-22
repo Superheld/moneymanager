@@ -169,6 +169,10 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     expect(spalten(db, "ruecklage")).toEqual(
       expect.arrayContaining(["konto_id", "ziel", "frist_monate", "rate", "beginn"]),
     );
+    // v82 — Kauf und Nutzungsdauer, nur für die Anzeige des Wertverlusts
+    expect(spalten(db, "ruecklage")).toEqual(
+      expect.arrayContaining(["kauf_datum", "kauf_preis", "nutzungsdauer_monate"]),
+    );
     // v23 — der Vertrag trägt die Kategorie, an der die Kategorisierungs-Kette hängt
     expect(spalten(db, "vertrag")).toContain("kategorie_id");
     // v9/v10/v11/v13
@@ -2119,6 +2123,28 @@ describe("Migration 81 — eine Rücklage: die aufbauenden Budgets werden Rückl
     // stehengebliebene Budget der Kollision nicht, und das hat gültige Verweise.
     const db = vor81();
     apply(db, 80, 81);
+    expect(db.exec("PRAGMA foreign_key_check")).toEqual([]);
+    db.close();
+  });
+});
+
+describe("Migration 82 — Kauf und Nutzungsdauer an der Rücklage, nur das Schema", () => {
+  it("legt drei leere Spalten an und lässt jede bestehende Rücklage, wie sie ist", () => {
+    const db = new SQL.Database();
+    db.run("PRAGMA foreign_keys = ON");
+    apply(db, 0, 81);
+    db.run("INSERT INTO kategorie (id, name, default_charakter) VALUES ('kat-heim','Wellbrock','Aufwand')");
+    db.run(
+      "INSERT INTO ruecklage (id, bezeichnung, ziel, frist_monate, beginn, kategorie_id, art, findet_ab) VALUES ('r-1','Ostendorp',60000,12,'2026-01-01','kat-heim','abschliessend','2026-01-01')",
+    );
+    const alt = "SELECT id, bezeichnung, ziel, frist_monate, beginn, kategorie_id, art, findet_ab FROM ruecklage";
+    const vorher = db.exec(alt)[0].values;
+    apply(db, 81, 82);
+    expect(db.exec(alt)[0].values).toEqual(vorher);
+    expect(db.exec("SELECT kauf_datum, kauf_preis, nutzungsdauer_monate FROM ruecklage")[0].values).toEqual([[null, null, null]]);
+    // Ein zweiter Lauf überspringt die Spalten (`PRAGMA table_info`) und ändert nichts.
+    apply(db, 81, 82);
+    expect(db.exec("SELECT kauf_datum, kauf_preis, nutzungsdauer_monate FROM ruecklage")[0].values).toEqual([[null, null, null]]);
     expect(db.exec("PRAGMA foreign_key_check")).toEqual([]);
     db.close();
   });

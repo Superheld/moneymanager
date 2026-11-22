@@ -20,6 +20,9 @@ interface Zeile {
   beendet_am: string | null;
   art: string;
   findet_ab: string | null;
+  kauf_datum: string | null;
+  kauf_preis: number | null;
+  nutzungsdauer_monate: number | null;
 }
 
 interface Ratenzeile {
@@ -43,7 +46,8 @@ interface AusbuchungsZeile {
   kategorie_id: string | null;
 }
 
-const SPALTEN = "id, bezeichnung, ziel, frist_monate, rate, beginn, kategorie_id, konto_id, beendet_am, art, findet_ab";
+const SPALTEN =
+  "id, bezeichnung, ziel, frist_monate, rate, beginn, kategorie_id, konto_id, beendet_am, art, findet_ab, kauf_datum, kauf_preis, nutzungsdauer_monate";
 
 /**
  * Eine Zeile als Rücklage. `beendetAm` kommt mit; bei `alle()` ist es durch den Filter
@@ -64,6 +68,11 @@ function ausZeile(z: Zeile, raten: readonly Ruecklagenrate[]): Ruecklage {
     art: z.art as Ruecklagenart,
     findetAb: z.findet_ab ?? undefined,
     raten,
+    // Nur vollständig — eine halbe Angabe (nur von Hand in der Datei möglich) zeigte einen
+    // Wertverlust, den niemand so angegeben hat.
+    ...(z.kauf_datum && z.kauf_preis != null && z.nutzungsdauer_monate != null
+      ? { kauf: { datum: z.kauf_datum, preis: z.kauf_preis as Cent, nutzungsdauerMonate: z.nutzungsdauer_monate } }
+      : {}),
   };
 }
 
@@ -104,20 +113,28 @@ export const sqliteRuecklagenRepository: RuecklagenRepository = {
     // und bei einer bestehenden die gespeicherte (Begründung am Port). Die Reihe bleibt
     // unberührt.
     //
-    // Der Wert steht zweimal in der Liste ($10 und $12) statt einmal zweimal benutzt: die
+    // Der Wert steht zweimal in der Liste ($10 und $15) statt einmal zweimal benutzt: die
     // Naht zur Shell bindet der Reihe nach (`src-tauri/src/datenbank.rs`), und ob ein
-    // wiederholter Platzhalter dort denselben Wert bekommt, prüft kein Test hier.
+    // wiederholter Platzhalter dort denselben Wert bekommt, prüft kein Test hier. Aus
+    // demselben Grund stehen die Platzhalter im Text aufsteigend.
+    //
+    // Kauf und Nutzungsdauer (Migration 82) schreibt jedes Speichern mit: wer die
+    // Rücklage weiterreicht (`{ ...r, beginn }` beim Abschliessen), reicht sie mit.
     await db.execute(
-      `INSERT INTO ruecklage (id, bezeichnung, ziel, frist_monate, rate, beginn, kategorie_id, konto_id, beendet_am, art, findet_ab)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,COALESCE($10,'abschliessend'),$11)
+      `INSERT INTO ruecklage (id, bezeichnung, ziel, frist_monate, rate, beginn, kategorie_id, konto_id, beendet_am, art, findet_ab,
+                              kauf_datum, kauf_preis, nutzungsdauer_monate)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,COALESCE($10,'abschliessend'),$11,$12,$13,$14)
        ON CONFLICT(id) DO UPDATE SET bezeichnung = excluded.bezeichnung,
          ziel = excluded.ziel, frist_monate = excluded.frist_monate, rate = excluded.rate,
          beginn = excluded.beginn, kategorie_id = excluded.kategorie_id,
          konto_id = excluded.konto_id, beendet_am = excluded.beendet_am,
-         art = COALESCE($12, ruecklage.art), findet_ab = excluded.findet_ab`,
+         kauf_datum = excluded.kauf_datum, kauf_preis = excluded.kauf_preis,
+         nutzungsdauer_monate = excluded.nutzungsdauer_monate,
+         art = COALESCE($15, ruecklage.art), findet_ab = excluded.findet_ab`,
       [
         r.id, r.bezeichnung, r.ziel ?? null, r.fristMonate ?? null, r.rate ?? null, r.beginn,
         r.kategorieId ?? null, r.kontoId ?? null, r.beendetAm ?? null, r.art ?? null, r.findetAb ?? null,
+        r.kauf?.datum ?? null, r.kauf?.preis ?? null, r.kauf?.nutzungsdauerMonate ?? null,
         r.art ?? null,
       ],
     );

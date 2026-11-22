@@ -28,6 +28,10 @@
 // überwiegt). Solche Monate wachsen nach unten statt auf null geklemmt zu werden: ein
 // leerer Balken hiesse „nichts ausgegeben", und das wäre eine andere Aussage.
 //
+// **Eine zweite Linie** (`zweiteLinie`, seit 2026-11-22) zeichnet gestrichelt einen
+// Vergleich dahinter — für eine Rücklage den Wertverlust des Gegenstands. Sie darf vor dem
+// ersten Monat beginnen; dann stehen dort leere Monate, nur mit ihr.
+//
 // **Seine Texte stehen unter `verlaufChart.*`, nicht unter `budgets.*`** (seit
 // 2026-11-16, Wortlaut unverändert; bis dahin hiess er `BudgetVerlaufChart`). Ein
 // Baustein, den beide Bereiche benutzen, trägt keinen davon in den anderen — sonst zeigte
@@ -39,32 +43,51 @@ import type { Fortschreibungsmonat } from "../../../application";
 import { useGeld } from "./einstellungenKontext";
 import { flussFarbe, warnFlaeche } from "./geldFarbe";
 
+/**
+ * Eine zweite Linie, gestrichelt, Monat für Monat (seit 2026-11-22, zuerst für den
+ * Wertverlust neben einer Rücklage). Sie darf FRÜHER beginnen als die Monate: dann stehen
+ * davor leere Monate ohne Balken und ohne Stand, nur mit ihr — der Gegenstand hat seit dem
+ * Kauf verloren, auch bevor die Rücklage begann. Den Namen für die Legende gibt der
+ * Aufrufer mit; der Baustein trägt so keinen Bereich in einen anderen.
+ */
+export interface ZweiteLinie {
+  readonly name: string;
+  readonly punkte: readonly { readonly monat: string; readonly betrag: number }[];
+}
+
 interface Props {
   monate: readonly Fortschreibungsmonat[];
   /** Entscheidet die Form der Linie hinter den Balken — Grenze oder Stand. */
   art: "monatlich" | "ruecklage";
   width?: number;
   height?: number;
-  /** Klick auf einen Monat (Index) — die Balken und der ganze Slot sind das Ziel. */
+  /** Klick auf einen Monat (Index in `monate`) — die Balken und der ganze Slot sind das Ziel. */
   onMonatClick?: (index: number) => void;
+  /** Index in `monate`, nicht in den leeren Monaten davor. */
   aktivIndex?: number | null;
+  zweiteLinie?: ZweiteLinie;
 }
 
-export function VerlaufChart({ monate, art, width = 1000, height = 220, onMonatClick, aktivIndex }: Props) {
+export function VerlaufChart({ monate, art, width = 1000, height = 220, onMonatClick, aktivIndex, zweiteLinie }: Props) {
   const { t } = useTranslation();
   const geld = useGeld();
   const padL = 60;
   const padR = 16;
   const padT = 14;
   const padB = 26;
-  const n = monate.length;
+  // Die leeren Monate vor dem ersten der Reihe, in denen nur die zweite Linie steht.
+  const erster = monate[0]?.monat;
+  const vorlauf = (zweiteLinie?.punkte ?? []).map((p) => p.monat).filter((m) => !erster || m < erster);
+  const versatz = vorlauf.length;
+  const n = versatz + monate.length;
+  const zweite = new Map((zweiteLinie?.punkte ?? []).map((p) => [p.monat, p.betrag]));
 
   const innerW = width - padL - padR;
   const innerH = height - padT - padB;
 
   // Skala über beide Reihen. Ein überzogener Monat ragt über seinen hellen Balken hinaus —
   // das soll er, sonst sähe „Rahmen genau ausgeschöpft" aus wie „Rahmen gerissen".
-  const oben = Math.max(1, ...monate.map((m) => Math.max(m.verfuegbar, m.verbraucht)));
+  const oben = Math.max(1, ...monate.map((m) => Math.max(m.verfuegbar, m.verbraucht)), ...zweite.values());
   /** Wo die Linie im Monat steht: beim Monatlichen die Grenze, beim Aufbauenden der Stand nach dem Monat. */
   const linienwert = (m: Fortschreibungsmonat) => Math.max(0, art === "ruecklage" ? m.rest : m.verfuegbar);
   const unten = Math.min(0, ...monate.map((m) => m.verbraucht));
@@ -74,7 +97,9 @@ export function VerlaufChart({ monate, art, width = 1000, height = 220, onMonatC
 
   const slot = n > 0 ? innerW / n : innerW;
   const verbrauchBreite = Math.min(18, slot * 0.36);
-  const mitte = (i: number) => padL + slot * i + slot / 2;
+  /** Die Mitte des Slots eines Monats der Reihe (`i` in `monate`), hinter den leeren davor. */
+  const links = (i: number) => padL + slot * (i + versatz);
+  const mitte = (i: number) => links(i) + slot / 2;
 
   /**
    * Die Linie hinter den Balken. Monate ohne Rahmen (vor der ersten Betragsversion)
@@ -92,7 +117,7 @@ export function VerlaufChart({ monate, art, width = 1000, height = 220, onMonatC
       const yv = y(linienwert(m));
       if (art === "monatlich") {
         // Stufe: über die volle Breite des Monats, senkrecht verbunden zum nächsten.
-        const x0 = padL + slot * i;
+        const x0 = links(i);
         d += offen ? ` L${x0},${yv} L${x0 + slot},${yv}` : ` M${x0},${yv} L${x0 + slot},${yv}`;
       } else {
         d += offen ? ` L${mitte(i)},${yv}` : ` M${mitte(i)},${yv}`;
@@ -107,6 +132,21 @@ export function VerlaufChart({ monate, art, width = 1000, height = 220, onMonatC
   /** Nur jedes k-te Monatslabel, damit sie sich bei zwölf Monaten nicht überlappen. */
   const jedes = Math.max(1, Math.ceil(n / 12));
 
+  /** Die zweite Linie durch die Mitten ihrer Monate — vor der Reihe in den leeren Slots. */
+  const zweiterPfad = (() => {
+    if (zweite.size === 0) return "";
+    const slotVon = new Map<string, number>();
+    vorlauf.forEach((m, k) => slotVon.set(m, k));
+    monate.forEach((m, i) => slotVon.set(m.monat, i + versatz));
+    let d = "";
+    for (const [monat, betrag] of zweite) {
+      const k = slotVon.get(monat);
+      if (k == null) continue;
+      d += `${d ? " L" : "M"}${padL + slot * k + slot / 2},${y(Math.max(0, betrag))}`;
+    }
+    return d;
+  })();
+
   return (
     <div>
       <svg viewBox={`0 0 ${width} ${height}`} width="100%" style={{ display: "block", height: "auto" }}>
@@ -116,6 +156,17 @@ export function VerlaufChart({ monate, art, width = 1000, height = 220, onMonatC
             <text x={padL - 8} y={y(v) + 4} textAnchor="end" fontSize="10.5" fill="var(--ink-3)" fontFamily="var(--font-ui)">{fmtAchse(v)}</text>
           </g>
         ))}
+        {/* Die zweite Linie ganz hinten, gestrichelt und gedämpft: sie ist ein Vergleich,
+            nicht die Aussage. Der Stand davor bleibt, wonach man zuerst sieht. */}
+        {zweiterPfad && (
+          <path d={zweiterPfad} fill="none" stroke="var(--ink-3)" strokeWidth="1.6" strokeDasharray="5 4"
+            strokeLinejoin="round" strokeLinecap="round" data-zweite-linie="" />
+        )}
+        {vorlauf.map((monat, k) =>
+          k % jedes === 0 ? (
+            <text key={`v${monat}`} x={padL + slot * k + slot / 2} y={height - 8} textAnchor="middle" fontSize="10.5" fill="var(--ink-3)" fontFamily="var(--font-ui)">{monat}</text>
+          ) : null,
+        )}
         {/* Die Linie liegt HINTER den Balken: sie ist der Massstab, die Balken die
             Aussage. Die Farbe ist der Akzent, nicht die Tinte der Balken — sonst läse man
             beide als eine Grösse. */}
@@ -149,7 +200,7 @@ export function VerlaufChart({ monate, art, width = 1000, height = 220, onMonatC
                     rest: geld.formatMitSymbol(m.rest),
                   })}`}</title>
               {aktivIndex === i && (
-                <rect x={padL + slot * i} y={padT} width={slot} height={innerH} fill="var(--accent)" opacity="0.1" />
+                <rect x={links(i)} y={padT} width={slot} height={innerH} fill="var(--accent)" opacity="0.1" />
               )}
               <rect
                 x={cx - verbrauchBreite / 2}
@@ -168,13 +219,13 @@ export function VerlaufChart({ monate, art, width = 1000, height = 220, onMonatC
                   diesem Monat, sie gehört also zwischen ihn und seinen Vorgänger. */}
               {m.zufuehrungVorher != null && (
                 <g>
-                  <line x1={padL + slot * i} y1={padT} x2={padL + slot * i} y2={nulllinie + 5}
+                  <line x1={links(i)} y1={padT} x2={links(i)} y2={nulllinie + 5}
                     stroke="var(--accent-deep)" strokeWidth="1.2" strokeDasharray="3 3" />
-                  <circle cx={padL + slot * i} cy={nulllinie} r="3" fill="var(--accent-deep)" />
+                  <circle cx={links(i)} cy={nulllinie} r="3" fill="var(--accent-deep)" />
                 </g>
               )}
-              {klickbar && <rect x={padL + slot * i} y={padT} width={slot} height={innerH} fill="transparent" />}
-              {i % jedes === 0 && (
+              {klickbar && <rect x={links(i)} y={padT} width={slot} height={innerH} fill="transparent" />}
+              {(i + versatz) % jedes === 0 && (
                 <text x={cx} y={height - 8} textAnchor="middle" fontSize="10.5" fill="var(--ink-3)" fontFamily="var(--font-ui)">{m.monat}</text>
               )}
             </g>
@@ -190,6 +241,9 @@ export function VerlaufChart({ monate, art, width = 1000, height = 220, onMonatC
         )}
         {monate.some((m) => m.zufuehrungVorher != null) && (
           <span><span style={{ display: "inline-block", width: 2, height: 11, background: "var(--accent-deep)", verticalAlign: "middle", marginRight: 8, marginLeft: 4 }} />{t("verlaufChart.legendeAenderung")}</span>
+        )}
+        {zweiterPfad && zweiteLinie && (
+          <span><span style={{ display: "inline-block", width: 14, borderTop: "2px dashed var(--ink-3)", verticalAlign: "middle", marginRight: 6 }} />{zweiteLinie.name}</span>
         )}
       </div>
     </div>

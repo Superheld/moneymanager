@@ -183,6 +183,24 @@ Drei Fälle, die man kennen muss:
   hängt. **Hängt ein früheres aufbauendes Budget mit
   anderen an einer Kategorie**, gehört ihm vor DEREN `findet_ab` jede Buchung weiter
   allein; erst danach wartet sie (`fundfenster.test.ts`, „Paket 4").
+- **Eine Ausgabe darf auch einer Rücklage AUSSERHALB ihrer Kategorie gehören** (seit
+  2026-11-22, Nachtrag zu ADR-0006). Der Fall: Fernseher und Rechner stehen beide unter
+  „Elektronik", der Fernseher soll aber die Rücklage „Fernseher" belasten. Zur Wahl steht
+  dafür jede laufende Rücklage, die **abgeschlossen wird**, eine Kategorie hat und deren
+  laufender Zyklus am Tag der Buchung schon begonnen hat (`fremdeRuecklagen` in
+  `zuordnung.ts`); geprüft in `ruecklageZuordnen`, dazu nur bei einer Ausgabe ohne
+  Gegenbein (`ruecklage.nurAusgaben`). Gespeichert wird dieselbe Zeile in
+  `ruecklage_zuordnung` wie beim Warten, und weil die Zuordnung in `zustaendigkeit` vor
+  allem anderen kommt, trägt danach die Rücklage den Anteil — was an seiner Kategorie
+  hängt, sieht ihn nicht mehr. Drei Grenzen, alle konservativ: eine, die **weiterläuft**,
+  bleibt an ihrer Kategorie (sie trägt eine Art von Ausgaben auf Dauer; einzelne Käufe von
+  woanders machten ihren Stand zu einer Sammlung von Ausnahmen); **nicht vor ihrem
+  Beginn** (eine solche Entnahme zählt in keinem Zyklus und kostete nirgends); eine
+  Buchung mit **Vertrag** bekommt keine Wahl (sie bleibt Fixkosten, die Zuordnung änderte
+  nichts). Dass Budgetverbrauch, Ergebnis und Anspruch dieselbe Buchung gleich behandeln
+  — auch bei `budgetrelevant = false` —, prüft `fundfenster.test.ts` („Wirkung 4").
+  Im Dialog steht die Wahl dafür hinter „Aus einer Rücklage bezahlt?", wenn an der
+  Kategorie nichts zu entscheiden ist (`noetig` an der Wahl).
 - **Ein monatliches Budget am selben Knoten gewinnt immer.** Eine NEUE Rücklage an dessen
   Kategorie weist die Anwendung ab (`ruecklage.kategorieHatBudget`, Hinweis auf eine
   Unterkategorie), seit Paket 5 ebenso ein neues Budget an der Kategorie einer Rücklage
@@ -194,6 +212,33 @@ Drei Fälle, die man kennen muss:
 Eine Rücklage auf einer Unterkategorie nimmt dem monatlichen Budget darüber ihre Buchungen
 ab, wie ein Unterbudget; das Budget sagt es an seiner Zeile („ohne Rücklage …",
 `herausgerechnet` in `zustaendigkeit.ts`, nur für Rücklagen, deren Fenster den Tag enthält).
+
+## Der Wertverlust neben dem Stand — nur Anzeige
+
+Seit Migration 82 kann eine Rücklage, die **abgeschlossen wird**, sagen, was sie einmal
+ersetzen soll: Kaufdatum, Kaufpreis, Nutzungsdauer in Monaten (`Ruecklage.kauf`, Spalten
+`kauf_datum`, `kauf_preis`, `nutzungsdauer_monate`; alle drei oder keins, geprüft in
+`ruecklagenPflege`). Der Fall: ein Fernseher, vor zwei Jahren gekauft, hält fünf Jahre —
+die Rücklage dafür beginnt erst später bei null, und ihr Stand allein sagt nicht, dass der
+Fernseher schon zwei Fünftel seines Werts verloren hat.
+
+- **Gerechnet wird damit nichts.** Stand, Raten, Kosten, Ergebnis und Kontobelegung lesen
+  `kauf` nicht; die Umstellungsprobe bleibt unverändert grün. Die Zahl ist eine Auskunft
+  neben dem Stand, keine zweite Rechnung.
+- **Linear auf null, in vollen Monaten** (`wertverlustAm` in `wertverlust.ts`): Kaufpreis ×
+  volle Monate seit dem Kauf ÷ Nutzungsdauer, gedeckelt auf den Kaufpreis. Kein Restwert,
+  keine andere Kurve — das wären Annahmen, die niemand getroffen hat.
+- **Die Liste zeigt ihn klein neben dem Stand** („Wertverlust bis heute … · fehlt …", das
+  Fehlende nur, wenn der Stand darunter liegt); die grosse Zahl bleibt der Stand. Schmal
+  eine kleine Zeile unter dem Balken.
+- **Der Verlauf zeichnet ihn als zweite, gestrichelte Linie** (`ruecklagenWertverlust`,
+  `zweiteLinie` an `VerlaufChart`), ab dem Kauf — liegt der vor dem Beginn der Rücklage,
+  stehen davor leere Monate nur mit dieser Linie.
+- **Nur bei einer, die abgeschlossen wird** (`ruecklage.kaufNurAbschliessend`): sie steht
+  für EINEN Gegenstand. Eine, die weiterläuft, trägt eine Art von Ausgaben auf Dauer; ein
+  Kaufdatum hätte dort keinen Gegenstand.
+- **Beim Abschliessen bleibt die Angabe stehen**; wer den neuen Gegenstand einträgt, ändert
+  sie im Dialog. Von selbst wird nichts umgeschrieben.
 
 ## Zwei Kostenregeln, und wo jede gilt
 
