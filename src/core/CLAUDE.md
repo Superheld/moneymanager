@@ -159,7 +159,7 @@ auf" ausführbar macht.
 
 | Datei | beantwortet |
 |---|---|
-| `einordnung.ts` | Was IST diese Buchung — Einnahme, Fixkosten, laufende Kosten, Entnahme aus einer Rücklage, Vorsorge, Umbuchung, ungeplant (auch: wartet auf Zuordnung)? Die eine Stelle dafür; wer auswertet, fragt hier und sortiert nicht selbst. Wer einen Anteil trägt, beantwortet sie über `zustaendigkeit.ts` — dieselbe Funktion, die der Verbrauch eines Budgets fragt. |
+| `einordnung.ts` | Was IST diese Buchung — Einnahme, Fixkosten, laufende Kosten, Entnahme aus einer Rücklage, Vorsorge, Umbuchung, ungeplant (auch: wartet auf Zuordnung)? Die eine Stelle dafür; wer auswertet, fragt hier und sortiert nicht selbst. Wer einen Anteil trägt, beantwortet sie über `zustaendigkeit.ts` — dieselbe Funktion, die der Verbrauch eines Budgets fragt. Der Befund „Ungeplant" der Analyse fragt hier (`ungeplantNachKategorie` in `auswertung.ts`). |
 | `ergebnis.ts` | Was kostet der Monat? Baut auf der Einordnung und fügt die Zeit hinzu (Periodisierung, Topfkosten), dazu die Überleitung. |
 | `reichweite.ts` | Wie viele Monate das freie Geld die Kosten trägt. Liest die Zeilen von `ergebnis.ts` nur und steht deshalb daneben, nicht darin. |
 | `bericht.ts` | Ein abgeschlossener Monat oder ein Jahr auf einem Blatt: summiert Monatsergebnisse und ihre Überleitung, stellt den Zeitraum davor daneben, vergleicht das Nettovermögen an zwei Stichtagen. Rechnet nichts Eigenes — ein Jahr ist die Summe seiner Monate, und deshalb geht auch seine Überleitung exakt auf. |

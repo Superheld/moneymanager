@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  blindeFlecken,
   budgettreue,
   empfaengerRangliste,
   festUndFrei,
@@ -12,11 +11,15 @@ import {
   monateImFenster,
   planWirkung,
   tiefstandImMonat,
+  ungeplantNachKategorie,
   vertragstreue,
 } from "./auswertung";
 import type { IstBuchung } from "./buchung/istbuchung";
 import type { Kategorie } from "./kategorien/kategorie";
 import type { Zahlungskonto } from "./konten/konto";
+import type { Budget } from "./budgets/budget";
+import type { Ruecklage } from "./ruecklagen/ruecklage";
+import { einordnen } from "./einordnung";
 
 const KATEGORIEN: Kategorie[] = [
   { id: "kat-a", name: "Alltag", defaultCharakter: "Aufwand" },
@@ -223,39 +226,70 @@ describe("Budgettreue", () => {
   });
 });
 
-describe("Blinde Flecken", () => {
-  const buchungen = [
-    b("geplant", "2026-01-05", -10000, { kategorieId: "kat-a" }),
-    b("ungeplant", "2026-01-06", -30000, { kategorieId: "kat-b" }),
-    b("vertrag", "2026-01-07", -10000, { kategorieId: "kat-b" }),
+describe("Ungeplant nach Kategorie", () => {
+  // Die Menge ist die der Einordnung: was ein Budget, ein Vertrag oder eine Rücklage trägt,
+  // fällt heraus — auch die Rücklage, die die alte Rechnung (`blindeFlecken`) übersah.
+  const kategorien: Kategorie[] = [
+    { id: "kat-alltag", name: "Alltag", defaultCharakter: "Aufwand" },
+    { id: "kat-frei", name: "Freies", defaultCharakter: "Aufwand" },
+    { id: "kat-reise", name: "Reise", defaultCharakter: "Aufwand" },
+    { id: "kat-geraet", name: "Gerät", defaultCharakter: "Aufwand" },
   ];
+  const budget: Budget = {
+    id: "b-alltag", kategorieId: "kat-alltag", kontoId: "k1", art: "monatlich", start: "2025-01-01",
+    betraege: [{ abMonat: "2025-01", betrag: 20000 }],
+  };
+  const reise: Ruecklage = { id: "r-reise", bezeichnung: "Ostwald", rate: 5000, beginn: "2025-01-01", kategorieId: "kat-reise", findetAb: "2025-01-01" };
+  const geraetA: Ruecklage = { id: "r-ga", bezeichnung: "Brinkhaus", rate: 1000, beginn: "2025-01-01", kategorieId: "kat-geraet", findetAb: "2025-01-01" };
+  const geraetB: Ruecklage = { id: "r-gb", bezeichnung: "Tjaden", rate: 1000, beginn: "2025-01-01", kategorieId: "kat-geraet", findetAb: "2025-01-01" };
 
-  it("meldet nur, was weder budgetiert noch vertraglich gebunden ist", () => {
-    const flecken = blindeFlecken(
-      buchungen,
-      new Set(["kat-a"]),
-      new Set(["vertrag"]),
-      KATEGORIEN,
-      "2026-01-01",
-      "2026-01-01",
-    );
-    expect(flecken.map((f) => f.name)).toEqual(["Beitraege"]);
-    // Der Anteil bezieht sich auf ALLE Ausgaben des Zeitraums, auch die gedeckten —
-    // sonst waere „100 %" die Antwort, sobald ueberhaupt etwas ungedeckt ist.
-    expect(flecken[0].anteil).toBeCloseTo(30000 / 50000, 5);
+  const buchungen = [
+    b("budget", "2026-01-05", -10000, { kategorieId: "kat-alltag" }),
+    b("frei-1", "2026-01-06", -30000, { kategorieId: "kat-frei" }),
+    b("frei-2", "2026-01-20", -2000, { kategorieId: "kat-frei" }),
+    b("retoure", "2026-01-21", 5000, { kategorieId: "kat-frei", charakter: "Aufwand" }),
+    b("vertrag", "2026-01-07", -10000, { kategorieId: "kat-frei" }),
+    b("reise", "2026-01-08", -40000, { kategorieId: "kat-reise" }),
+    b("geraet", "2026-01-09", -7000, { kategorieId: "kat-geraet" }),
+    b("ohne", "2026-01-10", -4000),
+    b("davor", "2025-12-30", -9900, { kategorieId: "kat-frei" }),
+  ];
+  const einordnungen = einordnen(buchungen, {
+    kategorien,
+    budgets: [budget],
+    vertragJeBuchung: new Map([["vertrag", "v1"]]),
+    vorsorgeKonten: new Set(),
+    ruecklagen: [reise, geraetA, geraetB],
+    ruecklagenzuordnungen: [],
+    ausbuchungen: [],
+  });
+  const liste = ungeplantNachKategorie(einordnungen, kategorien, "2026-01-01", "2026-01-01");
+  const je = new Map(liste.map((z) => [z.kategorieId ?? "ohne", z]));
+
+  it("nimmt Budget, Vertrag und Rücklage heraus", () => {
+    expect([...je.keys()].sort()).toEqual(["kat-frei", "kat-geraet", "ohne"]);
   });
 
-  it("nimmt Buchungen ohne Kategorie mit — sie sind der blindeste Fleck", () => {
-    const flecken = blindeFlecken(
-      [b("ohne", "2026-01-08", -4000)],
-      new Set(),
-      new Set(),
-      KATEGORIEN,
-      "2026-01-01",
-      "2026-01-01",
-    );
-    expect(flecken).toHaveLength(1);
-    expect(flecken[0].kategorieId).toBeUndefined();
+  it("summiert als Ausgabe, die Erstattung senkt — und zählt die Posten", () => {
+    const frei = je.get("kat-frei")!;
+    expect(frei.summe).toBe(30000 + 2000 - 5000);
+    expect(frei.anzahl).toBe(3);
+    expect(frei.anteile.map((x) => x.buchung.id)).toEqual(["retoure", "frei-2", "frei-1"]);
+  });
+
+  it("zählt, was auf eine Zuordnung wartet, mit — und weist es aus", () => {
+    const geraet = je.get("kat-geraet")!;
+    expect(geraet.summe).toBe(7000);
+    expect(geraet.wartend).toBe(1);
+    expect(je.get("kat-frei")!.wartend).toBe(0);
+  });
+
+  it("nimmt Buchungen ohne Kategorie mit", () => {
+    expect(je.get("ohne")!.name).toBe("—");
+  });
+
+  it("sortiert die grösste Summe nach vorn", () => {
+    expect(liste[0].kategorieId).toBe("kat-frei");
   });
 });
 

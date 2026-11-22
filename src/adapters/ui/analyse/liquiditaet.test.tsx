@@ -43,6 +43,7 @@ const t = (schluessel: string, werte?: Record<string, string>) => i18n.t(schlues
 
 const sicht: Liquiditaetssicht = {
   bis: "2026-12-10",
+  kurve: [],
   zeilen: [
     {
       kontoId: "k1", name: "Hauptkonto", start: 50000,
@@ -90,11 +91,52 @@ describe("LiquiditaetKarte — was die Tabelle sagt", () => {
     rendere(
       <>
         <span>da</span>
-        <LiquiditaetKarte sicht={{ bis: "2026-12-10", zeilen: [] }} />
+        <LiquiditaetKarte sicht={{ bis: "2026-12-10", zeilen: [], kurve: [] }} />
       </>,
     );
     await screen.findByText("da");
     expect(screen.queryByText(t("blickNachVorn.reicht.titel"))).toBeNull();
+  });
+});
+
+describe("LiquiditaetKarte — die Kurve", () => {
+  const tag = (datum: string, fest: number, erwartet: number, posten: { bezeichnung: string; betrag: number }[] = []) => ({
+    datum, fest, erwartet, budgetanteil: fest === erwartet ? 0 : 500, posten,
+  });
+  const mitKurve: Liquiditaetssicht = {
+    ...sicht,
+    kurve: [
+      tag("2026-09-11", 50000, 50000),
+      tag("2026-09-12", 50000, 49500),
+      tag("2026-09-13", -3000, -4000, [{ bezeichnung: "Ruhnau", betrag: -53000 }]),
+    ],
+  };
+
+  it("zeigt erst die Aufforderung, dann zum gewählten Tag Stand und Posten", async () => {
+    const nutzer = userEvent.setup();
+    rendere(<LiquiditaetKarte sicht={mitKurve} />);
+    await screen.findByText(t("blickNachVorn.reicht.kurveWaehlen"));
+    expect(screen.queryByText("Ruhnau")).toBeNull();
+
+    // Mit der Tastatur: der erste Pfeil wählt den ersten Tag, jeder weitere den nächsten.
+    const kurve = screen.getByRole("group", { name: t("blickNachVorn.reicht.kurveName") });
+    kurve.focus();
+    await nutzer.keyboard("{ArrowRight}");
+    expect(screen.getByText(t("blickNachVorn.reicht.kurveNichts"))).toBeInTheDocument();
+    await nutzer.keyboard("{End}");
+    const info = screen.getByTestId("kurventag");
+    expect(within(info).getByText("Ruhnau")).toBeInTheDocument();
+    expect(info.textContent).toMatch(/13\.09\./);
+    expect(info.textContent).toMatch(/530,00/);
+    // Unter null amber, an der Zahl — der Posten selbst ist ein Abfluss und trägt die Geldfarbe.
+    expect(info.innerHTML).toMatch(/--warn-deep/);
+    expect(info.textContent).toContain(t("blickNachVorn.reicht.kurveBudgets"));
+  });
+
+  it("zeichnet ohne Kurve nichts davon", async () => {
+    rendere(<LiquiditaetKarte sicht={sicht} />);
+    await zeile("Kasse");
+    expect(screen.queryByText(t("blickNachVorn.reicht.kurveWaehlen"))).toBeNull();
   });
 });
 

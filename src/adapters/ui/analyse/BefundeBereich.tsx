@@ -20,6 +20,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { Befunde, IstBuchung } from "../../../application";
 import { Card, DataTable, KPIStat, Pill } from "../bausteine";
+import { UngeplantTabelle } from "./UngeplantTabelle";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe, warnFarbe, warnTon } from "../bausteine/geldFarbe";
 
@@ -31,6 +32,22 @@ import { geldFarbe, warnFarbe, warnTon } from "../bausteine/geldFarbe";
  * Blick. Wer mehr will, blättert — wer den Kopf der Liste braucht, sieht ihn sofort.
  */
 const SEITE = 8;
+
+/**
+ * Eine Befund-Karte: Name und Begründung kommen aus demselben Schlüssel.
+ *
+ * Ausserhalb von `BefundeBereich` definiert: als Funktion darin wäre sie bei jedem Render
+ * eine NEUE Komponente, und React hängte alles darunter ab und wieder an — eine
+ * aufgeklappte Kategorie unter „Ungeplant" klappte zu, sobald der Buchungsdialog aufgeht.
+ */
+function Block({ name, children }: { name: string; children: ReactNode }) {
+  const { t } = useTranslation();
+  return (
+    <Card title={t(`befunde.block.${name}.name`)} subtitle={t(`befunde.block.${name}.untertitel`)}>
+      {children}
+    </Card>
+  );
+}
 
 export function BefundeBereich({
   befunde,
@@ -56,13 +73,6 @@ export function BefundeBereich({
     labelZurueck: t("konten.seiteZurueck"),
     labelVor: t("konten.seiteVor"),
   };
-
-  /** Eine Befund-Karte: Name und Begründung kommen aus demselben Schlüssel. */
-  const Block = ({ name, children }: { name: string; children: ReactNode }) => (
-    <Card title={t(`befunde.block.${name}.name`)} subtitle={t(`befunde.block.${name}.untertitel`)}>
-      {children}
-    </Card>
-  );
 
   return (
     <>
@@ -201,33 +211,14 @@ export function BefundeBereich({
 
       {/* Eigene Karte und kein Anhang der Budget-Tabelle: was in keinem Budget vorkommt,
           hat dort auch keine Zeile — und unter einer fremden Tabelle liest es sich wie
-          deren Fussnote statt wie der eigenständige Befund, der es ist. */}
-      <Block name="blind">
-        {befunde.blindeFlecken.length === 0 ? (
-          <div className="muted">{t("befunde.blindKeine")}</div>
-        ) : (
-          <DataTable
-            sortable
-            pageSize={SEITE}
-            {...tabellentexte}
-            columns={[
-              { key: "name", label: t("befunde.spalteKategorie"), maxWidth: 260 },
-              {
-                key: "summe",
-                label: `${t("befunde.spalteSumme")} ${geld.symbol}`,
-                align: "right",
-                render: (r) => geld.format(r.summe),
-              },
-              {
-                key: "anteil",
-                label: t("befunde.spalteAnteil"),
-                align: "right",
-                render: (r) => quote(r.anteil),
-              },
-            ]}
-            rows={[...befunde.blindeFlecken]}
-          />
-        )}
+          deren Fussnote statt wie der eigenständige Befund, der es ist.
+
+          Seit 2026-11-22 dieselbe Menge wie die Zeile „Ungeplant" der Monatskarten (über
+          die Einordnung), und jede Kategorie klappt bis zu ihren Buchungen auf — UNTER der
+          Tabelle, wie es `Zeilenlink` vorsieht: dort sieht man, wo ein Budget, ein Vertrag
+          oder eine Rücklage fehlt, und öffnet die Buchung, die falsch einsortiert ist. */}
+      <Block name="ungeplant">
+        <UngeplantTabelle zeilen={befunde.ungeplant} onBuchung={onBuchung} tabellentexte={tabellentexte} />
       </Block>
 
       <Block name="vertraege">

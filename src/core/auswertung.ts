@@ -27,6 +27,7 @@ import { kategorieAnteile, type IstBuchung } from "./buchung/istbuchung";
 import { istInterneUmbuchung } from "./buchung/historie";
 import { istLiquide, type Zahlungskonto } from "./konten/konto";
 import type { Kategorie } from "./kategorien/kategorie";
+import type { Einordnung } from "./einordnung";
 
 /** Der Monat einer ISO-Datumsangabe: „2026-08-13" → „2026-08". */
 function monat(iso: string): string {
@@ -421,62 +422,72 @@ export function budgettreue(
   });
 }
 
-export interface BlinderFleck {
+/** Eine Kategorie mit ungeplanten Anteilen im Zeitraum. */
+export interface UngeplantJeKategorie {
   readonly kategorieId?: string;
   readonly name: string;
-  /** Positiv. */
+  /** Als Ausgabe: positiv heisst „ging raus" — durch Negieren der Summe, siehe oben. */
   readonly summe: Cent;
-  /** Anteil an allen Ausgaben des Zeitraums (0,12 = 12 %). */
-  readonly anteil: number;
+  /** Wie viele Anteile — eine geteilte Buchung zählt je Anteil in ihrer Kategorie. */
+  readonly anzahl: number;
+  /** Wie viele davon auf eine Zuordnung zu einer Rücklage warten (`wartetAuf`). */
+  readonly wartend: number;
+  /** Die Anteile selbst, jüngster zuerst — für die Liste unter der Zeile. */
+  readonly anteile: readonly Einordnung[];
 }
 
 /**
- * Ausgaben in Kategorien, die von keinem Budget erfasst sind.
+ * Was im Zeitraum UNGEPLANT war, nach Kategorie — weder Vertrag noch Budget noch
+ * Rücklage.
  *
- * **Die wichtigste Auswertung im Budget-Block, und die einzige, die von selbst nie
- * auffällt.** Wer auf seine Budgets schaut, sieht ausschliesslich das, was er schon
- * geplant hat; was daneben abfliesst, kommt in keiner Budgetzeile vor. Ein Haushalt kann
- * jedes Budget einhalten und trotzdem im Minus landen — dann liegt das Geld genau hier.
+ * **Die Menge kommt aus der Einordnung (`einordnung.ts`) und aus nichts sonst**: die
+ * Anteile der Art `ungeplant`, dieselben, die die Monatskarten der Übersicht in ihrer
+ * Zeile „Ungeplant" zeigen. Bis 2026-11-22 rechnete diese Auswertung als
+ * `blindeFlecken` eine eigene Menge — Aufwand ohne Vertrag und ohne budgetierte
+ * Kategorie —, und eine Ausgabe, die eine Rücklage trug, stand hier als ungeplant,
+ * während die Übersicht sie als Entnahme führte. Zwei Mengen für dieselbe Frage.
  *
- * Nicht budgetiert heisst dabei ausdrücklich NICHT „falsch": Vertragsraten stehen
- * bewusst ausserhalb der Budgets (sie sind anderswo geplant, siehe `budgetBuchungen`),
- * und sie sind deshalb hier auch nicht mitzuzählen. Übrig bleibt, was weder geplant noch
- * vertraglich gebunden ist.
+ * Ein Anteil, der auf eine Zuordnung WARTET, gehört dazu: die Ergebnisrechnung zählt
+ * ihn als ungeplant, bis jemand wählt. Er wird mitgezählt und zusätzlich gezählt
+ * (`wartend`), damit sichtbar ist, dass hier keine Rücklage fehlt, sondern eine Wahl.
+ *
+ * Erstattungen bleiben drin und senken die Summe — dieselbe Vorzeichenregel wie
+ * überall hier. Eine Kategorie, die unterm Strich Geld zurückgebracht hat, steht mit
+ * negativer Summe da und am Ende der Liste.
  */
-export function blindeFlecken(
-  buchungen: readonly IstBuchung[],
-  budgetierteKategorien: ReadonlySet<string>,
-  vertragsBuchungen: ReadonlySet<string>,
+export function ungeplantNachKategorie(
+  einordnungen: readonly Einordnung[],
   kategorien: readonly Kategorie[],
   von: string,
   bis: string,
-): BlinderFleck[] {
+): UngeplantJeKategorie[] {
+  const vonM = monat(von);
+  const bisM = monat(bis);
   const byId = new Map(kategorien.map((k) => [k.id, k]));
-  const map = new Map<string, { id?: string; summe: Cent }>();
-  let gesamt = 0;
+  const gruppen = new Map<string, Einordnung[]>();
 
-  for (const b of imFenster(buchungen, von, bis)) {
-    if (b.charakter !== "Aufwand") continue;
-    for (const a of kategorieAnteile(b)) {
-      if (a.betrag > 0) continue;
-      gesamt -= a.betrag;
-      if (vertragsBuchungen.has(b.id)) continue;
-      if (a.kategorieId && budgetierteKategorien.has(a.kategorieId)) continue;
-      const key = a.kategorieId ?? "__ohne__";
-      const e = map.get(key) ?? { id: a.kategorieId, summe: 0 };
-      e.summe -= a.betrag;
-      map.set(key, e);
-    }
+  for (const x of einordnungen) {
+    if (x.art !== "ungeplant") continue;
+    const m = monat(x.buchung.datum);
+    if (m < vonM || m > bisM) continue;
+    const key = x.kategorieId ?? "__ohne__";
+    const liste = gruppen.get(key) ?? [];
+    liste.push(x);
+    gruppen.set(key, liste);
   }
 
-  return [...map.values()]
-    .filter((e) => e.summe > 0)
-    .map((e): BlinderFleck => ({
-      kategorieId: e.id,
-      name: (e.id && byId.get(e.id)?.name) || "—",
-      summe: e.summe,
-      anteil: gesamt > 0 ? e.summe / gesamt : 0,
-    }))
+  return [...gruppen.values()]
+    .map((liste): UngeplantJeKategorie => {
+      const id = liste[0].kategorieId;
+      return {
+        kategorieId: id,
+        name: (id && byId.get(id)?.name) || "—",
+        summe: -liste.reduce((s, x) => s + x.betrag, 0) || 0,
+        anzahl: liste.length,
+        wartend: liste.filter((x) => x.wartetAuf).length,
+        anteile: [...liste].sort((a, b) => b.buchung.datum.localeCompare(a.buchung.datum)),
+      };
+    })
     .sort((a, b) => b.summe - a.summe);
 }
 

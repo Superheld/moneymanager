@@ -18,6 +18,8 @@ import {
   addTage,
   istLiquide,
   liquiditaetsvorschau,
+  liquiditaetskurve,
+  type Kurventag,
   type Verlaufsbefund,
   type Vormerkung,
   ergebnisbasis,
@@ -36,8 +38,9 @@ import {
   type ErgebnisSchulden,
   type Ruecklage,
   type Ruecklagenzuordnung,
-  blindeFlecken,
-  budgetKategorien,
+  ungeplantNachKategorie,
+  einordnen,
+  einordnungskontext,
   budgetStand,
   budgettreue,
   empfaengerRangliste,
@@ -62,7 +65,6 @@ import {
   parseIso,
   tageImMonat,
   toIso,
-  type BlinderFleck,
   type Budget,
   type Zustaendigkeitssicht,
   type Budgettreue,
@@ -377,9 +379,25 @@ export interface Befunde {
   readonly empfaenger: readonly Empfaengerzeile[];
   readonly kategorien: readonly Kategorienutzung[];
   readonly budgets: readonly Budgettreue[];
-  readonly blindeFlecken: readonly BlinderFleck[];
+  /** Was weder Vertrag noch Budget noch Rücklage trägt, je Kategorie (`ungeplantNachKategorie`). */
+  readonly ungeplant: readonly UngeplantZeile[];
   readonly vertraege: readonly Vertragstreue[];
   readonly grossposten: readonly Grossposten[];
+}
+
+/**
+ * Eine Kategorie unter „Ungeplant" — mit den Buchungen, die beim Aufklappen darunter
+ * stehen. Die Zeilen tragen den Betrag des ANTEILS, damit sie sich auf `summe` addieren
+ * (mit umgekehrtem Vorzeichen: `summe` ist als Ausgabe positiv, die Zeile negativ).
+ */
+export interface UngeplantZeile {
+  readonly kategorieId?: string;
+  readonly name: string;
+  readonly summe: Cent;
+  readonly anzahl: number;
+  /** Davon warten so viele auf die Wahl einer Rücklage. */
+  readonly wartend: number;
+  readonly zeilen: readonly Buchungszeile[];
 }
 
 export function analyseBefunde(basis: Analysebasis, von: string, bis: string): Befunde {
@@ -391,10 +409,6 @@ export function analyseBefunde(basis: Analysebasis, von: string, bis: string): B
 
   const zahlen = kennzahlen(basis.buchungen, basis.konten, vertragsBuchungen, von, bis);
 
-  const budgetierte = new Set<string>();
-  for (const b of basis.budgets) {
-    for (const id of budgetKategorien(b, basis.budgets, basis.kategorien)) budgetierte.add(id);
-  }
   const sicht: Zustaendigkeitssicht = zustaendigkeitssichtMit(
     {
       buchungen: basis.buchungen,
@@ -405,6 +419,12 @@ export function analyseBefunde(basis: Analysebasis, von: string, bis: string): B
     basis,
   );
   const budgetJeId = new Map(basis.budgets.map((b) => [b.id, b]));
+  const zeilenkontext: Zeilenkontext = {
+    umsatzZuBuchung: basis.umsatzZuBuchung,
+    kontoNamen: basis.kontoNamen,
+    kategorieNamen: kategorieName,
+    vertragsnamen: basis.vertragsnamen,
+  };
 
   return {
     kennzahlen: zahlen,
@@ -433,14 +453,22 @@ export function analyseBefunde(basis: Analysebasis, von: string, bis: string): B
       von,
       bis,
     ),
-    blindeFlecken: blindeFlecken(
-      basis.buchungen,
-      budgetierte,
-      vertragsBuchungen,
+    // Dieselbe Einordnung wie die Monatskarten der Übersicht und die Kostensicht: der
+    // Kontext aus derselben Eingabe (`einordnungskontext`), damit „Ungeplant" hier genau
+    // die Anteile meint, die dort in der Zeile „Ungeplant" stehen.
+    ungeplant: ungeplantNachKategorie(
+      einordnen(basis.buchungen, einordnungskontext(basis)),
       basis.kategorien,
       von,
       bis,
-    ),
+    ).map((u): UngeplantZeile => ({
+      kategorieId: u.kategorieId,
+      name: u.name,
+      summe: u.summe,
+      anzahl: u.anzahl,
+      wartend: u.wartend,
+      zeilen: u.anteile.map((x) => buchungszeile(x.buchung, x.betrag, x.kategorieId, zeilenkontext)),
+    })),
     vertraege: vertragstreue(
       basis.vertraege.map((v) => ({ id: v.id, anbieter: v.anbieter })),
       basis.buchungen,
@@ -730,6 +758,12 @@ export interface Liquiditaetssicht {
   /** Der letzte Tag des gerechneten Fensters — die Aussage gilt nur bis hierher. */
   readonly bis: string;
   readonly zeilen: readonly Liquiditaetszeile[];
+  /**
+   * Der Stand aller Zeilen zusammen, Tag für Tag ab heute, mit den datierten Posten des
+   * Tages (`liquiditaetskurve`). Eine Umbuchung zwischen zwei der Konten fehlt darin — sie
+   * ändert die Summe nicht.
+   */
+  readonly kurve: readonly Kurventag[];
 }
 
 /**
@@ -773,6 +807,7 @@ export function analyseLiquiditaet(basis: Analysebasis, heute: string, tage = LI
   });
   return {
     bis: toIso(addTage(parseIso(heute), tage)),
+    kurve: liquiditaetskurve(vorschauen),
     zeilen: vorschauen.map((v) => ({
       kontoId: v.kontoId,
       name: basis.kontoNamen.get(v.kontoId) ?? v.kontoId,

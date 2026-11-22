@@ -9,7 +9,7 @@ import type { Depotwert } from "../core";
 import { depotEntwicklung, type Depotsicht } from "./depot/depotsichten";
 import { bilanzJeKlasse, ergebnisbasis, monatsErgebnis, staendeJeKlasse } from "../core";
 import { belegungssicht } from "./kontobelegung";
-import { analyseAusblick, analyseBericht, analyseBuchungen, analyseFensterTaggenau, analyseKostenverlauf, analyseLiquiditaet, analyseReichweite, type Analysebasis } from "./analysesichten";
+import { analyseAusblick, analyseBefunde, analyseBericht, analyseBuchungen, analyseFensterTaggenau, analyseKostenverlauf, analyseLiquiditaet, analyseReichweite, type Analysebasis } from "./analysesichten";
 
 describe("analyseFensterTaggenau", () => {
   it("schiebt die Monatsmarke auf den letzten Tag desselben Monats", () => {
@@ -104,6 +104,14 @@ describe("analyseBuchungen — der Betrag der Zeile", () => {
     expect(zeilen).toHaveLength(1);
     expect(zeilen[0].betrag).toBe(-1200);
     expect(zeilen[0].buchung.betrag).toBe(-5200);
+  });
+
+  it("führt unter „Ungeplant“ je Kategorie den Teil der Buchung, nicht den Gesamtbetrag", () => {
+    const befunde = analyseBefunde(geteilt, "2026-07-01", "2026-08-01");
+    const dro = befunde.ungeplant.find((u) => u.kategorieId === "k-dro")!;
+    expect(dro).toMatchObject({ name: "Drogerie", summe: 1200, anzahl: 1, wartend: 0 });
+    expect(dro.zeilen.map((z) => z.betrag)).toEqual([-1200]);
+    expect(befunde.ungeplant.map((u) => u.kategorieId)).toEqual(["k-le", "k-dro"]);
   });
 
   it("zeigt bei einer ungeteilten Buchung den vollen Betrag", () => {
@@ -379,6 +387,25 @@ describe("analyseLiquiditaet", () => {
       heute,
     );
     expect(sicht.zeilen[0].start).toBe(75000);
+  });
+
+  it("liefert die Kurve aller Zeilen Tag für Tag, mit den Posten des Tages", () => {
+    const sicht = analyseLiquiditaet(
+      basis({
+        regeln: [
+          { id: "r1", bezeichnung: "Kesselmann", betrag: -80000, rhythmus: "monatlich", startdatum: "2026-01-20", charakter: "Aufwand", kontoId: "giro" },
+        ],
+      }),
+      heute,
+      20,
+    );
+    expect(sicht.kurve).toHaveLength(21);
+    expect(sicht.kurve[0]).toMatchObject({ datum: heute, fest: 100000, posten: [] });
+    const tag = sicht.kurve.find((k) => k.datum === "2026-08-20")!;
+    expect(tag.fest).toBe(20000);
+    expect(tag.posten).toEqual([{ bezeichnung: "Kesselmann", betrag: -80000 }]);
+    // Der Tiefstand der Tabelle ist ein Punkt dieser Kurve — eine Rechnung, nicht zwei.
+    expect(Math.min(...sicht.kurve.map((k) => k.fest))).toBe(sicht.zeilen[0].fest.tiefstand);
   });
 });
 

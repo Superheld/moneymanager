@@ -261,6 +261,7 @@ export {
   LIQUIDITAET_TAGE,
   type Liquiditaetssicht,
   type Liquiditaetszeile,
+  type UngeplantZeile,
   analyseReichweite,
   type Reichweitensicht,
   analyseBericht,

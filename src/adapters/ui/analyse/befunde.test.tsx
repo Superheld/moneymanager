@@ -3,11 +3,12 @@
 //
 // Geprüft werden die Aussagen, für die es die Auswertungen überhaupt gibt — nicht die
 // Formulierungen: dass „fest" wirklich an der Vertragszuordnung hängt, dass eine Ausgabe
-// ohne Budget und ohne Vertrag als blinder Fleck erscheint, und dass eine Erstattung die
+// ohne Vertrag, Budget und Rücklage unter „Ungeplant" erscheint (dieselbe Menge wie in der
+// Übersicht, aufklappbar bis zur Buchung), und dass eine Erstattung die
 // Ausgabe senkt statt sie zu erhöhen.
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import type { Database } from "sql.js";
 
 const halter = vi.hoisted(() => {
@@ -21,6 +22,7 @@ import i18n from "../../../i18n/i18n";
 import { AnalyseScreen } from "./AnalyseScreen";
 import { sqliteLedgerRepository as ledger } from "../../persistence/sqliteLedgerRepository";
 import { sqliteVertragRepository as vertraege } from "../../persistence/sqliteVertragRepository";
+import { sqliteRuecklagenRepository as ruecklagen } from "../../persistence/sqliteRuecklagenRepository";
 import { sqliteVertragszuordnungRepository as zuordnungen } from "../../persistence/sqliteVertragZuordnungRepositories";
 import {
   sqliteKategorieRepository as kategorien,
@@ -98,13 +100,41 @@ describe("Befunde im Analyse-Bereich", () => {
 
   // Der Fall, der ohne diese Sicht nie auffällt: wer auf seine Budgets schaut, sieht
   // ausschliesslich das, was er schon geplant hat.
-  it("meldet eine Ausgabe ohne Budget und ohne Vertrag als blinden Fleck", async () => {
+  it("meldet eine Ausgabe ohne Vertrag, Budget und Rücklage als ungeplant", async () => {
     await grunddaten();
     await buchung("spontan", tag(0), -45600, { kategorieId: "kat-freizeit" });
 
     rendere(<AnalyseScreen />);
-    await block("blind");
+    await block("ungeplant");
     await waitFor(() => expect(document.body.textContent).toMatch(/456,00/));
+  });
+
+  // Die alte Rechnung (`blindeFlecken`) kannte keine Rücklagen: eine Ausgabe, die eine
+  // Rücklage trug, stand hier als ungeplant, während die Übersicht sie als Entnahme
+  // führte. Jetzt fragt die Karte die Einordnung, wie die Übersicht.
+  it("lässt heraus, was eine Rücklage trägt — und klappt eine Kategorie bis zur Buchung auf", async () => {
+    await grunddaten();
+    await ruecklagen.speichern({
+      id: "r1", bezeichnung: "Lindqvist", rate: 5000, beginn: tag(11), kategorieId: "kat-wohnen", findetAb: tag(11),
+    } as never);
+    await buchung("getragen", tag(1), -77700, { kategorieId: "kat-wohnen" });
+    await buchung("offen", tag(1), -12300, { kategorieId: "kat-freizeit", notiz: "Hallström" });
+
+    rendere(<AnalyseScreen />);
+    await block("ungeplant");
+    // Titel → Kopf → Kopfzeile → Karte; der Untertitel steht darin und belegt, dass es die richtige ist.
+    const titel = (await screen.findAllByText(text("befunde.block.ungeplant.name"))).find(
+      (el) => el.parentElement?.textContent?.includes(text("befunde.block.ungeplant.untertitel")),
+    ) as HTMLElement;
+    const karte = titel.parentElement!.parentElement!.parentElement as HTMLElement;
+    await waitFor(() => expect(karte.textContent).toMatch(/123,00/));
+    expect(karte.textContent).not.toMatch(/777,00/);
+    expect(karte.textContent).not.toContain("Wohnen");
+
+    // Zu: die Buchung steht noch nicht da. Auf: sie steht unter der Tabelle.
+    expect(karte.textContent).not.toContain("Hallström");
+    fireEvent.click(await within(karte).findByText("Freizeit"));
+    await within(karte).findByText("Hallström");
   });
 
   // Die Rangliste greift auf den Empfänger zu; bei einer von Hand erfassten Buchung ist
