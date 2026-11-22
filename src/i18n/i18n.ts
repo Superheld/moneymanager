@@ -110,6 +110,8 @@ const de = {
       unbekannt: "Diese Rücklage gibt es nicht (mehr).",
       ohneKategorie: "Diese Rücklage hängt an keiner Kategorie. Trag erst eine ein.",
       nichtAnKategorie: "Diese Rücklage hängt nicht an der Kategorie dieser Buchung.",
+      nurAusgaben: "Einer Rücklage zuordnen lässt sich nur eine Ausgabe, die keine Umbuchung ist.",
+      zuordnungVorBeginn: "Die Buchung liegt vor dem Beginn dieser Rücklage.",
       kategorieFehlt: "Eine Rücklage braucht eine Kategorie.",
       laeuftWeiter: "Eine Rücklage, die weiterläuft, wird nicht ausgebucht.",
       laeuftWeiterAbschluss: "Eine Rücklage, die weiterläuft, wird nicht abgeschlossen.",
@@ -1926,8 +1928,9 @@ const de = {
       wartet: "Wartet auf Zuordnung: an der Kategorie hängen mehrere Rücklagen. Bis du wählst, welche sie trägt, zählt sie als ungeplant.",
     },
   },
-  // Die Wahl im Buchungsdialog, welche Rücklage eine Ausgabe trägt — nur da, wo mehrere
-  // an ihrer Kategorie hängen oder schon entschieden ist.
+  // Die Wahl im Buchungsdialog, welche Rücklage eine Ausgabe trägt — offen, wo mehrere
+  // an ihrer Kategorie hängen oder schon entschieden ist; sonst hinter „Aus einer
+  // Rücklage bezahlt?", für eine Rücklage von ausserhalb der Kategorie (seit 2026-11-22).
   buchungRuecklage: {
     titel: "Rücklage",
     feld: "Rücklage",
@@ -1936,6 +1939,10 @@ const de = {
     keine: "keine Rücklage",
     loesen: "Wahl lösen",
     wartetHinweis: "An der Kategorie hängen mehrere Rücklagen. Wähl, welche diese Ausgabe trägt.",
+    ausRuecklage: "Aus einer Rücklage bezahlt?",
+    weitereHinweis: "Die gewählte Rücklage trägt diese Ausgabe, auch wenn sie an einer anderen Kategorie hängt. Zur Wahl stehen Rücklagen, die abgeschlossen werden.",
+    gruppeKategorie: "An der Kategorie",
+    gruppeWeitere: "Andere Rücklagen",
   },
   buchungsliste: {
     datum: "Datum",
@@ -2799,6 +2806,8 @@ const en: typeof de = {
       unbekannt: "This reserve no longer exists.",
       ohneKategorie: "This reserve has no category. Add one first.",
       nichtAnKategorie: "This reserve is not attached to this transaction's category.",
+      nurAusgaben: "Only an expense that is not a transfer can be assigned to a reserve.",
+      zuordnungVorBeginn: "The transaction is before this reserve began.",
       kategorieFehlt: "A reserve needs a category.",
       laeuftWeiter: "A reserve that keeps running is not booked out.",
       laeuftWeiterAbschluss: "A reserve that keeps running is not closed.",
@@ -4548,6 +4557,10 @@ const en: typeof de = {
     keine: "no reserve",
     loesen: "clear choice",
     wartetHinweis: "Several reserves are attached to the category. Choose which one carries this expense.",
+    ausRuecklage: "Paid from a reserve?",
+    weitereHinweis: "The chosen reserve carries this expense, even if it is attached to another category. You can choose reserves that are closed.",
+    gruppeKategorie: "In this category",
+    gruppeWeitere: "Other reserves",
   },
   buchungsliste: {
     datum: "Date",

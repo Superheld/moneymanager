@@ -370,7 +370,7 @@ und wurde deshalb 2026-08-25 herausgezogen:
 | `DublettenBlock` | steht sie womöglich schon ein zweites Mal da? |
 | `BuchungsHerkunft` | woher sie kommt — reine Anzeige |
 | `EinordnungsBlock` | was sie kaufmännisch ist, und WARUM — reine Anzeige (unten, „Die Einordnung an der Zeile") |
-| `RuecklagenwahlBlock` | welche Rücklage sie trägt — nur, wo mehrere an ihrer Kategorie hängen oder schon entschieden ist; speichert sofort |
+| `RuecklagenwahlBlock` | welche Rücklage sie trägt — offen, wo mehrere an ihrer Kategorie hängen oder schon entschieden ist; sonst hinter „Aus einer Rücklage bezahlt?" für eine Rücklage von ausserhalb der Kategorie (seit 2026-11-22, eigene Gruppe in der Auswahl); speichert sofort |
 | `JournalBlock` | was daran geändert wurde — und der Weg zurück |
 | `Richtungswahl` | Höhe und Richtung des Betrags, samt der Zerlegung dahinter |
 | `SplitModal` · `ZurUmbuchungModal` | die beiden Folge-Dialoge (S-7, S-1) |

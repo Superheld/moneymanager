@@ -1345,4 +1345,16 @@ function ruecklagenFaelle(
   });
   buchung(tagIn(-6, 11), -18500, "konto-giro", "kat-arzt-apotheke", "Steinforth Praxis Rechnung");
   buchung(tagIn(-2, 8), -9200, "konto-giro", "kat-arzt-apotheke", "Steinforth Praxis Rechnung");
+
+  // (10) Eine Ausgabe, die einer Ruecklage AUSSERHALB ihrer Kategorie zugeordnet ist
+  // (Nachtrag zu ADR-0006, 2026-11-22). Die Ruecklage haengt an „Haushalt", die Buchung
+  // steht unter „Freizeit & Hobby", an der das monatliche Budget `budget-freizeit` haengt.
+  // Mit der Zuordnung traegt sie die Ruecklage, und das Budget zaehlt sie nicht. Am Ende
+  // des Abschnitts, damit die Nummern der Buchungen davor bleiben.
+  ruecklage({
+    id: "rue-fall-fernseher", bezeichnung: "Fernseher", kategorie: "kat-haushalt", konto: "konto-tagesgeld",
+    art: "abschliessend", beginn: tagIn(-6, 1), findetAb: tagIn(-6, 1), ziel: 120000, frist: 36,
+  });
+  const fremd = buchung(tagIn(-1, 9), -8900, "konto-giro", "kat-freizeit-hobby", "Wendorff Handel Halterung");
+  setzen("INSERT INTO ruecklage_zuordnung (istbuchung_id, kategorie_id, ruecklage_id) VALUES (?, ?, ?)", [fremd, "kat-freizeit-hobby", "rue-fall-fernseher"]);
 }

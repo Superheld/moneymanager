@@ -51,6 +51,7 @@ Die Rücklagen zum Durchspielen (Abschnitt `ruecklagenFaelle` in `seedDaten.ts`)
 | Konto „Tagesgeld 2" | reicht nicht für alle Rücklagen darauf, wird anteilig verteilt |
 | Kategorien „Finanzen" / „Familie & Kinder" | Vorschlag im Bereich Rücklagen bzw. Budgets |
 | Budget „Gesundheit" mit Rücklage „Behandlungen" darunter | ein Budget, das ohne die Rücklage auf seiner Unterkategorie zählt |
+| „Fernseher" (an „Haushalt") | trägt eine Ausgabe unter „Freizeit & Hobby", die ihr ausdrücklich zugeordnet ist — das Budget dort zählt sie nicht |
 
 Wer einen Fall ergänzt, trägt ihn in `seedDaten.ts` ein, sichert ihn in `seed.test.ts` zu
 und schreibt ihn in diese Tabelle.

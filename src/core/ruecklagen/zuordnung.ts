@@ -73,3 +73,38 @@ export function waehlbareRuecklagen(
   }
   return raus;
 }
+
+/**
+ * Die Rücklagen, denen ein Anteil AUSSERHALB ihrer Kategorie zugeordnet werden darf (seit
+ * 2026-11-22, Nachtrag zu ADR-0006): jede, die abgeschlossen wird, noch läuft, eine
+ * Kategorie hat und nicht schon über `waehlbareRuecklagen` zur Wahl steht — und deren
+ * laufender Zyklus am Tag der Buchung schon begonnen hat. Nach Name.
+ *
+ * Der Fall dahinter: Fernseher und Rechner stehen beide unter „Elektronik", der Kauf des
+ * Fernsehers soll aber die Rücklage „Fernseher" belasten und nicht, was an „Elektronik"
+ * hängt. Die Zuordnung gewinnt in `zustaendigkeit` ohnehin vor allem anderen; gesperrt
+ * war bis dahin nur die Wahl.
+ *
+ * Drei Grenzen, alle konservativ:
+ *
+ *   • **Nur `abschliessend`.** Eine Rücklage, die weiterläuft, trägt eine Art von Ausgaben
+ *     auf Dauer (Reparaturen) und findet sie über ihre Kategorie; einzelne Käufe von
+ *     woanders hineinzuziehen, machte ihren Stand zu einer Sammlung von Ausnahmen, die
+ *     niemand mehr nachvollzieht. Wer das will, hängt sie an eine höhere Kategorie.
+ *   • **Nicht vor ihrem Beginn.** Eine Entnahme vor dem Beginn des laufenden Zyklus zählt
+ *     in keinem Zyklus (`imFenster` in `topf.ts`): die Einordnung führte sie als Entnahme,
+ *     und kosten würde sie nirgends — der Monat sähe besser aus, als er war.
+ *   • **Ohne Kategorie nie** — aus demselben Grund wie bei `waehlbareRuecklagen`.
+ */
+export function fremdeRuecklagen(
+  kategorien: readonly Kategorie[],
+  ruecklagen: readonly Ruecklage[],
+  kategorieId: string | undefined,
+  datum: string,
+): Ruecklage[] {
+  const eigene = new Set(waehlbareRuecklagen(kategorien, ruecklagen, kategorieId).map((r) => r.id));
+  return ruecklagen
+    .filter((r) => !r.beendetAm && !!r.kategorieId && ruecklagenart(r) === "abschliessend")
+    .filter((r) => !eigene.has(r.id) && r.beginn <= datum)
+    .sort((a, b) => a.bezeichnung.localeCompare(b.bezeichnung));
+}

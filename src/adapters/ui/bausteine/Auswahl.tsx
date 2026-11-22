@@ -24,6 +24,24 @@ export interface AuswahlOption {
   readonly wert: string;
   readonly text: string;
   readonly deaktiviert?: boolean;
+  /**
+   * Überschrift einer Gruppe (seit 2026-11-22, Base UI `Select.Group`). Aufeinander
+   * folgende Optionen mit derselben Überschrift stehen darunter; ohne Angabe steht eine
+   * Option für sich. Zuerst gebraucht für die Rücklagen im Buchungsdialog: die an der
+   * Kategorie und die übrigen sollen getrennt zu erkennen sein.
+   */
+  readonly gruppe?: string;
+}
+
+/** Die Optionen in Läufen gleicher Gruppe, in ihrer Reihenfolge. */
+function inGruppen(optionen: readonly AuswahlOption[]): { gruppe?: string; optionen: AuswahlOption[] }[] {
+  const raus: { gruppe?: string; optionen: AuswahlOption[] }[] = [];
+  for (const o of optionen) {
+    const letzte = raus[raus.length - 1];
+    if (letzte && letzte.gruppe === o.gruppe) letzte.optionen.push(o);
+    else raus.push({ gruppe: o.gruppe, optionen: [o] });
+  }
+  return raus;
 }
 
 export function Auswahl({
@@ -67,20 +85,33 @@ export function Auswahl({
       <Select.Portal>
         <Select.Positioner className="auswahl-positioner" sideOffset={4} alignItemWithTrigger={false}>
           <Select.Popup className="auswahl-popup">
-            {optionen.map((o) => (
-              <Select.Item key={o.wert} value={o.wert} disabled={o.deaktiviert} className="auswahl-item">
-                <Select.ItemText>{o.text}</Select.ItemText>
-                {/* Der Haken sitzt RECHTS und ausserhalb des Textflusses: säße er links,
-                    ruckte die ganze Liste beim Öffnen um seine Breite zur Seite. */}
-                <Select.ItemIndicator className="auswahl-haken">
-                  <Icon name="uebernehmen" groesse={14} />
-                </Select.ItemIndicator>
-              </Select.Item>
-            ))}
+            {inGruppen(optionen).map((lauf, i) =>
+              lauf.gruppe == null ? (
+                lauf.optionen.map(eintrag)
+              ) : (
+                <Select.Group key={`g${i}`} className="auswahl-gruppe">
+                  <Select.GroupLabel className="auswahl-gruppe-titel">{lauf.gruppe}</Select.GroupLabel>
+                  {lauf.optionen.map(eintrag)}
+                </Select.Group>
+              ),
+            )}
           </Select.Popup>
         </Select.Positioner>
       </Select.Portal>
     </Select.Root>
+  );
+}
+
+function eintrag(o: AuswahlOption) {
+  return (
+    <Select.Item key={o.wert} value={o.wert} disabled={o.deaktiviert} className="auswahl-item">
+      <Select.ItemText>{o.text}</Select.ItemText>
+      {/* Der Haken sitzt RECHTS und ausserhalb des Textflusses: säße er links,
+          ruckte die ganze Liste beim Öffnen um seine Breite zur Seite. */}
+      <Select.ItemIndicator className="auswahl-haken">
+        <Icon name="uebernehmen" groesse={14} />
+      </Select.ItemIndicator>
+    </Select.Item>
   );
 }
 

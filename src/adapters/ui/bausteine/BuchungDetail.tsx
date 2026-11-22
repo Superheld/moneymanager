@@ -819,9 +819,10 @@ function BuchungFormular({
           Auch am Umbuchungs-Bein: gerade dort fragt man, warum es nirgends mitzählt. */}
       {buchung && <EinordnungsBlock einordnung={einordnung} />}
 
-      {/* Welche Rücklage sie trägt — nur, wo mehrere an der Kategorie hängen oder schon
-          entschieden ist. Direkt unter der Einordnung, weil die Wahl genau deren Satz
-          ändert. */}
+      {/* Welche Rücklage sie trägt — offen, wo mehrere an der Kategorie hängen oder schon
+          entschieden ist; sonst hinter einer Zeile, die aufklappt (eine Rücklage von
+          ausserhalb der Kategorie). Direkt unter der Einordnung, weil die Wahl genau
+          deren Satz ändert. */}
       {buchung && (
         <RuecklagenwahlBlock
           buchungId={buchung.id}

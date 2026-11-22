@@ -60,9 +60,36 @@ describe("ruecklageZuordnen", () => {
     expect(stand()).toHaveLength(1);
   });
 
-  it("weist ab, was nicht an der Kategorie des Anteils hängt, was keine Kategorie hat und einen Anteil, den es nicht gibt", async () => {
+  it("lässt eine Rücklage, die abgeschlossen wird, auch ausserhalb ihrer Kategorie zu", async () => {
+    // Der Fall des Nutzers: der Kauf steht unter einer Kategorie, die Rücklage hängt an
+    // einer anderen. Seit dem Nachtrag zu ADR-0006 (2026-11-22) geht das.
+    const { d, stand } = deps();
+    await ruecklageZuordnen(d, { istbuchungId: "b1", kategorieId: "k-reise", ruecklageId: "r-markt" });
+    expect(stand()).toEqual([{ istbuchungId: "b1", kategorieId: "k-reise", ruecklageId: "r-markt" }]);
+  });
+
+  it("weist eine fremde ab, die weiterläuft, die beendet ist oder erst nach der Buchung beginnt", async () => {
+    const extra: Ruecklage[] = [
+      { ...r("r-lauf", "k-markt"), art: "fortlaufend" },
+      { ...r("r-weg2", "k-markt"), beendetAm: "2026-03-01" },
+      { ...r("r-spaet", "k-markt"), beginn: "2026-06-01", findetAb: "2026-06-01" },
+    ];
     const { d } = deps();
-    await expect(ruecklageZuordnen(d, { istbuchungId: "b1", kategorieId: "k-reise", ruecklageId: "r-markt" })).rejects.toThrow("ruecklage.nichtAnKategorie");
+    const mit = { ...d, ruecklagenRepo: { alle: async () => [...RUECKLAGEN, ...extra] } as unknown as RuecklagenRepository };
+    await expect(ruecklageZuordnen(mit, { istbuchungId: "b1", kategorieId: "k-reise", ruecklageId: "r-lauf" })).rejects.toThrow("ruecklage.nichtAnKategorie");
+    await expect(ruecklageZuordnen(mit, { istbuchungId: "b1", kategorieId: "k-reise", ruecklageId: "r-weg2" })).rejects.toThrow("ruecklage.nichtAnKategorie");
+    await expect(ruecklageZuordnen(mit, { istbuchungId: "b1", kategorieId: "k-reise", ruecklageId: "r-spaet" })).rejects.toThrow("ruecklage.zuordnungVorBeginn");
+  });
+
+  it("weist eine fremde bei einer Umbuchung ab — dort sagte die Einordnung etwas anderes als der Stand", async () => {
+    const umbuchung: IstBuchung = { ...BUCHUNG, id: "b-um", transferId: "t1", aufteilungen: undefined, kategorieId: "k-reise" };
+    const { d } = deps();
+    const mit = { ...d, ledger: { ...d.ledger, alle: async () => [BUCHUNG, umbuchung] } };
+    await expect(ruecklageZuordnen(mit, { istbuchungId: "b-um", kategorieId: "k-reise", ruecklageId: "r-markt" })).rejects.toThrow("ruecklage.nurAusgaben");
+  });
+
+  it("weist ab, was keine Kategorie hat, und einen Anteil, den es nicht gibt", async () => {
+    const { d } = deps();
     await expect(ruecklageZuordnen(d, { istbuchungId: "b1", kategorieId: "k-reise", ruecklageId: "r-ohne" })).rejects.toThrow("ruecklage.ohneKategorie");
     await expect(ruecklageZuordnen(d, { istbuchungId: "b1", kategorieId: "k-frei", ruecklageId: "r-dach" })).rejects.toThrow("ruecklage.anteilFehlt");
     await expect(ruecklageZuordnen(d, { istbuchungId: "b1", kategorieId: "k-reise", ruecklageId: "r-weg" })).rejects.toThrow("ruecklage.unbekannt");
@@ -71,19 +98,48 @@ describe("ruecklageZuordnen", () => {
 });
 
 describe("ruecklagenwahlJeBuchung", () => {
-  it("bietet nur an, wo mehrere in Frage kommen oder schon entschieden ist — ohne Vorbelegung", () => {
+  it("stellt offen zur Wahl, wo mehrere in Frage kommen oder schon entschieden ist — ohne Vorbelegung", () => {
     const wahl = ruecklagenwahlJeBuchung([BUCHUNG], KATEGORIEN, RUECKLAGEN, [], new Set(["b1\u0000k-reise"]));
-    // Reise: nord, süd und das Dach darüber; Markt: nur eine, also keine Wahl.
+    // Reise: nord, süd und das Dach darüber, dazu Markt von ausserhalb; Markt: eine an
+    // der Kategorie, die Reise-Rücklagen von ausserhalb — nichts zu entscheiden.
     expect(wahl.get("b1")).toEqual([
       {
         kategorieId: "k-reise",
         ruecklagen: [{ id: "r-nord", bezeichnung: "r-nord" }, { id: "r-sued", bezeichnung: "r-sued" }, { id: "r-dach", bezeichnung: "r-dach" }],
+        weitere: [{ id: "r-markt", bezeichnung: "r-markt" }],
+        noetig: true,
         gewaehlt: undefined,
         wartet: true,
       },
+      {
+        kategorieId: "k-markt",
+        ruecklagen: [{ id: "r-markt", bezeichnung: "r-markt" }],
+        weitere: [{ id: "r-dach", bezeichnung: "r-dach" }, { id: "r-nord", bezeichnung: "r-nord" }, { id: "r-sued", bezeichnung: "r-sued" }],
+        noetig: false,
+        gewaehlt: undefined,
+        wartet: false,
+      },
     ]);
     const entschieden = ruecklagenwahlJeBuchung([BUCHUNG], KATEGORIEN, RUECKLAGEN, [{ istbuchungId: "b1", kategorieId: "k-markt" }], new Set());
-    expect(entschieden.get("b1")?.map((w) => [w.kategorieId, w.gewaehlt])).toEqual([["k-reise", undefined], ["k-markt", null]]);
+    expect(entschieden.get("b1")?.map((w) => [w.kategorieId, w.gewaehlt, w.noetig])).toEqual([["k-reise", undefined, true], ["k-markt", null, true]]);
+  });
+
+  it("bietet keine Wahl ohne Rücklage von ausserhalb, bei einem Vertrag und bei einer Umbuchung", () => {
+    // Nur eine Rücklage überhaupt: an „Markt" findet sie von selbst, und es gibt keine
+    // andere — keine Wahl. An „Reise" ist sie die von ausserhalb.
+    const allein = ruecklagenwahlJeBuchung([BUCHUNG], KATEGORIEN, [r("r-markt", "k-markt")], [], new Set());
+    expect(allein.get("b1")?.map((w) => [w.kategorieId, w.noetig])).toEqual([["k-reise", false]]);
+    expect(ruecklagenwahlJeBuchung([BUCHUNG], KATEGORIEN, RUECKLAGEN, [], new Set(), new Set(["b1"])).get("b1")).toBeUndefined();
+    const um: IstBuchung = { ...BUCHUNG, transferId: "t1" };
+    expect(ruecklagenwahlJeBuchung([um], KATEGORIEN, RUECKLAGEN, [], new Set()).get("b1")).toBeUndefined();
+  });
+
+  it("nennt eine gewählte, die inzwischen beendet ist, unter den übrigen — die Wahl behält ihren Namen", () => {
+    const beendet: Ruecklage = { ...r("r-alt", "k-markt"), bezeichnung: "Torbeck", beendetAm: "2026-06-01" };
+    const wahl = ruecklagenwahlJeBuchung([BUCHUNG], KATEGORIEN, [...RUECKLAGEN, beendet], [{ istbuchungId: "b1", kategorieId: "k-reise", ruecklageId: "r-alt" }], new Set());
+    const reise = wahl.get("b1")!.find((w) => w.kategorieId === "k-reise")!;
+    expect(reise.gewaehlt).toBe("r-alt");
+    expect(reise.weitere).toContainEqual({ id: "r-alt", bezeichnung: "Torbeck" });
   });
 });
 

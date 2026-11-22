@@ -20,7 +20,7 @@ import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
 import { MIGRATIONS } from "./adapters/persistence/migrations";
 import { seedEinspielen } from "./testwerkzeug/seedDaten";
 import { standardkategorienFlach } from "./application/kategorien/standardkategorien";
-import { KONTOKLASSEN, passtZu } from "./core";
+import { getrageneBuchungen, KONTOKLASSEN, passtZu } from "./core";
 import type { Zahlungsspur } from "./core";
 import { pluginApi } from "./testwerkzeug/harness";
 import { sqliteVermoegenRepository } from "./adapters/persistence/sqliteVermoegenRepository";
@@ -186,8 +186,10 @@ describe("Spielstand", () => {
     // Bis Paket 5 stand hier 0: der Spielstand hatte keine Zuordnung. Seit den Faellen zum
     // Durchspielen (`ruecklagenFaelle`) sind es genau die beiden ausdruecklichen
     // Entscheidungen an `kat-anschaffungen` — eine Ruecklage und „keine". Mehr soll es
-    // nicht sein: alles andere dort soll warten.
-    expect(zahl(db, "SELECT COUNT(*) FROM ruecklage_zuordnung")).toBe(2);
+    // dort nicht sein: alles andere dort soll warten. Dazu seit 2026-11-22 eine Ausgabe,
+    // die einer Ruecklage ausserhalb ihrer Kategorie zugeordnet ist (`rue-fall-fernseher`).
+    expect(zahl(db, "SELECT COUNT(*) FROM ruecklage_zuordnung WHERE kategorie_id = 'kat-anschaffungen'")).toBe(2);
+    expect(zahl(db, "SELECT COUNT(*) FROM ruecklage_zuordnung")).toBe(3);
   });
 
   /**
@@ -784,7 +786,7 @@ describe("Spielstand — Ruecklagen zum Durchspielen", () => {
     const anAnschaffungen = s.wartend.filter((w) => w.kategorieId === "kat-anschaffungen");
     expect(anAnschaffungen.length).toBeGreaterThanOrEqual(3);
     // Die beiden entschiedenen stehen NICHT auf der Karte: eine traegt `rue-6`, eine keine.
-    const zuordnungen = await sqliteRuecklagenzuordnungRepository.alle();
+    const zuordnungen = (await sqliteRuecklagenzuordnungRepository.alle()).filter((z) => z.kategorieId === "kat-anschaffungen");
     expect(zuordnungen.map((z) => z.ruecklageId ?? null).sort()).toEqual([null, "rue-6"].sort());
     const wartend = new Set(s.wartend.map((w) => w.buchungId));
     for (const z of zuordnungen) expect(wartend.has(z.istbuchungId), z.istbuchungId).toBe(false);
@@ -878,5 +880,18 @@ describe("Spielstand — Ruecklagen zum Durchspielen", () => {
     const { staende } = await budgetuebersichtLaden(deps, HEUTE);
     const gesundheit = staende.find((s) => s.budget.id === "budget-fall-gesundheit");
     expect(gesundheit?.abgezogen).toContain("Behandlungen");
+  });
+
+  it("ordnet eine Ausgabe einer Ruecklage ausserhalb ihrer Kategorie zu — das Budget dort zaehlt sie nicht", async () => {
+    const s = await laden();
+    const fernseher = zeile(s, "rue-fall-fernseher");
+    const [zuordnung] = (await sqliteRuecklagenzuordnungRepository.alle()).filter((z) => z.ruecklageId === "rue-fall-fernseher");
+    expect(zuordnung).toBeDefined();
+    expect(zuordnung.kategorieId).not.toBe(fernseher.ruecklage.kategorieId);
+    const vonAnfang = "2000-01-01";
+    const getragen = getrageneBuchungen(s.verlaufsicht, "rue-fall-fernseher", vonAnfang, "2100-01-01").map((p) => p.buchung.id);
+    expect(getragen).toContain(zuordnung.istbuchungId);
+    const imBudget = getrageneBuchungen(s.verlaufsicht, "budget-freizeit", vonAnfang, "2100-01-01").map((p) => p.buchung.id);
+    expect(imBudget).not.toContain(zuordnung.istbuchungId);
   });
 });

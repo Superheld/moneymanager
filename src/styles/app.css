@@ -2021,6 +2021,24 @@ select.field.tabellenfilter {
   opacity: 0.45;
   cursor: default;
 }
+/* Eine Gruppe in der Liste (`gruppe` an der Option): die Ueberschrift klein und gedaempft,
+   wie die Spaltenkoepfe einer Tabelle — sie ordnet, sie ist keine Wahl. Ab der zweiten
+   Gruppe eine Linie darueber, sonst laese sich die Ueberschrift als letzte Option davor. */
+.auswahl-gruppe + .auswahl-gruppe,
+.auswahl-item + .auswahl-gruppe,
+.auswahl-gruppe + .auswahl-item {
+  border-top: 1px solid var(--line-soft);
+  margin-top: 4px;
+  padding-top: 4px;
+}
+.auswahl-gruppe-titel {
+  padding: 6px 10px 2px;
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
 .auswahl-haken {
   display: flex;
   flex: 0 0 auto;

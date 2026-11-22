@@ -183,6 +183,24 @@ Drei Fälle, die man kennen muss:
   hängt. **Hängt ein früheres aufbauendes Budget mit
   anderen an einer Kategorie**, gehört ihm vor DEREN `findet_ab` jede Buchung weiter
   allein; erst danach wartet sie (`fundfenster.test.ts`, „Paket 4").
+- **Eine Ausgabe darf auch einer Rücklage AUSSERHALB ihrer Kategorie gehören** (seit
+  2026-11-22, Nachtrag zu ADR-0006). Der Fall: Fernseher und Rechner stehen beide unter
+  „Elektronik", der Fernseher soll aber die Rücklage „Fernseher" belasten. Zur Wahl steht
+  dafür jede laufende Rücklage, die **abgeschlossen wird**, eine Kategorie hat und deren
+  laufender Zyklus am Tag der Buchung schon begonnen hat (`fremdeRuecklagen` in
+  `zuordnung.ts`); geprüft in `ruecklageZuordnen`, dazu nur bei einer Ausgabe ohne
+  Gegenbein (`ruecklage.nurAusgaben`). Gespeichert wird dieselbe Zeile in
+  `ruecklage_zuordnung` wie beim Warten, und weil die Zuordnung in `zustaendigkeit` vor
+  allem anderen kommt, trägt danach die Rücklage den Anteil — was an seiner Kategorie
+  hängt, sieht ihn nicht mehr. Drei Grenzen, alle konservativ: eine, die **weiterläuft**,
+  bleibt an ihrer Kategorie (sie trägt eine Art von Ausgaben auf Dauer; einzelne Käufe von
+  woanders machten ihren Stand zu einer Sammlung von Ausnahmen); **nicht vor ihrem
+  Beginn** (eine solche Entnahme zählt in keinem Zyklus und kostete nirgends); eine
+  Buchung mit **Vertrag** bekommt keine Wahl (sie bleibt Fixkosten, die Zuordnung änderte
+  nichts). Dass Budgetverbrauch, Ergebnis und Anspruch dieselbe Buchung gleich behandeln
+  — auch bei `budgetrelevant = false` —, prüft `fundfenster.test.ts` („Wirkung 4").
+  Im Dialog steht die Wahl dafür hinter „Aus einer Rücklage bezahlt?", wenn an der
+  Kategorie nichts zu entscheiden ist (`noetig` an der Wahl).
 - **Ein monatliches Budget am selben Knoten gewinnt immer.** Eine NEUE Rücklage an dessen
   Kategorie weist die Anwendung ab (`ruecklage.kategorieHatBudget`, Hinweis auf eine
   Unterkategorie), seit Paket 5 ebenso ein neues Budget an der Kategorie einer Rücklage
