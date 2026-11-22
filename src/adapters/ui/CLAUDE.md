@@ -644,16 +644,34 @@ das bedeutet, ist enger als es klingt, und die Grenze gehört benannt:
   waagerecht, ein Registerband ebenso. Das ist der Stand, und die Neuaufteilung kommt
   danach.
 
+**Eine Tabelle von Hand fällt schmal nicht zusammen.** Die zwei Spalten der schmalen Form
+gibt es nur in der `DataTable`; eine eigene `<table>` behält alle Spalten und läuft
+seitlich aus dem Bild. So stand es bis 2026-11-22 in der Inbox. Sie bleibt trotzdem eine
+eigene Tabelle — ihre Zellen müssen umbrechen (Gründe einer Dublette, Herkunft eines
+Vorschlags), die `DataTable` kürzt jede auf eine Zeile — und ordnet ihre Zellen schmal per
+CSS in dieselbe Form um (`.inbox-tabelle` in `app.css`). Eine neue Tabelle nimmt die
+`DataTable`; wer davon abweicht, baut die schmale Form selbst mit.
+
 Vier Dinge, die bei jedem neuen Stück ab jetzt gelten und die man schmal nicht nachholen
 kann:
 
 - **Kein Raster ohne `min-width: 0`.** Ein Rasterkind wächst per Vorgabe mit seinem Inhalt;
   eine breite Tabelle zieht dann die ganze Seite auf, und der Scrollrahmen der `DataTable`
   kommt nie zum Zug.
-- **44 px Trefferfläche** für alles, was ein Finger treffen muss.
+- **44 px Trefferfläche** für alles, was ein Finger treffen muss (`--trefferflaeche`).
+  Die Bausteine tragen sie seit 2026-11-22 selbst, als `min-height` (wo der Inhalt
+  schmaler sein kann, auch `min-width`) im Abschnitt „Trefferflächen" am Ende von
+  `app.css`, breit auf `auto` zurückgenommen. Wer einen Baustein mit Bedienteil baut,
+  hängt seine Klasse dort an; `trefferflaechen.test.ts` prüft die Liste. **Keine
+  Mindestbreite an Knöpfen mit Text:** in einer Flex-Zeile ersetzt sie das `auto`, das
+  einen Knopf nie schmaler werden lässt als seine Beschriftung — so lief der Seitenkopf
+  aus dem Bild.
 - **Ein Eingabefeld unter 16 px lässt iOS Safari die Seite ZOOMEN**, sobald es den Fokus
   bekommt — und zurück zoomt sie nicht. `.field` ist deshalb schmal 16 px und erst ab
-  700 px wieder 13,5.
+  700 px wieder 13,5. Das gilt für das Feld, das den Fokus bekommt, nicht für seine
+  Hülle (im `Datumsfeld` trug bis 2026-11-22 nur die Hülle die 16 px), für ein natives
+  `select` (`Zeilenauswahl`) und für jeden kleineren Sonderfall (`tabellenfilter`): der
+  kleinere Grad steht dort erst ab 700 px. Geprüft in `trefferflaechen.test.ts`.
 - **Ränder über `env(safe-area-inset-*)`**, nicht als feste Zahl. Voraussetzung dafür ist
   `viewport-fit=cover` in `index.html`; ohne die Angabe meldet `env()` überall Null.
 
@@ -1083,8 +1101,8 @@ Zeitraum und an seinem letzten Tag. Was daran Entscheidung ist:
   Nettovermögen addiert und eine sinkende Schuld als Zuwachs dasteht. Gedreht wird das an
   einer Stelle, in `vermoegensvergleich`; gespeichert bleibt die Restschuld positiv.
 - **Schmal** bleiben Name und Betrag des Zeitraums; die Veränderung wandert in die zweite
-  Zeile und trägt dort ihren Namen (`.zweitzeile-beschriftung` in `app.css`, breit
-  ausgeblendet, weil dort der Spaltenkopf ihn trägt).
+  Zeile und trägt dort ihren Namen (`zweitzeileName` an der Spalte — wie jede
+  rechtsbündige Spalte der `DataTable`, hier nur ohne das € des Kopfes).
 
 Kein Export und kein Druck — das Blatt ist so gebaut, dass es sich wie eines lesen lässt.
 Geprüft in `analyse/bericht.test.tsx`.

@@ -67,6 +67,11 @@ Zeile. In einer Tabellenzelle sprengt es die Zeilenhöhe und erzwingt eine Spalt
 die der Inhalt nicht braucht. `Zeilenauswahl` ist so gross wie eine `Pill` daneben und
 gehört dorthin, wo eine Zeile eine kleine Entscheidung trägt.
 
+**Schmal ist sie grösser** (seit 2026-11-22): 16 px Schrift und 44 px Höhe, wie jedes
+Feld dort — ein natives `select` unter 16 px lässt iOS beim Antippen zoomen, und eine Pille
+trifft kein Finger. Deshalb steht ihr Aussehen in `app.css` (`.zeilenauswahl`) und nicht
+mehr inline: ein Inline-Stil kennt keine Breite.
+
 Das Gegenstück im Formular ist heute `Auswahl` (siehe unten) und war früher
 `<select className="field">`; an der Aufgabenteilung ändert das nichts.
 
@@ -373,9 +378,37 @@ tragen (noch) keine Angabe.
 Sobald EINE Spalte das setzt, gilt nur noch das Gesetzte und der Rest fällt weg. Der
 Mechanismus ermöglicht das Wegräumen, er nimmt es nicht vorweg.
 
-Eine Zahl steckt darin, die man kennen muss: schmal liegt **`table-layout: fixed`** an und
-die Wertspalte ist auf `12ch` festgelegt. Ohne beides zöge ein langer Name die Tabelle
-wieder aus dem Bild — genau das Übel, gegen das die schmale Form gebaut ist.
+**In der zweiten Zeile trägt eine Zahl ihren Namen, ein Bedienteil bleibt ganz** (seit
+2026-11-22). Vorher stand dort eine abgeschnittene Kette ohne Namen: bei den
+Rücklagenvorschlägen `— · 30,00 · 5 ✓ ✕`, unter „Wartet auf Zuordnung" statt der Auswahl
+nur `…` — zuordnen ging am Telefon nicht. Zwei Regeln seitdem:
+
+- **Rechtsbündig heisst beschriftet.** Eine rechtsbündige Spalte trägt eine Zahl, und
+  „30,00" sagt nicht, ob es die Rate ist oder der Stand; ihr Spaltenkopf geht ihr deshalb
+  voran (`.zweitzeile-beschriftung`). Eine linksbündige trägt, was für sich spricht —
+  Pille, Datum, Name — und bleibt ohne. Weil das aus `align` folgt, wurde der Bestand
+  ohne Zutun lesbarer; wer es je Spalte anders will, setzt `zweitzeileName` (`true`,
+  `false` oder ein eigener Name, etwa ohne das € des Kopfes wie im Bericht).
+- **Jeder Wert ist ein Stück, das als Ganzes umbricht** (`.datentabelle-zweitteil`).
+  Gekürzt wird nur ein einzelner Text, der allein breiter ist als die Zeile; ein Stück mit
+  einem Bedienteil darin nie (`:has(…)` in `app.css`) — auch `overflow: hidden` bleibt
+  dort weg, sonst schnitte es den Fokusrahmen ab. Die Zeile wird dadurch höher, und das
+  ist der Preis: eine Zeile, die ihre Höhe hält und dabei den Knopf verliert, wäre der
+  teurere Fehler. Der Trenner „·" hängt hinter seinem Stück, damit er beim Umbruch am
+  Ende der oberen Zeile steht und nicht allein am Anfang der unteren.
+
+**Die Wertspalte ist so breit wie ihr längster Wert, der Titel bekommt den Rest** (seit
+2026-11-22). Davor lag schmal `table-layout: fixed` an und die Wertspalte stand fest auf
+`12ch`: ein langer Name konnte die Tabelle so nicht aus dem Bild ziehen, aber jeder Betrag
+mit Tausenderstelle stand als `+27.14…` da und jeder längere Spaltenkopf als `BEWEG…` —
+abgeschnitten war ausgerechnet die Zahl, wegen der man hinsieht. Jetzt rechnet die Tabelle
+wieder selbst (`auto`), und der Schutz gegen den langen Namen sitzt am Titel: seine Hülle
+trägt `contain: inline-size` und meldet der Tabelle damit keine Eigenbreite, die Zelle
+nimmt per `width: 100%` den Rest und kürzt darin. Das ist spezifiziertes Verhalten (CSS
+Containment), anders als `max-width` an einer Zelle. Ein Spaltenkopf bricht schmal um,
+statt gekürzt zu werden; der Sortierpfeil hängt per geschütztem Leerzeichen am letzten
+Wort. Als Fangnetz trägt der Wert eine Obergrenze von `50vw` — ein Betrag erreicht sie
+nie, ein Text als Wert soll dem Titel trotzdem nicht die ganze Zeile nehmen.
 
 ## `Modal` schmal: ueber die ganze Hoehe, Fusszeile bleibt stehen
 

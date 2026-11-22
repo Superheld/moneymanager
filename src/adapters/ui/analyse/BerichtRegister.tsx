@@ -165,7 +165,8 @@ function ErgebnisKarte({ bericht, art, name }: { bericht: Bericht; art: Berichts
           { key: "name", label: "", schmal: "titel", render: (z) => z.name },
           { key: "jetzt", label: `${name(bericht.schluessel)} ${geld.symbol}`, align: "right", schmal: "wert", render: (z) => betrag(z.wert.jetzt, z.stufe) },
           // Schmal bleibt vom Vergleich die Veränderung, beschriftet: eine dritte Zahl ohne
-          // Namen in der zweiten Zeile wäre keine Auskunft (`.zweitzeile-beschriftung`).
+          // Namen in der zweiten Zeile wäre keine Auskunft (`zweitzeileName` — der Kopf
+          // allein trüge noch das €, und das wiederholte nur die Einheit des Berichts).
           ...(vergleich
             ? [
                 { key: "vorher", label: `${name(bericht.vorher!)} ${geld.symbol}`, align: "right" as const, render: (z: Ergebniszeile) => betrag(z.wert.vorher) },
@@ -174,12 +175,8 @@ function ErgebnisKarte({ bericht, art, name }: { bericht: Bericht; art: Berichts
                   label: `${t("bericht.spalteVeraenderung")} ${geld.symbol}`,
                   align: "right" as const,
                   schmal: "zweitzeile" as const,
-                  render: (z: Ergebniszeile) => (
-                    <>
-                      <span className="zweitzeile-beschriftung">{t("bericht.spalteVeraenderung")} </span>
-                      {betrag(z.wert.veraenderung)}
-                    </>
-                  ),
+                  zweitzeileName: t("bericht.spalteVeraenderung"),
+                  render: (z: Ergebniszeile) => betrag(z.wert.veraenderung),
                 },
               ]
             : []),
@@ -259,12 +256,8 @@ function VermoegenKarte({ bericht }: { bericht: Bericht }) {
             label: `${t("bericht.spalteVeraenderung")} ${geld.symbol}`,
             align: "right",
             schmal: "zweitzeile",
-            render: (z) => (
-              <>
-                <span className="zweitzeile-beschriftung">{t("bericht.spalteVeraenderung")} </span>
-                {betrag(z.veraenderung, false)}
-              </>
-            ),
+            zweitzeileName: t("bericht.spalteVeraenderung"),
+            render: (z) => betrag(z.veraenderung, false),
           },
         ]}
         rows={v.zeilen}

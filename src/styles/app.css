@@ -615,10 +615,41 @@ select.field {
   color: var(--ink-3);
 }
 
-/* Die Beschriftung eines Werts, der schmal in die zweite Zeile wandert (`schmal:
-   "zweitzeile"` an der Spalte): breit sagt der Spaltenkopf, was die Zahl ist; schmal steht
-   dieser Kopf nicht mehr da, und eine Zahl ohne Namen ist keine Auskunft. Eine Frage des
-   Aussehens, nicht des Markups — deshalb CSS und nicht `useSchmal`. */
+/* Die zweite Zeile der schmalen DataTable: jeder Wert ein Stück, das als Ganzes
+   umbricht. Ein Text, der allein breiter ist als die Zeile, kürzt sich; ein Stück mit
+   einem Bedienteil darin kürzt sich nie — ein abgeschnittener Knopf ist keiner, und
+   `overflow: hidden` schnitte auch seinen Fokusrahmen ab. Gibt es nur schmal (das Markup
+   entsteht nur dort, siehe `zelleZweitzeile` in `DataTable.tsx`). */
+.datentabelle-zweitzeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--sp-1);
+  row-gap: var(--sp-1);
+  margin-top: 2px;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-regular);
+  color: var(--ink-3);
+}
+.datentabelle-zweitteil {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.datentabelle-zweitteil:has(button, select, input, [role="combobox"], [role="checkbox"]) {
+  flex-shrink: 0;
+  overflow: visible;
+}
+.datentabelle-trenner {
+  opacity: 0.45;
+}
+
+/* Die Beschriftung eines Werts, der schmal in die zweite Zeile wandert: breit sagt der
+   Spaltenkopf, was die Zahl ist; schmal steht dieser Kopf nicht mehr da, und eine Zahl
+   ohne Namen ist keine Auskunft. Die DataTable setzt sie selbst (`zweitzeileName` an der
+   Spalte); breit ausgeblendet für Stellen, die dasselbe Markup in beiden Breiten zeigen. */
 @media (min-width: 700px) {
   .zweitzeile-beschriftung {
     display: none;
@@ -643,12 +674,143 @@ tr.datentabelle-zeile--klickbar:focus-visible {
   width: 5.5ch;
   padding: 2px 4px;
   text-align: center;
-  font-size: var(--fs-xs);
+  font-size: 16px; /* NICHT als Token: unter 16 px zoomt iOS beim Fokus (ui/CLAUDE.md) */
   border: 1px solid var(--line);
   border-radius: var(--r-sm, 4px);
   background: var(--surface);
   color: var(--ink-2);
   font-family: inherit;
+}
+@media (min-width: 700px) {
+  .datentabelle-seitenfeld {
+    font-size: var(--fs-xs);
+  }
+}
+
+/* --- Zeilenauswahl (bausteine/Zeilenauswahl.tsx) ---
+   So gross wie eine Pille daneben — breit. Schmal gilt für sie, was für jedes Feld gilt:
+   16 px Schrift, sonst zoomt iOS beim Antippen (ein natives `select` zählt dazu), und
+   44 px Höhe (unten, „Trefferflächen"). Die Masse standen bis 2026-11-22 inline am
+   Element, und ein Inline-Stil kennt keine Breite. */
+.zeilenauswahl {
+  font: inherit;
+  font-size: 16px; /* NICHT als Token: unter 16 px zoomt iOS beim Fokus (ui/CLAUDE.md) */
+  padding: 2px 6px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+  max-width: 100%;
+}
+.zeilenauswahl:disabled {
+  cursor: default;
+}
+@media (min-width: 700px) {
+  .zeilenauswahl {
+    font-size: var(--fs-xs);
+  }
+}
+
+/* --- Die Tabelle der Inbox (review/ReviewScreen.tsx) ---
+   Sie ist keine DataTable, weil ihre Zellen umbrechen müssen (Gründe einer Dublette, die
+   Herkunft eines Vorschlags) — die DataTable kürzt jede Zelle auf eine Zeile. Damit fiel
+   sie schmal auch nicht auf deren zwei Spalten zusammen und lief seitlich aus dem Bild.
+
+   Schmal ordnet CSS dieselben Zellen deshalb so an, wie die DataTable es mit ihren tut:
+   oben Empfänger und Betrag, darunter Datum, Konto, Kategorie und die Aktionen. Die Zeile
+   wird dafür ein Flex-Behälter; `::after` und `::before` mit voller Breite erzwingen Umbrüche nach dem
+   Betrag und vor der Kategorie. Die Abfrage steht als `max-width`, nicht als Grundform: die Tabelle aus einem
+   Flex-Stapel breit wieder zur Tabelle zu machen hiesse, jede Regel einzeln
+   zurückzunehmen — dieselbe Ausnahme wie bei der `h1` des `PageHead`. */
+.inbox-tabelle th {
+  text-align: left;
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.inbox-tabelle td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--ink);
+}
+@media (max-width: 699.98px) {
+  .inbox-tabelle,
+  .inbox-tabelle thead,
+  .inbox-tabelle tbody {
+    display: block;
+  }
+  .inbox-tabelle tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: var(--sp-2);
+    row-gap: var(--sp-1);
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .inbox-tabelle thead tr {
+    border-bottom-color: var(--line);
+    padding: 8px 0;
+  }
+  /* Zwei erzwungene Umbrüche: nach dem Betrag und nach Datum und Konto. */
+  .inbox-tabelle tbody tr::after,
+  .inbox-tabelle tbody tr::before {
+    content: "";
+    order: 3;
+    flex-basis: 100%;
+  }
+  .inbox-tabelle tbody tr::before {
+    order: 5;
+  }
+  .inbox-tabelle th,
+  .inbox-tabelle td {
+    display: block;
+    padding: 0;
+    border-bottom: 0;
+  }
+  /* Schmal stehen nur die Köpfe der beiden Spalten, die oben stehen — wie in der
+     DataTable. Die Auswahl aller bleibt, sie ist eine Handlung. */
+  .inbox-tabelle th.inbox-datum,
+  .inbox-tabelle th.inbox-konto,
+  .inbox-tabelle th.inbox-kategorie,
+  .inbox-tabelle th.inbox-aktionen {
+    display: none;
+  }
+  .inbox-tabelle .inbox-auswahl {
+    order: 0;
+    align-self: center;
+  }
+  .inbox-tabelle .inbox-gegenpartei {
+    order: 1;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .inbox-tabelle .inbox-betrag {
+    order: 2;
+    white-space: nowrap;
+  }
+  .inbox-tabelle td.inbox-datum,
+  .inbox-tabelle td.inbox-konto {
+    order: 4;
+    font-size: var(--fs-xs);
+    color: var(--ink-3);
+  }
+  .inbox-tabelle td.inbox-konto::before {
+    content: "· ";
+  }
+  .inbox-tabelle td.inbox-kategorie {
+    order: 6;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .inbox-tabelle td.inbox-aktionen {
+    order: 7;
+  }
 }
 
 /* In `Aufklapptabelle` ist die Zeile ein `tr` und kann kein Knopf sein — sie traegt
@@ -678,9 +840,19 @@ tr.buchungszeile {
    ============================================================ */
 .tabellenfilter .field,
 .field.tabellenfilter {
-  font-size: var(--fs-tabelle);
   padding: 5px 9px;
   border-radius: var(--r-md);
+}
+/* Der kleinere Schriftgrad erst ab 700 px: schmal gilt die 16-px-Regel von `.field`
+   auch für einen Filter — iOS zoomt beim Fokus, egal wie klein das Feld gemeint ist.
+   Bis 2026-11-22 stand er ohne Abfrage da und hob die Regel für jedes Suchfeld über
+   einer Tabelle wieder auf. */
+@media (min-width: 700px) {
+  .tabellenfilter .field,
+  .field.tabellenfilter,
+  .tabellenfilter .datumsfeld-eingabe {
+    font-size: var(--fs-tabelle);
+  }
 }
 .tabellenfilter select.field,
 select.field.tabellenfilter {
@@ -693,7 +865,6 @@ select.field.tabellenfilter {
 }
 .tabellenfilter .datumsfeld-eingabe {
   padding: 5px 0;
-  font-size: var(--fs-tabelle);
 }
 .tabellenfilter .datumsfeld-knopf {
   width: 22px;
@@ -1743,10 +1914,18 @@ select.field.tabellenfilter {
   outline: none;
   background: none;
   padding: 10px 0;
-  font-size: var(--fs-sm);
+  /* Die EINGABE muss die 16 px haben, nicht die Hülle: iOS sieht auf das Feld, das den
+     Fokus bekommt. Bis 2026-11-22 trug die Hülle (`.field`) sie und das Feld darin
+     13,5 — und die Seite zoomte beim Antippen eines Datums. */
+  font-size: 16px; /* NICHT als Token: unter 16 px zoomt iOS beim Fokus (ui/CLAUDE.md) */
   font-family: var(--font-ui);
   font-variant-numeric: tabular-nums;
   color: var(--ink);
+}
+@media (min-width: 700px) {
+  .datumsfeld-eingabe {
+    font-size: var(--fs-sm);
+  }
 }
 .datumsfeld-knopf {
   display: flex;
@@ -1880,4 +2059,98 @@ select.field.tabellenfilter {
   margin-top: var(--sp-5);
   font-size: var(--fs-xs);
   overflow-wrap: anywhere;
+}
+
+/* ============================================================
+   TREFFERFLÄCHEN — schmal mindestens 44 px für alles, was ein Finger treffen muss.
+
+   Die Regel stand seit 2026-09-02 in `ui/CLAUDE.md` („Mobile first") und galt nirgends:
+   am Telefon nachgemessen waren Symbol-Knöpfe 28 px gross, Knöpfe 35 hoch, Umschalter 29,
+   ein Zeilenlink 23. Mit der Maus trifft man das, mit dem Finger daneben — und in einer
+   Zeile mit „bearbeiten" und „löschen" nebeneinander auf der teuren Seite.
+
+   Gesetzt wird `min-height` (und, wo der Inhalt schmaler sein kann, `min-width`) und
+   nichts sonst: das vergrössert ein Element nur dort, wo es kleiner ist, und lässt
+   Breite, Polsterung und Schrift stehen. Ein `button` mittet seinen Inhalt selbst, die
+   Schrift bleibt also in der Mitte der Fläche. Breit wird genau das zurückgenommen, und
+   zwar auf `auto`, den Ausgangswert — vorher trug keiner dieser Bausteine eine
+   Mindestgrösse, breit sieht also alles aus wie vorher. Wo das Sichtbare kleiner bleiben
+   soll (das Kästchen ohne Text), liegt eine unsichtbare Fläche darum. Geprüft in
+   `ui/trefferflaechen.test.ts`.
+   ============================================================ */
+.btn,
+.iconbtn,
+.umschalter-knopf,
+.registerleiste-reiter,
+.zeilenlink,
+.zeilenauswahl,
+.auswahl-trigger,
+.field,
+.kaestchen,
+.datentabelle-seitenfeld,
+.datumsfeld-knopf,
+.dialog-schliessen {
+  min-height: var(--trefferflaeche);
+}
+/* Die Breite nur dort, wo der Inhalt schmaler sein kann als ein Finger: Symbole, die
+   Glyphen der Seitensteuerung („‹"), ein kurzer Name, ein kurzer Reiter wie „Depot".
+
+   NICHT an jedem Knopf, und das ist gemessen: `min-width` ersetzt in einer Flex-Zeile den
+   Ausgangswert `auto`, der einen Knopf nie schmaler werden lässt als seine Beschriftung.
+   Mit 44 px statt `auto` schrumpfte „+ Budget anlegen" im Seitenkopf unter seinen Text,
+   und die Seite lief seitlich aus dem Bild. Aus demselben Grund hält der Reiter sein
+   Schrumpfen selbst an — die Leiste rollt, statt die Reiter zu stauchen. */
+.iconbtn,
+.zeilenlink,
+.registerleiste-reiter,
+.datentabelle-seiten .btn,
+.datentabelle-seitenfeld,
+.datumsfeld-knopf,
+.dialog-schliessen {
+  min-width: var(--trefferflaeche);
+}
+.registerleiste-reiter {
+  flex-shrink: 0;
+}
+/* Ein Kästchen ohne Text bleibt 16 px gross zu sehen — als 44er Kasten sähe es aus wie
+   ein Knopf. Die Fläche liegt deshalb unsichtbar darum. Mit Text trifft man das Label,
+   und das trägt oben schon die Mindesthöhe. */
+.kaestchen-feld:not(.kaestchen > .kaestchen-feld) {
+  position: relative;
+}
+.kaestchen-feld:not(.kaestchen > .kaestchen-feld)::after {
+  content: "";
+  position: absolute;
+  inset: calc((16px - var(--trefferflaeche)) / 2);
+}
+@media (min-width: 700px) {
+  .btn,
+  .iconbtn,
+  .umschalter-knopf,
+  .registerleiste-reiter,
+  .zeilenlink,
+  .zeilenauswahl,
+  .auswahl-trigger,
+  .field,
+  .kaestchen,
+  .datentabelle-seitenfeld,
+  .datumsfeld-knopf,
+  .dialog-schliessen {
+    min-height: auto;
+  }
+  .iconbtn,
+  .zeilenlink,
+  .registerleiste-reiter,
+  .datentabelle-seiten .btn,
+  .datentabelle-seitenfeld,
+  .datumsfeld-knopf,
+  .dialog-schliessen {
+    min-width: auto;
+  }
+  .registerleiste-reiter {
+    flex-shrink: 1;
+  }
+  .kaestchen-feld:not(.kaestchen > .kaestchen-feld)::after {
+    content: none;
+  }
 }

@@ -58,9 +58,13 @@
 // Finanz-App eine gekürzte Auskunft, die niemand entschieden hat. Weggeräumt wird je
 // Tabelle von Hand, über `column.schmal` — ist das an EINER Spalte gesetzt, gilt nur noch,
 // was ausdrücklich dasteht, und der Rest fällt weg.
+//
+// **In der zweiten Zeile trägt eine Zahl ihren Namen** (rechtsbündige Spalten, siehe
+// `zweitzeileName`), und jeder Wert bricht als Ganzes um — ein Bedienteil dort wird nie
+// abgeschnitten. Einzelheiten in `bausteine/CLAUDE.md`, „`DataTable` schmal".
 
 import { NumberField } from "@base-ui/react/number-field";
-import { Fragment, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { Button } from "./Button";
 import { useSchmal } from "./useSchmal";
 
@@ -87,6 +91,17 @@ export interface DataColumn<T = unknown> {
    * wirft nichts weg.
    */
   schmal?: "titel" | "wert" | "zweitzeile";
+  /**
+   * Der Name, mit dem der Wert dieser Spalte schmal in der ZWEITEN Zeile steht — dort
+   * gibt es ihren Spaltenkopf nicht mehr.
+   *
+   * Ohne Angabe tragen rechtsbündige Spalten ihre Beschriftung (`label`), linksbündige
+   * keine: rechts steht eine Zahl, und „30,00" sagt nicht, ob es die Rate ist oder der
+   * Stand; links steht, was für sich spricht — eine Pille, ein Datum, ein Name.
+   * `true` erzwingt die Beschriftung, `false` unterdrückt sie, ein Text ersetzt sie (für
+   * Köpfe, die eine Einheit tragen, die der Wert schon zeigt).
+   */
+  zweitzeileName?: ReactNode;
   /**
    * Diese Spalte trägt den Bezeichner einer klickbaren Zeile (den Link-Stil) — statt der
    * ersten. Für Tabellen, deren erste Spalte kein Name ist: im Kontoauszug steht vorn das
@@ -150,13 +165,37 @@ const BEDIENTEIL = "button, a, input, select, textarea, label, [role=button], [r
 const STANDARD_MAX = "32ch";
 
 /**
- * Breite der Wertspalte in der schmalen Form.
+ * Obergrenze der Wertspalte in der schmalen Form — ein Fangnetz, keine Breite.
  *
- * Sie muss FEST sein: schmal liegt `table-layout: fixed` an, sonst zieht ein langer Name
- * die Tabelle wieder aus dem Bild — genau das Übel, gegen das die schmale Form gebaut ist.
- * 12ch fasst einen Betrag samt Minus, Tausenderpunkt und Währungszeichen.
+ * Die Spalte ist so breit wie ihr längster Wert (siehe `TITEL_OHNE_EIGENBREITE`); ein
+ * Betrag erreicht diese Grenze nie. Steht in einer Tabelle als Wert doch einmal Text, soll
+ * er dem Titel nicht die ganze Zeile nehmen.
  */
-const SCHMAL_WERT_BREITE = "12ch";
+const SCHMAL_WERT_HOECHSTENS = "50vw";
+
+/**
+ * Mindestbreite des Wertkopfes in der schmalen Form, in seiner eigenen Schrift.
+ *
+ * Ohne sie bräche ein Kopf über einer kurzen Zahl Wort für Wort um — „Bisher / Monat €"
+ * stand über „39,58" in vier Zeilen. Mit ihr sind es höchstens zwei. Der Titel verliert
+ * dabei nichts gegen früher: bis 2026-11-22 war die Wertspalte fest so breit.
+ */
+const SCHMAL_KOPF_MINDESTENS = "12ch";
+
+/**
+ * Schmal hält diese Hülle den Titel aus der Breitenrechnung der Tabelle heraus.
+ *
+ * Bis 2026-11-22 lag schmal `table-layout: fixed` an und die Wertspalte stand fest auf
+ * `12ch` — sonst hätte ein langer Name die Tabelle aus dem Bild gezogen. Der Preis war,
+ * dass ein Betrag mit Tausenderstelle (`+27.14…`) und jeder längere Spaltenkopf
+ * abgeschnitten wurden: die Zahl, wegen der man hinsieht. Jetzt rechnet die Tabelle
+ * wieder selbst (`auto`), und der Titel trägt `contain: inline-size`: sein Inhalt meldet
+ * der Tabelle damit KEINE Eigenbreite. Die Wertspalte bekommt, was ihr längster Wert
+ * braucht, der Titel per `width: 100%` den Rest und kürzt darin. Anders als `max-width`
+ * an einer Zelle (in CSS 2.1 undefiniert, siehe oben) ist das spezifiziertes Verhalten
+ * (CSS Containment).
+ */
+const TITEL_OHNE_EIGENBREITE: CSSProperties = { contain: "inline-size", minWidth: 0 };
 
 interface MitIndex<T> {
   c: DataColumn<T>;
@@ -182,6 +221,15 @@ function schmalRollen<T>(columns: readonly DataColumn<T>[]) {
   const titel = mitIndex[0];
   const wert = mitIndex.slice(1).find((e) => e.c.align === "right") ?? null;
   return { titel, wert, zweit: mitIndex.filter((e) => e !== titel && e !== wert) };
+}
+
+/** Der Name, der einem Wert schmal in der zweiten Zeile vorangeht — oder keiner. */
+function zweitzeilenName<T>(c: DataColumn<T>): ReactNode {
+  const n = c.zweitzeileName;
+  if (n === false) return null;
+  if (n !== undefined && n !== null && n !== true) return n;
+  if (n === true || c.align === "right") return c.label === "" ? null : c.label;
+  return null;
 }
 
 /** Der rohe Wert einer Spalte — für Spalten ohne `render`. */
@@ -258,26 +306,40 @@ export function DataTable<T>({
     ? [rollen.titel, rollen.wert].filter((e): e is MitIndex<T> => !!e)
     : columns.map((c, i) => ({ c, i }));
 
+  /**
+   * Die zweite Zeile der schmalen Form: die übrigen Werte, je einer ein Stück, das als
+   * Ganzes umbricht (`.datentabelle-zweitzeile` in `app.css`).
+   *
+   * Bis 2026-11-22 war sie EINE Zeile, die am Rand abgeschnitten wurde. Für Text war das
+   * verschmerzbar, für ein Bedienteil nicht: die Auswahl unter „Wartet auf Zuordnung"
+   * stand nur noch als `…` da, und zuordnen ging am Telefon nicht. Jetzt wandert, was
+   * nicht mehr passt, in eine weitere Zeile — ein Bedienteil ganz, nur ein einzelner Text,
+   * der allein breiter ist als die Zeile, wird gekürzt. Die Zeile wird dadurch höher; das
+   * ist der Preis, und ein abgeschnittener Knopf wäre der teurere.
+   */
   function zelleZweitzeile(row: T) {
     if (!rollen) return null;
-    const teile: ReactNode[] = [];
+    const teile: { n: number; name: ReactNode; v: ReactNode }[] = [];
     const texte: string[] = [];
     rollen.zweit.forEach((e, n) => {
       const v = zellwert(e.c, row);
       if (v === null || v === undefined || v === "") return;
-      if (teile.length) teile.push(<span key={"t" + n} style={{ opacity: 0.45 }}> · </span>);
-      teile.push(<Fragment key={"v" + n}>{v}</Fragment>);
+      teile.push({ n, name: zweitzeilenName(e.c), v });
       const s = alsText(v);
       if (s) texte.push(s);
     });
     if (!teile.length) return null;
     return (
-      <div
-        title={texte.length ? texte.join(" · ") : undefined}
-        style={{ marginTop: 2, fontSize: "var(--fs-xs)", fontWeight: "var(--fw-regular)", color: "var(--ink-3)",
-          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-      >
-        {teile}
+      <div className="datentabelle-zweitzeile" title={texte.length ? texte.join(" · ") : undefined}>
+        {teile.map((teil, k) => (
+          <span key={teil.n} className="datentabelle-zweitteil">
+            {teil.name !== null && <span className="zweitzeile-beschriftung">{teil.name} </span>}
+            {teil.v}
+            {/* Der Trenner hängt HINTER dem Stück: bricht die Zeile um, steht er am Ende
+                der oberen, nicht allein am Anfang der unteren. */}
+            {k < teile.length - 1 && <span className="datentabelle-trenner" aria-hidden="true"> ·</span>}
+          </span>
+        ))}
       </div>
     );
   }
@@ -313,13 +375,15 @@ export function DataTable<T>({
   return (
     <>
       <div style={{ overflowX: "auto", maxWidth: "100%" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--fs-tabelle)", tableLayout: schmal ? "fixed" : "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--fs-tabelle)", tableLayout: "auto" }}>
           <thead>
             <tr>
               {kopf.map(({ c, i }) => {
                 const sortbar = kannSortieren(c);
                 const aktiv = sort?.idx === i;
-                const pfeil = aktiv ? (sort!.dir === "asc" ? " ▲" : " ▼") : sortbar ? " ⇅" : "";
+                // Geschütztes Leerzeichen: bricht ein Kopf schmal um, bleibt der Pfeil am
+                // letzten Wort, statt allein in einer Zeile zu stehen.
+                const pfeil = aktiv ? (sort!.dir === "asc" ? "\u00a0▲" : "\u00a0▼") : sortbar ? "\u00a0⇅" : "";
                 const rechts = c.align === "right";
                 return (
                   <th
@@ -330,12 +394,16 @@ export function DataTable<T>({
                       fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: ".04em",
                       color: aktiv ? "var(--ink-2)" : "var(--ink-3)", padding: "8px 10px",
                       borderBottom: "1px solid var(--line)", cursor: sortbar ? "pointer" : "default",
-                      userSelect: "none", whiteSpace: "nowrap",
-                      width: schmal && rechts ? SCHMAL_WERT_BREITE : undefined,
-                      overflow: schmal ? "hidden" : undefined, textOverflow: schmal ? "ellipsis" : undefined }}
+                      // Schmal darf ein Kopf umbrechen, statt abgeschnitten zu werden: die
+                      // Wertspalte ist so schmal wie ihre Zahlen, und ein Kopf wie
+                      // „Bewegungen €" ist breiter als „−286,94".
+                      userSelect: "none", whiteSpace: schmal ? "normal" : "nowrap",
+                      verticalAlign: schmal ? "bottom" : undefined }}
                   >
-                    {c.label}
-                    <span style={{ opacity: aktiv ? 0.9 : 0.35 }}>{pfeil}</span>
+                    <span style={schmal && rechts ? { display: "inline-block", minWidth: SCHMAL_KOPF_MINDESTENS } : undefined}>
+                      {c.label}
+                      <span style={{ opacity: aktiv ? 0.9 : 0.35 }}>{pfeil}</span>
+                    </span>
                   </th>
                 );
               })}
@@ -359,14 +427,17 @@ export function DataTable<T>({
                 const wv = rollen.wert ? zellwert(rollen.wert.c, row) : null;
                 return (
                   <tr key={ri} {...bedienung} aria-current={ausgewaehlt} style={zeilenStil}>
-                    <td style={{ padding: "10px", borderBottom: "1px solid var(--line-soft)", textAlign: "left", color: "var(--ink)", overflow: "hidden" }}>
-                      <div title={alsText(tv)} className={klickbar(row) ? BEZEICHNER : undefined} style={{ fontWeight: "var(--fw-bold)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tv}</div>
-                      {zelleZweitzeile(row)}
+                    <td style={{ padding: "10px", borderBottom: "1px solid var(--line-soft)", textAlign: "left", color: "var(--ink)", width: "100%" }}>
+                      <div style={TITEL_OHNE_EIGENBREITE}>
+                        <div title={alsText(tv)} className={klickbar(row) ? BEZEICHNER : undefined} style={{ fontWeight: "var(--fw-bold)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tv}</div>
+                        {zelleZweitzeile(row)}
+                      </div>
                     </td>
                     {rollen.wert && (
                       <td style={{ padding: "10px", borderBottom: "1px solid var(--line-soft)", textAlign: "right",
-                        fontVariantNumeric: "tabular-nums", color: "var(--ink)", overflow: "hidden",
-                        textOverflow: "ellipsis", whiteSpace: "nowrap", verticalAlign: "top" }}>{wv}</td>
+                        fontVariantNumeric: "tabular-nums", color: "var(--ink)", whiteSpace: "nowrap", verticalAlign: "top" }}>
+                        <div title={alsText(wv)} style={{ maxWidth: SCHMAL_WERT_HOECHSTENS, marginLeft: "auto", overflow: "hidden", textOverflow: "ellipsis" }}>{wv}</div>
+                      </td>
                     )}
                   </tr>
                 );

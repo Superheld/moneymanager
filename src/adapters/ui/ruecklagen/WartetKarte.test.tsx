@@ -3,7 +3,7 @@
 // Buchungen, bei denen offen ist, welche Rücklage sie trägt, und lässt direkt wählen. Von
 // der Oberfläche bis ins Schema; alle Werte erfunden.
 
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Database } from "sql.js";
@@ -88,6 +88,43 @@ describe("Rücklagen — Wartet auf Zuordnung", () => {
       expect(z.ruecklageId).toBeUndefined();
     });
     await waitFor(() => expect(screen.queryByText(i18n.t("ruecklagen.wartend.titel"))).toBeNull());
+  });
+
+  /**
+   * Der Prüfstein der schmalen Form: bis 2026-11-22 stand die Wahl am Telefon nur als
+   * `…` am Ende einer abgeschnittenen zweiten Zeile, und zuordnen ging nicht. Jetzt
+   * steht sie dort als eigenes Stück, das umbricht statt gekürzt zu werden.
+   */
+  describe("schmal", () => {
+    afterEach(() => Reflect.deleteProperty(window, "matchMedia"));
+
+    it("ordnet auch in der schmalen Form zu", async () => {
+      Object.defineProperty(window, "matchMedia", {
+        writable: true,
+        configurable: true,
+        value: (media: string) => ({
+          matches: true, media, onchange: null,
+          addEventListener() {}, removeEventListener() {}, dispatchEvent: () => false,
+          addListener() {}, removeListener() {},
+        }),
+      });
+      const nutzer = userEvent.setup();
+      await bestand();
+      rendere(<RuecklagenScreen />);
+      const wahl = await screen.findByRole("combobox", { name: i18n.t("ruecklagen.wartend.spalteWahl") });
+      const zweitzeile = wahl.closest(".datentabelle-zweitzeile") as HTMLElement;
+      expect(zweitzeile).not.toBeNull();
+      // Die Zeile kürzt nicht mehr als Ganzes; gekürzt wird höchstens ein einzelnes Stück.
+      expect(zweitzeile.style.whiteSpace).toBe("");
+      expect(zweitzeile.style.overflow).toBe("");
+      expect(wahl.closest(".datentabelle-zweitteil")).not.toBeNull();
+
+      await nutzer.selectOptions(wahl, "r-selv");
+      await waitFor(async () => {
+        const [z] = await sqliteRuecklagenzuordnungRepository.alle();
+        expect(z).toMatchObject({ istbuchungId: "b-orvl", ruecklageId: "r-selv" });
+      });
+    });
   });
 
   it("steht nicht da, wenn nichts wartet", async () => {

@@ -219,6 +219,87 @@ describe("DataTable — schmal", () => {
     expect(wertspalte()).toEqual(["−12,90 €", "−84,20 €"]);
   });
 
+  /**
+   * Bis 2026-11-22 stand die Wertspalte schmal fest auf 12ch bei `table-layout: fixed`,
+   * und ein Betrag mit Tausenderstelle stand als `+27.14…` da. Jetzt ist die Wertspalte
+   * so breit wie ihr Wert; den langen Namen hält `contain: inline-size` am Titel klein.
+   * Ob der Browser das so rechnet, kann jsdom nicht zeigen — geprüft wird, dass die
+   * Bedingungen dafür am Markup stehen.
+   */
+  it("schneidet den Wert nicht ab und haelt den Titel aus der Breitenrechnung", () => {
+    schmalStellen(true);
+    const { container } = render(<DataTable columns={spaltenBreit} rows={daten} />);
+    const tabelle = container.querySelector("table") as HTMLElement;
+    expect(tabelle.style.tableLayout).toBe("auto");
+    const [titel, wert] = Array.from(container.querySelectorAll("tbody tr")[0].querySelectorAll("td")) as HTMLElement[];
+    expect(titel.style.width).toBe("100%");
+    expect((titel.firstElementChild as HTMLElement).style.contain).toBe("inline-size");
+    expect(wert.style.whiteSpace).toBe("nowrap");
+    expect(wert.style.width).toBe("");
+    expect((wert.firstElementChild as HTMLElement).style.maxWidth).toBe("50vw");
+  });
+
+  it("laesst einen Spaltenkopf schmal umbrechen, statt ihn zu kuerzen", () => {
+    schmalStellen(true);
+    const { container } = render(<DataTable columns={spaltenBreit} rows={daten} sortable />);
+    const koepfe = Array.from(container.querySelectorAll("thead th")) as HTMLElement[];
+    for (const k of koepfe) {
+      expect(k.style.whiteSpace).toBe("normal");
+      expect(k.style.textOverflow).toBe("");
+    }
+    // Der Pfeil haengt am letzten Wort und steht nach einem Umbruch nicht allein.
+    expect(koepfe[1].textContent).toBe("Betrag ⇅");
+  });
+
+  /**
+   * Bis 2026-11-22 stand die zweite Zeile ohne Namen da: „— · 30,00 · 5". Eine Zahl
+   * sagt nicht, was sie ist; eine Pille, ein Datum, ein Name tun es.
+   */
+  it("beschriftet rechtsbuendige Werte in der zweiten Zeile, linksbuendige nicht", () => {
+    schmalStellen(true);
+    const spalten = [
+      { key: "name", label: "Name" },
+      { key: "datum", label: "Datum" },
+      { key: "betrag", label: "Betrag", align: "right" as const },
+      { key: "rate", label: "Rate", align: "right" as const },
+    ];
+    const { container } = render(<DataTable columns={spalten} rows={[{ name: "Ohlert", datum: "03.08.2026", betrag: "12,00", rate: "30,00" }]} />);
+    const zweit = container.querySelector(".datentabelle-zweitzeile") as HTMLElement;
+    const namen = Array.from(zweit.querySelectorAll(".zweitzeile-beschriftung")).map((e) => e.textContent?.trim());
+    expect(namen).toEqual(["Rate"]);
+    expect(zweit.textContent).toContain("Rate 30,00");
+    expect(zweit.textContent).toContain("03.08.2026");
+  });
+
+  it("nimmt einen eigenen Namen oder keinen, wenn die Spalte es sagt", () => {
+    schmalStellen(true);
+    const spalten = [
+      { key: "name", label: "Name" },
+      { key: "betrag", label: "Betrag", align: "right" as const },
+      { key: "rate", label: "Rate €", align: "right" as const, zweitzeileName: "Rate" },
+      { key: "monate", label: "Monate", align: "right" as const, zweitzeileName: false },
+      { key: "art", label: "Art", zweitzeileName: true },
+    ];
+    const { container } = render(<DataTable columns={spalten} rows={[{ name: "Ohlert", betrag: "12,00", rate: "30,00", monate: "5", art: "fest" }]} />);
+    const namen = Array.from(container.querySelectorAll(".zweitzeile-beschriftung")).map((e) => e.textContent?.trim());
+    expect(namen).toEqual(["Rate", "Art"]);
+  });
+
+  /** Ein Bedienteil steht als eigenes Stück da und wird nicht mit dem Text gekürzt. */
+  it("legt jeden Wert der zweiten Zeile in ein eigenes Stueck", () => {
+    schmalStellen(true);
+    const spalten = [
+      { key: "name", label: "Name" },
+      { key: "betrag", label: "Betrag", align: "right" as const },
+      { key: "datum", label: "Datum" },
+      { key: "wahl", label: "Wahl", render: () => <select aria-label="Wahl"><option>a</option></select> },
+    ];
+    const { container } = render(<DataTable columns={spalten} rows={[{ name: "Ohlert", betrag: "12,00", datum: "03.08.2026" }]} />);
+    const stuecke = container.querySelectorAll(".datentabelle-zweitzeile > .datentabelle-zweitteil");
+    expect(stuecke).toHaveLength(2);
+    expect(screen.getByRole("combobox", { name: "Wahl" }).closest(".datentabelle-zweitteil")).toBe(stuecke[1]);
+  });
+
   it("laesst die breite Form unberuehrt", () => {
     schmalStellen(false);
     const { container } = render(<DataTable columns={spaltenBreit} rows={daten} />);
