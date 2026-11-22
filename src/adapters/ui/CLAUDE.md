@@ -683,7 +683,10 @@ kann:
   Die Bausteine tragen sie seit 2026-11-22 selbst, als `min-height` (wo der Inhalt
   schmaler sein kann, auch `min-width`) im Abschnitt „Trefferflächen" am Ende von
   `app.css`, breit auf `auto` zurückgenommen. Wer einen Baustein mit Bedienteil baut,
-  hängt seine Klasse dort an; `trefferflaechen.test.ts` prüft die Liste. **Keine
+  hängt seine Klasse dort an; `trefferflaechen.test.ts` prüft die Liste. Dasselbe gilt
+  für eine Zeile, die aufklappt und selbst das Bedienteil ist, ohne Baustein zu sein
+  (Monatskarten der Übersicht, Kopfzeile je Konto im Abgleich): sie trägt
+  `.aufklappzeile`, und der Test führt sie in einer eigenen Liste. **Keine
   Mindestbreite an Knöpfen mit Text:** in einer Flex-Zeile ersetzt sie das `auto`, das
   einen Knopf nie schmaler werden lässt als seine Beschriftung — so lief der Seitenkopf
   aus dem Bild.

@@ -69,6 +69,7 @@ export function AbgleichBereich() {
             {/* Die Kopfzeile beantwortet die Frage schon: stimmt es, und wenn nicht, um
                 wieviel. Alles Weitere ist die Begründung darunter. */}
             <Collapsible.Trigger
+              className="aufklappzeile"
               style={{
                 width: "100%", background: "none", border: 0, padding: 0, cursor: "pointer",
                 display: "flex", alignItems: "baseline", justifyContent: "space-between",

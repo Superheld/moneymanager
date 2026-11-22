@@ -2136,6 +2136,14 @@ select.field.tabellenfilter {
 .registerleiste-reiter {
   flex-shrink: 0;
 }
+/* Eine Zeile, die aufklappt, ist selbst das Bedienteil — und kein Baustein, sondern je
+   Bereich gebaut: die Zeilen der Monatskarten in der Übersicht (40 px) und die Kopfzeile
+   je Konto im Abgleich (23 px). Der Inhalt rückt in die Mitte der gewonnenen Höhe; ohne
+   `align-content` stünde die Abgleichzeile (Flex mit Umbruch) oben und darunter Leere. */
+.aufklappzeile {
+  min-height: var(--trefferflaeche);
+  align-content: center;
+}
 /* Ein Kästchen ohne Text bleibt 16 px gross zu sehen — als 44er Kasten sähe es aus wie
    ein Knopf. Die Fläche liegt deshalb unsichtbar darum. Mit Text trifft man das Label,
    und das trägt oben schon die Mindesthöhe. */
@@ -2173,6 +2181,10 @@ select.field.tabellenfilter {
   }
   .registerleiste-reiter {
     flex-shrink: 1;
+  }
+  .aufklappzeile {
+    min-height: auto;
+    align-content: normal;
   }
   .kaestchen-feld:not(.kaestchen > .kaestchen-feld)::after {
     content: none;
