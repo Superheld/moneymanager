@@ -12,7 +12,7 @@ Fall ergänzen will, entscheidet zuerst, in welche er gehört.
 | **Daten je Test** | im Test selbst, gegen eine frische sql.js-Datenbank (`harness.tsx`) | genau eine Regel prüfen, mit so wenig Daten wie nötig | `npm test` |
 | **Der Spielstand** | `seedDaten.ts`, geschrieben von `npm run seed` | die App ansehen und durchspielen: jeder Bereich hat etwas zu zeigen | `npm run tauri dev`, `npm run vorschau`, `src/seed.test.ts` |
 | **Bestände der Umstellungsprobe** | `src/umstellungsprobe.test.ts` (Bestand A und B) mit `src/umstellungsprobe.erwartet.json` | sichern, dass ein Umbau keinen vergangenen Monat ändert | `npm test` |
-| **Alter Spielstand für eine Migrationsprobe** | wird je Probe aus einer älteren Fassung erzeugt, liegt nicht im Repo | prüfen, dass neue Migrationen einen Bestand im alten Aufbau richtig umbauen (`scripts/migrationsprobe.mjs`) | von Hand, vor einer Version mit Migrationen |
+| **Alter Spielstand für eine Migrationsprobe** | wird je Probe aus einer älteren Fassung erzeugt, liegt nicht im Repo | prüfen, dass neue Migrationen einen Bestand im alten Aufbau richtig umbauen (`scripts/migrationsprobe.mjs`, fährt `migrate()` über `migrationsprobe.ts`) | von Hand, vor einer Version mit Migrationen; dass die Probe migriert wie die App, sichert `migrationsprobe.test.ts` mit einem eigenen kleinen Bestand |
 
 Zwei Regeln dazu:
 

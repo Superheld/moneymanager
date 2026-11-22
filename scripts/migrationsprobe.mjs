@@ -2,31 +2,44 @@
 // Faehrt die Migrationskette gegen eine KOPIE eines Spielstands mit aelterem Schema.
 // Nicht gegen den echten Bestand — siehe CLAUDE.md, „Eine Aenderung machen".
 //
-// WOZU ES DAS GIBT. `npm test` prueft die Migrationen gegen sql.js — und sql.js hat
-// Fremdschluessel standardmaessig AUS, waehrend sqlx sie in der App auf jeder Verbindung
-// EINSCHALTET. Eine Migration kann deshalb gruen sein und in der App scheitern oder still
-// Daten loeschen. Genau das ist beim Umbau auf Fremdschluessel passiert: `DROP TABLE`
-// scheiterte an RESTRICT, und wo CASCADE darauf zeigte, haette es Zeilen mitgenommen.
+//   npx vite-node scripts/migrationsprobe.mjs -- <kopie.db>
 //
-// Der Test kann das nicht finden. Dieses Skript schon.
+// Das Skript liest die Kopie und schreibt nur `<kopie>-migriert.db` daneben, und das nur,
+// wenn die Kette durchlief und die Fremdschluessel sauber sind.
 //
-//   node scripts/migrationsprobe.mjs <kopie.db>
+// WOZU ES DAS GIBT. Ein Bestand im ALTEN Aufbau, mit Daten darin, die die Kette umbauen
+// muss — das hat `npm test` nicht. Dort entsteht jede Datenbank frisch im Zielschema.
 //
-// Das Skript SCHREIBT nur in die Kopie.
+// WIE ES MIGRIERT. Ueber `migrate()` aus `src/adapters/persistence/db.ts`, nicht ueber
+// einen Nachbau — die Arbeit steht in `src/testwerkzeug/migrationsprobe.ts`, dieses
+// Skript ist nur Datei und Ausgabe darum. Bis 2026-11-22 lief hier eine eigene Schleife,
+// und sie wich ab: keine Transaktion je Version, kein Eintrag in `_migration`, kein
+// `-- @wennSpalte`. Ob Skript und App gleich migrieren, prueft
+// `src/testwerkzeug/migrationsprobe.test.ts`.
+//
+// Was die Probe NICHT nachstellt: SQLCipher und die SQLite-Fassung der App. Gefahren wird
+// unter sql.js; was nur an der SQLite-Version haengt, sieht man erst beim App-Start.
 
 import { readFileSync, writeFileSync } from "node:fs";
+import { basename } from "node:path";
 import { createRequire } from "node:module";
-import initSqlJs from "sql.js";
 
 const require = createRequire(import.meta.url);
 const pfad = process.argv[2];
 
 if (!pfad) {
-  console.error("Aufruf: node scripts/migrationsprobe.mjs <kopie.db>");
+  console.error("Aufruf: npx vite-node scripts/migrationsprobe.mjs -- <kopie.db>");
   process.exit(2);
 }
 
-const { MIGRATIONS } = await import("../src/adapters/persistence/migrations.ts").catch(() => {
+// Der echte Bestand ist verschluesselt und waere fuer sql.js ohnehin unlesbar — abgewiesen
+// wird er trotzdem am Namen, bevor irgendetwas geoeffnet wird.
+if (basename(pfad) === "moneymanager.db") {
+  console.error("ABGEWIESEN: `moneymanager.db` ist der echte Bestand. Die Probe faehrt nur Kopien eines Spielstands.");
+  process.exit(2);
+}
+
+const { migrationsprobe } = await import("../src/testwerkzeug/migrationsprobe.ts").catch(() => {
   console.error(
     "Die Migrationen sind TypeScript — dieses Skript ueber vite-node starten:\n" +
       "  npx vite-node scripts/migrationsprobe.mjs -- <kopie.db>",
@@ -34,86 +47,52 @@ const { MIGRATIONS } = await import("../src/adapters/persistence/migrations.ts")
   process.exit(2);
 });
 
+const initSqlJs = (await import("sql.js")).default;
 const SQL = await initSqlJs({ locateFile: () => require.resolve("sql.js/dist/sql-wasm.wasm") });
-const db = new SQL.Database(readFileSync(pfad));
 
-// Waehrend des Umbaus AUS — wie die Schemasitzung es in der App tut, bevor `migrate()` beginnt.
-db.run("PRAGMA foreign_keys = OFF");
-
-const zahl = (sql) => {
-  try {
-    const r = db.exec(sql);
-    return r.length ? Number(r[0].values[0][0]) : 0;
-  } catch {
-    return null;
-  }
-};
-
-const tabellen = () =>
-  db
-    .exec("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")[0]
-    .values.map((z) => String(z[0]));
-
-const vorher = Object.fromEntries(tabellen().map((t) => [t, zahl(`SELECT COUNT(*) FROM ${t}`)]));
-const stand = zahl("SELECT COALESCE(MAX(version),0) FROM _migration");
-console.log(`Stand vor der Migration: v${stand}`);
-
-const bedingung = (sql) => sql.match(/^\s*--\s*@wennTabelle\s+(\w+)/i)?.[1];
-const hatTabelle = (n) =>
-  db.exec(`SELECT name FROM sqlite_master WHERE type='table' AND name='${n}'`).length > 0;
-const zugang = (sql) => sql.match(/^\s*ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(\w+)/i);
-const abgang = (sql) => sql.match(/^\s*ALTER\s+TABLE\s+(\w+)\s+DROP\s+COLUMN\s+(\w+)/i);
-const hatSpalte = (t, s) => {
-  const r = db.exec(`PRAGMA table_info(${t})`);
-  return r.length > 0 && r[0].values.some((z) => String(z[1]) === s);
-};
-
-let gelaufen = 0;
-for (const m of MIGRATIONS) {
-  if (m.version <= stand) continue;
-  for (const sql of m.sql) {
-    const noetig = bedingung(sql);
-    if (noetig && !hatTabelle(noetig)) continue;
-    const dazu = zugang(sql);
-    if (dazu && hatSpalte(dazu[1], dazu[2])) continue;
-    const weg = abgang(sql);
-    if (weg && !hatSpalte(weg[1], weg[2])) continue;
-    try {
-      db.run(sql);
-    } catch (e) {
-      console.error(`\nFEHLER in v${m.version}: ${e.message}`);
-      console.error(sql.slice(0, 300));
-      process.exit(1);
-    }
-  }
-  console.log(`v${m.version} ok`);
-  gelaufen++;
+let ergebnis;
+try {
+  ergebnis = await migrationsprobe(SQL, readFileSync(pfad));
+} catch (e) {
+  console.error(
+    `Die Datei laesst sich nicht lesen: ${e.message}\n` +
+      "Ein Spielstand, den die App geoeffnet hat, ist verschluesselt — sql.js liest ihn nicht.",
+  );
+  process.exit(2);
 }
 
-if (gelaufen === 0) console.log("Nichts zu tun — die Kopie ist auf dem letzten Stand.");
+console.log(`Stand vor der Migration: v${ergebnis.standVorher}`);
+console.log(
+  ergebnis.standNachher === ergebnis.standVorher
+    ? "Nichts gelaufen."
+    : `Stand nach der Migration: v${ergebnis.standNachher}`,
+);
 
-// Was die Kette hinterlassen hat. Ausgegeben wird die VERAENDERUNG, nicht der Bestand:
-// Zahlen aus der echten Datenbank gehoeren nicht in eine Ausgabe, die irgendwo landet.
-console.log("\nZeilen je Tabelle:");
-for (const t of tabellen()) {
-  const jetzt = zahl(`SELECT COUNT(*) FROM ${t}`);
-  const alt = vorher[t];
-  if (alt === undefined) console.log(`  ${t}: neu angelegt`);
-  else if (alt !== jetzt) console.log(`  ${t}: VERAENDERT (${jetzt > alt ? "mehr" : "weniger"})`);
-}
-for (const t of Object.keys(vorher)) {
-  if (!tabellen().includes(t)) console.log(`  ${t}: abgeraeumt`);
+// Ausgegeben wird die VERAENDERUNG, nicht der Bestand: Zahlen aus einer Datenbank gehoeren
+// nicht in eine Ausgabe, die irgendwo landet.
+if (ergebnis.veraendert.length) {
+  console.log("\nZeilen je Tabelle:");
+  for (const { tabelle, veraenderung } of ergebnis.veraendert) console.log(`  ${tabelle}: ${veraenderung}`);
 }
 
-db.run("PRAGMA foreign_keys = ON");
-const fk = db.exec("PRAGMA foreign_key_check");
-console.log(`\nFremdschluessel-Pruefung: ${fk.length === 0 ? "sauber" : "VERLETZT"}`);
-if (fk.length) {
-  console.log(fk[0].values.slice(0, 10));
+if (ergebnis.verletzt.length) {
+  console.log("\nFremdschluessel VERLETZT (Tabelle -> Ziel):");
+  for (const { tabelle, ziel } of ergebnis.verletzt.slice(0, 10)) console.log(`  ${tabelle} -> ${ziel}`);
+}
+
+if (ergebnis.fehler) {
+  console.error(`\nFEHLER: ${ergebnis.fehler}`);
   process.exit(1);
 }
 
-const ziel = pfad.replace(/\.db$/, "-migriert.db");
-writeFileSync(ziel, Buffer.from(db.export()));
+// `migrate()` prueft nur, wenn eine Version lief — die Probe prueft immer. Ein Verstoss,
+// den die App bei diesem Stand nicht melden wuerde, ist trotzdem einer.
+if (ergebnis.verletzt.length) {
+  console.error("\nFEHLER: Fremdschluessel verletzt, obwohl keine Version lief — der Widerspruch lag schon in der Kopie.");
+  process.exit(1);
+}
+
+console.log("\nFremdschluessel-Pruefung: sauber");
+const ziel = pfad.replace(/\.db$/, "") + "-migriert.db";
+writeFileSync(ziel, Buffer.from(ergebnis.daten));
 console.log(`Migrierte Fassung: ${ziel}`);
-db.close();
