@@ -1087,6 +1087,7 @@ const de = {
     kpiDeckung: "Deckungsgrad",
     erklaerung:
       "Eine Rücklage hängt an einer <b>Kategorie</b>: was dort ausgegeben wird, trägt sie von selbst. Sie <b>läuft weiter</b> (Reparaturen) oder <b>wird abgeschlossen</b> (Urlaub, ein Gerät). Ihre Rate ergibt sich aus einem <b>Ziel mit Frist</b> oder ist eine <b>freie Rate</b>. Nennst du das Konto, auf dem das Geld liegt, wird die Rechnung gegen den <b>echten Kontostand</b> abgeglichen.",
+    erklaerungFrage: "Wie funktioniert eine Rücklage?",
     leer: "Noch keine Rücklagen. Leg deine erste an.",
     leerErklaerung: "Hierher gehört, was sicher kommt, aber nicht jeden Monat: Urlaub, das nächste Auto, eine neue Waschmaschine. Legst du jeden Monat einen Teil zurück, trifft dich die Ausgabe nicht auf einmal.",
     leerMitVorschlaegen: "Weiter unten stehen Vorschläge aus deinen bisherigen Ausgaben. Übernimm einen oder leg selbst eine Rücklage an.",
@@ -3722,6 +3723,7 @@ const en: typeof de = {
     kpiDeckung: "Coverage",
     erklaerung:
       "A reserve is attached to a <b>category</b>: whatever is spent there, it carries on its own. It <b>keeps running</b> (repairs) or <b>is closed</b> (a holiday, an appliance). Its rate follows from a <b>target with a deadline</b> or is a <b>free rate</b>. Name the account the money sits on and the calculation is reconciled against the <b>real account balance</b>.",
+    erklaerungFrage: "How does a reserve work?",
     leer: "No reserves yet. Add your first one.",
     leerErklaerung: "This is for what is sure to come, just not every month: a holiday, the next car, a new washing machine. Put a part aside every month and the expense does not hit you all at once.",
     leerMitVorschlaegen: "Further down are suggestions from what you have spent so far. Take one or create a reserve yourself.",

@@ -52,6 +52,8 @@ import { Umschalter } from "../bausteine/Umschalter";
 import { Toggle } from "@base-ui/react/toggle";
 import { Button as BaseButton } from "@base-ui/react/button";
 import { fehlerMelden } from "../bausteine/Meldungen";
+import { useSchmal } from "../bausteine/useSchmal";
+import { SchmalKlappblock } from "../bausteine/SchmalKlappblock";
 
 /** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
 const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
@@ -235,24 +237,40 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
 
 
 
-  return (
-    <div className="screen">
-      {/* Ohne Untertitel, und das ist eine Entscheidung: „Kontostände, gebuchte und
-          voraussichtliche Buchungen je Konto" sagte genau das, was man sieht. Was hier
-          eine AUSSAGE trägt, steht an der Karte, wo es hingehört — „Anfangsbestand +
-          bestätigte Ist-Buchungen = realer Stand". */}
-      <PageHead title={t("konten.titel")} />
+  /**
+   * Schmal (unter 700 px) steht oben das gewählte Konto und darunter sein Gebuchtes
+   * (seit 2026-11-22). Die Kontenliste rückt ans Ende und klappt ein; gewählt wird oben
+   * über ein Auswahlfeld im Kopf des Auszugs, der „Abrufen" mitnimmt. Vorher kamen erst
+   * die ganze Liste, dann der Kopf, dann die Buchungen — bis zur ersten Buchung rund drei
+   * Bildschirme. Breit ändert sich nichts.
+   *
+   * `useSchmal` statt CSS, weil sich das Markup ändert (Auswahlfeld statt Name, Liste
+   * eingeklappt). Ohne ein Konto bleibt die Liste oben und offen: sie trägt dann den
+   * leeren Zustand mit seinen Wegen. Geprüft in `schmal.test.tsx`.
+   */
+  const schmal = useSchmal();
+  const listeUnten = schmal && kontozeilen.length > 0;
+  /** Nur zeigen, wenn es überhaupt etwas abzurufen gibt — ein Knopf, der nichts tun kann, ist eine Frage an den Nutzer statt einer Antwort. */
+  const abrufKnopf = kontozeilen.some((z) => z.online) && (
+    <Button variant="primary" onClick={() => setAbruf(true)}>{t("konten.abrufen")}</Button>
+  );
+  const belegungKarte = aktiv && belegung?.jeKonto.get(aktiv.id) && (
+    <BelegungKarte
+      belegung={belegung.jeKonto.get(aktiv.id)!}
+      namen={belegung.namen}
+      konto={aktiv.bezeichnung}
+    />
+  );
 
+  const kontenKarte = (
       <Card
         title={t("konten.deineKonten")}
         subtitle={t("konten.deineKontenUntertitel")}
         action={
           <span style={{ display: "flex", gap: "var(--sp-2)" }}>
-            {/* Nur zeigen, wenn es überhaupt etwas abzurufen gibt — ein Knopf, der
-                nichts tun kann, ist eine Frage an den Nutzer statt einer Antwort. */}
-            {kontozeilen.some((z) => z.online) && (
-              <Button variant="primary" onClick={() => setAbruf(true)}>{t("konten.abrufen")}</Button>
-            )}
+            {/* Schmal steht „Abrufen" im Kopf des Auszugs, oben — hier unten fände ihn
+                niemand. */}
+            {!listeUnten && abrufKnopf}
             <Button plus onClick={() => onNavigate("kontenverwaltung")}>{t("konten.kontoAnlegen")}</Button>
           </span>
         }
@@ -343,14 +361,19 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
           />
         )}
       </Card>
+  );
 
-      {aktiv && belegung?.jeKonto.get(aktiv.id) && (
-        <BelegungKarte
-          belegung={belegung.jeKonto.get(aktiv.id)!}
-          namen={belegung.namen}
-          konto={aktiv.bezeichnung}
-        />
-      )}
+  return (
+    <div className="screen">
+      {/* Ohne Untertitel, und das ist eine Entscheidung: „Kontostände, gebuchte und
+          voraussichtliche Buchungen je Konto" sagte genau das, was man sieht. Was hier
+          eine AUSSAGE trägt, steht an der Karte, wo es hingehört — „Anfangsbestand +
+          bestätigte Ist-Buchungen = realer Stand". */}
+      <PageHead title={t("konten.titel")} />
+
+      {!listeUnten && kontenKarte}
+
+      {!schmal && belegungKarte}
 
 
       {abruf && (
@@ -362,36 +385,65 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
 
       {/* Ein Depot-Konto bekommt den Bestand statt des Auszugs: es hat keine Bewegungen,
           und die gewohnte Liste stünde dauerhaft leer. */}
-      {aktiv && aktivZeile?.depot && <DepotAuszug konto={aktiv} sicht={aktivZeile.depot} />}
+      {!schmal && aktiv && aktivZeile?.depot && <DepotAuszug konto={aktiv} sicht={aktivZeile.depot} />}
 
-      {aktiv && register && !aktivZeile?.depot && (
+      {/* Schmal steht der Kopf auch über einem Depot: er trägt dort das Auswahlfeld, ohne
+          das man von einem Depot nicht mehr wegkäme (die Liste liegt eingeklappt unten). */}
+      {aktiv && register && (!aktivZeile?.depot || schmal) && (
         // Kein eigener Rand oben: `.screen` setzt den Kartenabstand. Mit ihm standen über
         // dieser Karte 32 px und darunter 16 — am Bildschirmvergleich gefunden.
         <Card pad>
           {/* Statement-Masthead: wessen Auszug, welcher reale Stand */}
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--sp-4)", flexWrap: "wrap", marginBottom: "var(--sp-4)" }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                <span style={{ fontSize: "var(--fs-h3)", fontWeight: "var(--fw-bold)", letterSpacing: "var(--ls-h)" }}>{aktiv.bezeichnung}</span>
-                <Pill variant="neutral">{t(`konten.typ.${aktiv.typ}`)}</Pill>
-              </div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: "var(--sp-3)", marginTop: 8 }}>
-                <span className="num" style={{ fontSize: "var(--fs-h1)", fontWeight: "var(--fw-black)", letterSpacing: "var(--ls-tight)", lineHeight: 1, color: register.standHeute < 0 ? "var(--warn-deep)" : "var(--ink)" }}>
-                  {geld.formatMitSymbol(register.standHeute)}
-                </span>
-                <span style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)" }}>{t("konten.realerStandLabel")}</span>
-              </div>
-              {/* Woraus die grosse Zahl darüber besteht — ausgeschrieben statt als
-                  „Anfangsbestand X · Σ Ist Y". Die alte Fassung nannte
-                  zwei Zahlen und verschwieg, dass sie zusammen genau den Stand darüber
-                  ergeben; „Σ Ist" hiess dabei nichts, was ausserhalb des Codes jemand
-                  wissen konnte. */}
-              <div className="hinweis" style={{ marginTop: 6 }}>
-                {t("konten.standHerkunft", {
-                  anfang: geld.formatMitSymbol(aktiv.saldo),
-                  bewegung: geld.formatMitSymbol(aktivZeile?.bewegungen ?? 0, { mitVorzeichen: true }),
-                })}
-              </div>
+            <div style={{ minWidth: 0, flex: schmal ? "1 1 100%" : undefined }}>
+              {schmal ? (
+                // Schmal wählt man das Konto hier — die Liste liegt eingeklappt unten.
+                // Der Typ steht dort in seiner Spalte.
+                <Auswahl
+                  ariaLabel={t("konten.detail.konto")}
+                  wert={aktivId}
+                  aufAenderung={setAktivId}
+                  optionen={kontozeilen.map((z) => ({ wert: z.konto.id, text: z.konto.bezeichnung }))}
+                />
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                  <span style={{ fontSize: "var(--fs-h3)", fontWeight: "var(--fw-bold)", letterSpacing: "var(--ls-h)" }}>{aktiv.bezeichnung}</span>
+                  <Pill variant="neutral">{t(`konten.typ.${aktiv.typ}`)}</Pill>
+                </div>
+              )}
+              {aktivZeile?.depot ? (
+                // Nur schmal: ein Depot hat keine Buchungen, sein Stand ist der zuletzt
+                // gemeldete Wert — wie in der Spalte „realer Stand" der Liste.
+                <div style={{ marginTop: 8 }}>
+                  <span
+                    className="num"
+                    style={{ fontSize: "var(--fs-h1)", fontWeight: "var(--fw-black)", letterSpacing: "var(--ls-tight)", lineHeight: 1 }}
+                    title={t("depot.standErklaerung", { datum: aktivZeile.depot.aktuell ? datum.mitJahr(aktivZeile.depot.aktuell.stichtag) : "—" })}
+                  >
+                    {aktivZeile.depot.aktuell ? geld.formatMitSymbol(aktivZeile.depot.aktuell.gesamtwert) : "—"}
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: "var(--sp-3)", marginTop: 8 }}>
+                    <span className="num" style={{ fontSize: "var(--fs-h1)", fontWeight: "var(--fw-black)", letterSpacing: "var(--ls-tight)", lineHeight: 1, color: register.standHeute < 0 ? "var(--warn-deep)" : "var(--ink)" }}>
+                      {geld.formatMitSymbol(register.standHeute)}
+                    </span>
+                    <span style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)" }}>{t("konten.realerStandLabel")}</span>
+                  </div>
+                  {/* Woraus die grosse Zahl darüber besteht — ausgeschrieben statt als
+                      „Anfangsbestand X · Σ Ist Y". Die alte Fassung nannte
+                      zwei Zahlen und verschwieg, dass sie zusammen genau den Stand darüber
+                      ergeben; „Σ Ist" hiess dabei nichts, was ausserhalb des Codes jemand
+                      wissen konnte. */}
+                  <div className="hinweis" style={{ marginTop: 6 }}>
+                    {t("konten.standHerkunft", {
+                      anfang: geld.formatMitSymbol(aktiv.saldo),
+                      bewegung: geld.formatMitSymbol(aktivZeile?.bewegungen ?? 0, { mitVorzeichen: true }),
+                    })}
+                  </div>
+                </>
+              )}
 
               {/* Der Abgleich gegen eine unabhängige Quelle. Ohne ihn ist der Stand oben
                   nur in sich schlüssig — er kann vollständig aussehen und trotzdem eine
@@ -425,7 +477,13 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
               )}
 
             </div>
-            <span style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center" }}>
+            <span style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
+              {/* Schmal hier statt im Kopf der Liste, die eingeklappt unten liegt. Gefüllt
+                  nur, wenn das gewählte Konto selbst abgerufen wird — sonst ist „Buchung"
+                  daneben der Hauptknopf. */}
+              {listeUnten && kontozeilen.some((z) => z.online) && (
+                <Button variant={aktivZeile?.online ? "primary" : undefined} onClick={() => setAbruf(true)}>{t("konten.abrufen")}</Button>
+              )}
               {/* Umbuchen legt ZWEI neue Buchungen an — beide müssen auf Konten landen,
                   die von Hand geführt werden. Für die Gegenseite einer Bank-Abhebung gibt
                   es den anderen Weg: im Detail der abgerufenen Zeile das Gegenbein
@@ -450,6 +508,8 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
           {fehler && <div className="err" style={{ marginTop: 10 }}>{fehler}</div>}
         </Card>
       )}
+
+      {schmal && aktiv && aktivZeile?.depot && <DepotAuszug konto={aktiv} sicht={aktivZeile.depot} />}
 
       {/* Das Gebuchte steht in einer EIGENEN Karte und nimmt die ganze Breite.
 
@@ -767,6 +827,15 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
             />
           )}
         </Card>
+      )}
+
+      {/* Schmal nach dem Gebuchten: was auf dem gewählten Konto gebunden ist, und die
+          Liste aller Konten — eingeklappt, mit ihren Spalten wie breit. */}
+      {schmal && belegungKarte}
+      {listeUnten && (
+        <SchmalKlappblock titel={t("konten.deineKonten")} zusatz={`(${kontozeilen.length})`}>
+          {kontenKarte}
+        </SchmalKlappblock>
       )}
 
       {/* Anlegen und Bearbeiten sind derselbe Dialog: ohne `buchung` legt er eine neue an,

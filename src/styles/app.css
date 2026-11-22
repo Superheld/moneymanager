@@ -1482,6 +1482,59 @@ select.field.tabellenfilter {
   white-space: nowrap;
 }
 
+/* --- Schmal eingeklappt: was in Buchungen und Rücklagen unter die Arbeit rückt ---
+   (bausteine/SchmalKlappblock.tsx). Nur schmal gerendert, deshalb ohne Medienabfrage.
+   Darin stehen Karten; sie halten untereinander denselben Abstand wie auf der Seite.
+   Folgen mehrere Zeilen aufeinander, trennt sie die Linie von `.abschnitt` — der
+   Kartenabstand der Seite darüber käme doppelt, deshalb hier ohne eigenen Rand oben. */
+.screen > .abschnitt {
+  margin-top: 0;
+  padding-top: var(--sp-2);
+}
+/* Auf der Seite ist die Zeile die Überschrift dessen, was darunter aufgeht, und keine
+   Nebenaktion wie im Dialog: über die ganze Breite (der Finger trifft sie überall),
+   linksbündig auch beim Umbruch, und in der Farbe des Fliesstexts statt gedämpft. */
+.screen > .abschnitt > .btn--link {
+  display: block;
+  width: 100%;
+  padding-inline: 0;
+  text-align: left;
+  color: var(--ink-2);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semi);
+}
+.schmal-klappblock-inhalt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-card);
+  padding-top: var(--sp-2);
+}
+
+/* Rücklagen schmal: je Rücklage eine Zeile mit Name, Stand und Balken; die ganze Zeile
+   ist der Knopf (ruecklagen/RuecklagenScreen.tsx, Liste `.ruecklagen-liste`). Die Mindesthöhe trägt
+   `.aufklappzeile` unten bei den Trefferflächen. */
+.ruecklagen-liste .aufklappzeile {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ruecklage-kurz-kopf {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp-3);
+}
+.ruecklage-kurz-kopf > b {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 /* --- Monatsausblick: drei Karten im goldenen Schnitt ---
    Der laufende Monat trägt eine Zahlenspalte mehr und bekommt die breite Seite
    (38,2 %); die beiden Vorschauen teilen sich den Rest. Eine hälftige Aufteilung
@@ -2203,7 +2256,7 @@ select.field.tabellenfilter {
 }
 /* Eine Zeile, die aufklappt, ist selbst das Bedienteil — und kein Baustein, sondern je
    Bereich gebaut: die Zeilen der Monatskarten in der Übersicht (40 px) und die Kopfzeile
-   je Konto im Abgleich (23 px). Der Inhalt rückt in die Mitte der gewonnenen Höhe; ohne
+   je Konto im Abgleich (23 px), schmal dazu die Zeile je Rücklage. Der Inhalt rückt in die Mitte der gewonnenen Höhe; ohne
    `align-content` stünde die Abgleichzeile (Flex mit Umbruch) oben und darunter Leere. */
 .aufklappzeile {
   min-height: var(--trefferflaeche);

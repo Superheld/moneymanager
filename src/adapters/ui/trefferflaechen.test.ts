@@ -110,6 +110,7 @@ const BEDIENTEILE: [datei: string, klasse: string, auchBreite: boolean][] = [
 const AUFKLAPPZEILEN: [datei: string, klasse: string][] = [
   ["uebersicht/ErgebnisKarten.tsx", "aufklappzeile"],
   ["kontenverwaltung/AbgleichBereich.tsx", "aufklappzeile"],
+  ["ruecklagen/RuecklagenScreen.tsx", "aufklappzeile"],
 ];
 
 /** Felder, die den Fokus bekommen und tippen oder wählen lassen. */
