@@ -692,8 +692,9 @@ und ist keine Quelle mehr. Was an seine Stelle tritt, ist offen.
   ist Absicht: sonst müsste OpenSSL aus dem System kommen, und dort ist es auf einem
   frischen Rechner und in einem CI-Läufer nicht.
 - **cargo-deny vor `cargo update`:** ein gezieltes `cargo update -p <kiste>` ist der Weg,
-  eine Meldung zu beheben — blind über den ganzen Baum ist es der Weg, den brotli-Pin
-  unten zu verlieren. Danach `npm run test:rust`.
+  eine Meldung zu beheben — es hebt die Kiste und nur das, was sie zwingend mitzieht.
+  Blind über den ganzen Baum bewegt es Dutzende Kisten, die niemand angesehen hat, und
+  eine Meldung lässt sich danach keiner Ursache mehr zuordnen. Danach `npm run test:rust`.
 - **Eine Freigabe in `deny.toml` ist eine Wiedervorlage, kein Abschluss.** Es gibt zwei
   Sorten, und nur eine meldet sich selbst: verschwindet die betroffene Kiste aus dem Baum,
   nennt cargo-deny die Freigabe unnötig. Bleibt die Kiste und erscheint nur eine
@@ -702,7 +703,18 @@ und ist keine Quelle mehr. Was an seine Stelle tritt, ist offen.
   die `ignore`-Liste durch und prüft jede Zeile, die mit `WIEDERVORLAGE` markiert ist,
   gegen ihr Advisory. Wer eine solche Freigabe neu einträgt, schreibt die Bedingung
   daneben, unter der sie fällt.
-- **brotli / rustc:** Tauri zieht `brotli 8.0.3`, das via `alloc-stdlib 0.2.3`
-  `alloc-no-stdlib 3.0.0` einbindet, selbst aber `alloc-no-stdlib 2.0.4` nutzt →
-  Trait-Konflikt (`StandardAlloc` implementiert `Allocator` nicht). In `Cargo.lock` gepinnt:
-  `alloc-stdlib = 0.2.2`. Lockfile committen, nicht blind `cargo update` laufen lassen.
+- **Rust- und JS-Seite von Tauri heben zusammen.** Die CLI verlangt dieselbe Haupt- und
+  Nebenversion zwischen einer Kiste und ihrem npm-Paket (`tauri` ↔ `@tauri-apps/api`,
+  `tauri-plugin-updater` ↔ `@tauri-apps/plugin-updater` usw.) und bricht den Build sonst
+  ab („Found version mismatched Tauri packages"). `--ignore-version-mismatches` schaltet
+  das ab und ist nicht der Weg: dann reden zwei Fassungen derselben Schnittstelle
+  miteinander. Wer eine Seite hebt, hebt die andere im selben Branch, gezielt mit
+  `npm install <paket>@<version>`.
+- **`brotli` ist nicht mehr gepinnt.** Unter Tauri 2.11 zog `brotli 8.0.3` über
+  `alloc-stdlib 0.2.3` ein `alloc-no-stdlib 3.0.0`, nutzte selbst aber 2.0.4 — zwei
+  Fassungen desselben Traits, und der Build brach ab („`StandardAlloc` implementiert
+  `Allocator` nicht"). Dagegen stand `alloc-stdlib = 0.2.2` fest im Lockfile. Seit Tauri
+  2.12 kommt `brotli 9`, und das bindet `alloc-stdlib 0.3` und `alloc-no-stdlib 3` selbst
+  in zueinander passenden Fassungen; der Pin hat keinen Gegenstand mehr. Taucht der
+  Fehler wieder auf, steht in `Cargo.lock` mehr als ein `alloc-no-stdlib` — dort zuerst
+  nachsehen.
