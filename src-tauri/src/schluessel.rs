@@ -244,7 +244,7 @@ fn einwickeln_mit(
     let mut schluessel = kek(passphrase, salz, &angaben)?;
     let aead = XChaCha20Poly1305::new((&schluessel).into());
     let geheimtext = aead
-        .encrypt(XNonce::from_slice(nonce), dk.0.as_slice())
+        .encrypt(&XNonce::from(*nonce), dk.0.as_slice())
         .map_err(|_| SchluesselFehler::HuelleKaputt)?;
     schluessel.zeroize();
 
@@ -270,14 +270,13 @@ pub fn auswickeln(huelle: &Huelle, passphrase: &str) -> Result<Datenschluessel, 
     let geheimtext = BASE64
         .decode(huelle.geheimtext.as_bytes())
         .map_err(|_| SchluesselFehler::HuelleKaputt)?;
-    if nonce.len() != NONCE_BYTES {
-        return Err(SchluesselFehler::HuelleKaputt);
-    }
+    // Eine Nonce falscher Laenge faellt hier auf, VOR der teuren Ableitung.
+    let nonce = XNonce::try_from(nonce.as_slice()).map_err(|_| SchluesselFehler::HuelleKaputt)?;
 
     let mut schluessel = kek(passphrase, &salz, &huelle.kdf)?;
     let aead = XChaCha20Poly1305::new((&schluessel).into());
     let klartext = aead
-        .decrypt(XNonce::from_slice(&nonce), geheimtext.as_slice())
+        .decrypt(&nonce, geheimtext.as_slice())
         // Ab hier ist nicht mehr unterscheidbar, ob die Passphrase falsch war oder jemand
         // an der Datei gedreht hat. Das ist Absicht: Poly1305 prueft beides in einem, und
         // zwei verschiedene Meldungen waeren ein Orakel.
@@ -308,7 +307,9 @@ mod tests {
         let aead = XChaCha20Poly1305::new((&k).into());
         let nonce = BASE64.decode(h.nonce.as_bytes()).unwrap();
         h.geheimtext = BASE64.encode(
-            &aead.encrypt(XNonce::from_slice(&nonce), dk.bytes().as_slice()).unwrap(),
+            &aead
+                .encrypt(&XNonce::try_from(nonce.as_slice()).unwrap(), dk.bytes().as_slice())
+                .unwrap(),
         );
         k.zeroize();
         h
@@ -395,6 +396,16 @@ mod tests {
         for h in [speicher, durchgaenge, spuren, verfahren] {
             assert_eq!(auswickeln(&h, "kennwort").unwrap_err(), SchluesselFehler::HuelleKaputt);
         }
+    }
+
+    #[test]
+    fn eine_nonce_falscher_laenge_ist_eine_kaputte_huelle() {
+        let dk = Datenschluessel::wuerfeln();
+        let mut h = schnelle_huelle(&dk, "kennwort");
+        // 12 Byte: die Nonce von ChaCha20 ohne X. Wer sie unterschiebt, bekommt keinen
+        // Absturz und keinen Versuch, sondern eine Absage.
+        h.nonce = BASE64.encode(&[0u8; 12]);
+        assert_eq!(auswickeln(&h, "kennwort").unwrap_err(), SchluesselFehler::HuelleKaputt);
     }
 
     #[test]
