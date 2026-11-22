@@ -164,6 +164,12 @@ export interface AbrufDeps {
    */
   readonly depotRepo?: DepotRepository;
   /**
+   * Zu welchem Vorsorgeziel ein neu abgerufenes Depot zählt — hereingereicht wie die
+   * Kategorisierung: der Abruf kennt den Bereich Vermögen nicht (siehe
+   * `DepotUebernahmeDeps.vorgabeVorsorgeziel`).
+   */
+  readonly vorgabeVorsorgeziel?: () => Promise<string | undefined>;
+  /**
    * Wie viele Tage zurück geholt werden soll — überschreibt den fortlaufenden Stand.
    *
    * Der Normalfall ist der Rückgriff auf `letzterAbrufBis`; er hält den Abruf klein. Wer
@@ -523,6 +529,7 @@ export async function abrufAusfuehren(
         }
         const uebernahme = await depotUebernehmen(zugang.id, bankkonto, bestand, {
           depotRepo: deps.depotRepo,
+          vorgabeVorsorgeziel: deps.vorgabeVorsorgeziel,
           id: deps.id,
           jetzt: new Date().toISOString(),
         });

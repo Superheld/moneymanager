@@ -10,7 +10,10 @@
 
 import {
   addMonate,
+  beobachtungAm,
   ersteBeobachtung,
+  istAktiv,
+  istVorsorgekonto,
   nettovermoegen,
   nettovermoegenVerlauf,
   parseIso,
@@ -18,6 +21,8 @@ import {
   toIso,
   wirdGefuehrt,
   type Cent,
+  type Depot,
+  type Kontoklasse,
   type Nettovermoegen,
   type Verbindlichkeit,
   type VermoegensEingabe,
@@ -80,6 +85,30 @@ export interface Schuldzeile {
   readonly tilgungImMonat?: Cent;
 }
 
+/** Ein Zahlungskonto, wie es am Depot steht oder zur Wahl als Verrechnungskonto. */
+export interface Verrechnungskontozeile {
+  readonly id: string;
+  readonly bezeichnung: string;
+  readonly klasse: Kontoklasse;
+  /** Der Stand heute — derselbe, mit dem es in der Kontensumme steht. */
+  readonly stand: Cent;
+  /**
+   * Zählt es zur Vorsorge? Über seine Klasse (`istVorsorgekonto`) und nur darüber: dass
+   * es an einem Depot hängt, ändert daran nichts.
+   */
+  readonly zaehltZurVorsorge: boolean;
+}
+
+export interface Depotzeile {
+  readonly depot: Depot;
+  /** Der jüngste Depotwert bis heute. Fehlt, solange nie abgerufen wurde. */
+  readonly aktuell?: Beobachtungszeile;
+  /** Das gewählte Verrechnungskonto, wenn es das Konto noch gibt. */
+  readonly verrechnungskonto?: Verrechnungskontozeile;
+  /** Depotwert plus Stand des Verrechnungskontos — was an diesem Depot zusammen liegt. */
+  readonly summe: Cent;
+}
+
 export interface Vermoegenssicht {
   /** Der Stand von `heute`. */
   readonly netto: Nettovermoegen;
@@ -93,6 +122,14 @@ export interface Vermoegenssicht {
   readonly schulden: readonly Schuldzeile[];
   /** Die Verträge, die die Maske einer Schuld zur Wahl stellt. */
   readonly vertraege: readonly { readonly id: string; readonly name: string }[];
+  /** Die abgerufenen Depots, je mit ihrem Verrechnungskonto. */
+  readonly depots: readonly Depotzeile[];
+  /**
+   * Was die Maske eines Depots als Verrechnungskonto zur Wahl stellt: die geführten
+   * Konten, ohne die, deren Stand ein Depot IST (siehe `vermoegensbestandLaden`) — sie
+   * stehen hier schon als Depot.
+   */
+  readonly kontenZurWahl: readonly Verrechnungskontozeile[];
 }
 
 /** So weit reicht der Verlauf höchstens zurück — zehn Jahre in Monatsschritten. */
@@ -134,7 +171,7 @@ export async function vermoegensbestandLaden(deps: VermoegensbestandDeps): Promi
   );
   const konten = alleKonten.filter((k) => !mitDepot.has(k.id));
 
-  return { konten, buchungen, depotwerte, gegenstaende, werte, verbindlichkeiten, staende };
+  return { konten, buchungen, depots, depotwerte, gegenstaende, werte, verbindlichkeiten, staende };
 }
 
 export async function vermoegenLaden(deps: VermoegenDeps, heute: string): Promise<Vermoegenssicht> {
@@ -149,6 +186,40 @@ export async function vermoegenLaden(deps: VermoegenDeps, heute: string): Promis
   }
 
   const gegenstandName = new Map(gegenstaende.map((g) => [g.id, g.bezeichnung]));
+
+  // Der Stand eines Kontos über `nettovermoegen` selbst, mit nur diesem Konto: dieselbe
+  // Zahl, mit der es oben in „Konten" steckt, ohne eine zweite Saldenrechnung.
+  const kontozeile = (k: (typeof eingabe.konten)[number]): Verrechnungskontozeile => ({
+    id: k.id,
+    bezeichnung: k.bezeichnung,
+    klasse: k.klasse,
+    stand: nettovermoegen(
+      { ...eingabe, konten: [k], depots: [], depotwerte: [], gegenstaende: [], verbindlichkeiten: [] },
+      heute,
+    ).konten,
+    zaehltZurVorsorge: istVorsorgekonto(k),
+  });
+  const kontoNach = new Map(eingabe.konten.map((k) => [k.id, k]));
+  const depots: Depotzeile[] = eingabe.depots.map((depot) => {
+    const wert = beobachtungAm(
+      eingabe.depotwerte.filter((w) => w.depotId === depot.id),
+      heute,
+    );
+    const konto = depot.verrechnungskontoId ? kontoNach.get(depot.verrechnungskontoId) : undefined;
+    const verrechnungskonto = konto ? kontozeile(konto) : undefined;
+    return {
+      depot,
+      aktuell: wert ? { stichtag: wert.stichtag, betrag: wert.gesamtwert } : undefined,
+      verrechnungskonto,
+      summe: (wert?.gesamtwert ?? 0) + (verrechnungskonto?.stand ?? 0),
+    };
+  });
+  // Ein stillgelegtes Konto bleibt wählbar, solange es schon gewählt ist — sonst stünde
+  // in der Maske eine Wahl, die die Liste nicht kennt.
+  const gewaehlt = new Set(eingabe.depots.map((d) => d.verrechnungskontoId));
+  const kontenZurWahl = eingabe.konten
+    .filter((k) => istAktiv(k) || gewaehlt.has(k.id))
+    .map(kontozeile);
   const vertragName = new Map(vertraege.map((v) => [v.id, v.anbieter]));
 
   return {
@@ -188,5 +259,7 @@ export async function vermoegenLaden(deps: VermoegenDeps, heute: string): Promis
     vertraege: vertraege
       .map((v) => ({ id: v.id, name: v.anbieter }))
       .sort((a, b) => a.name.localeCompare(b.name)),
+    depots,
+    kontenZurWahl,
   };
 }

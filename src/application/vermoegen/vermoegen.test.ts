@@ -17,6 +17,7 @@ import {
 } from "../../core";
 import type { DepotRepository, LedgerPort, VermoegenRepository, VertragRepository, ZahlungskontoRepository } from "../ports";
 import {
+  depotAendern,
   restschuldEintragen,
   restschuldEntfernen,
   schuldAendern,
@@ -408,5 +409,75 @@ describe("vermoegenLaden", () => {
     const sicht = await vermoegenLaden(deps, HEUTE);
     expect(sicht.verlauf).toHaveLength(120);
     expect(sicht.verlauf[0].stichtag).toBe("2016-07-31");
+  });
+
+  it("zeigt je Depot den Depotwert, sein Verrechnungskonto und die Summe", async () => {
+    const verrechnung: Zahlungskonto = {
+      id: "vk", bezeichnung: "Verrechnung", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 300_00,
+    };
+    const depotkonto: Zahlungskonto = {
+      id: "dk", bezeichnung: "Depotkonto", typ: "Depot", klasse: "investment", inhaberIds: [], saldo: 0,
+    };
+    const alt: Zahlungskonto = { ...giro, id: "alt", bezeichnung: "Alt", aktiv: false };
+    const { deps } = sichtDeps({
+      konten: [giro, verrechnung, depotkonto, alt],
+      buchungen: [{ id: "b", datum: "2026-06-02", betrag: -50_00, kontoId: "vk", charakter: "Umschichtung", quelle: "import" }],
+      depots: [
+        { id: "d1", zugangId: "z1", schluessel: "s1", bezeichnung: "Erstdepot", verrechnungskontoId: "vk" },
+        // Ein Verweis auf ein Konto, das es nicht mehr gibt: kein Verrechnungskonto.
+        { id: "d2", zugangId: "z1", schluessel: "s2", bezeichnung: "Zweitdepot", verrechnungskontoId: "weg" },
+      ],
+      depotwerte: [
+        { depotId: "d1", stichtag: "2026-06-01", gesamtwert: 5_000_00 },
+        { depotId: "d1", stichtag: "2026-07-01", gesamtwert: 9_000_00 },
+      ],
+      zuordnungen: [{ zugangId: "z1", schluessel: "s2", zahlungskontoId: "dk" }],
+    });
+    const sicht = await vermoegenLaden(deps, HEUTE);
+    expect(sicht.depots[0]).toMatchObject({
+      aktuell: { stichtag: "2026-06-01", betrag: 5_000_00 },
+      verrechnungskonto: { id: "vk", stand: 250_00, zaehltZurVorsorge: false, klasse: "liquide" },
+      summe: 5_250_00,
+    });
+    expect(sicht.depots[1]).toMatchObject({ aktuell: undefined, verrechnungskonto: undefined, summe: 0 });
+    // Zur Wahl: die geführten Konten, ohne das, dessen Stand ein Depot ist.
+    expect(sicht.kontenZurWahl.map((k) => k.id)).toEqual(["giro", "vk"]);
+  });
+});
+
+describe("depotAendern", () => {
+  function depotDeps(depots: Depot[], konten: Zahlungskonto[]) {
+    let stand = [...depots];
+    const deps = {
+      depotRepo: {
+        alle: async () => [...stand],
+        speichern: async (d: Depot) => {
+          stand = [...stand.filter((x) => x.id !== d.id), d];
+        },
+      } as unknown as DepotRepository,
+      kontoRepo: { alle: async () => konten } as unknown as ZahlungskontoRepository,
+    };
+    return { deps, stand: () => stand };
+  }
+  const depot: Depot = { id: "d1", zugangId: "z", schluessel: "s", bezeichnung: "Erstdepot", vorsorgezielId: "ziel" };
+  const konto = { id: "vk", bezeichnung: "Verrechnung", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0 } as Zahlungskonto;
+
+  it("setzt Verrechnungskonto und Vorsorgeziel und lässt den Rest stehen", async () => {
+    const { deps, stand } = depotDeps([depot], [konto]);
+    await depotAendern(deps, "d1", { verrechnungskontoId: "vk", vorsorgezielId: "ziel" });
+    expect(stand()).toEqual([{ ...depot, verrechnungskontoId: "vk", vorsorgezielId: "ziel" }]);
+  });
+
+  it("nimmt beides wieder heraus, wenn die Angabe fehlt", async () => {
+    const { deps, stand } = depotDeps([{ ...depot, verrechnungskontoId: "vk" }], [konto]);
+    await depotAendern(deps, "d1", {});
+    expect(stand()[0].verrechnungskontoId).toBeUndefined();
+    expect(stand()[0].vorsorgezielId).toBeUndefined();
+  });
+
+  it("weist ein unbekanntes Depot und ein unbekanntes Konto ab", async () => {
+    const { deps } = depotDeps([depot], [konto]);
+    await erwarteFehler(depotAendern(deps, "fehlt", {}), "vermoegen.unbekannt");
+    await erwarteFehler(depotAendern(deps, "d1", { verrechnungskontoId: "weg" }), "vermoegen.verrechnungskontoUnbekannt");
   });
 });

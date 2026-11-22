@@ -18,6 +18,12 @@ export interface DepotUebernahmeDeps {
   readonly id: () => string;
   /** Zeitstempel der Erfassung — von aussen, damit der Ablauf prüfbar bleibt. */
   readonly jetzt: string;
+  /**
+   * Das Vorsorgeziel, zu dem ein NEU angelegtes Depot zählt. Hereingereicht, weil das
+   * Depot den Bereich Vermögen nicht kennt; es trägt die Angabe nur (`Depot.vorsorgezielId`).
+   * Ein bestehendes Depot behält, was der Nutzer gewählt hat.
+   */
+  readonly vorgabeVorsorgeziel?: () => Promise<string | undefined>;
 }
 
 export interface DepotUebernahme {
@@ -48,12 +54,16 @@ async function depotFinden(
   );
   if (vorhanden) return vorhanden;
 
+  const vorsorgezielId = await deps.vorgabeVorsorgeziel?.();
   const neu: Depot = {
     id: deps.id(),
     zugangId,
     schluessel: konto.schluessel,
     bezeichnung: konto.bezeichnung,
     waehrung: konto.waehrung,
+    // Ohne Verrechnungskonto: welches es ist, sagt die Bank hier nicht, und die App rät
+    // nicht.
+    ...(vorsorgezielId ? { vorsorgezielId } : {}),
   };
   await deps.depotRepo.speichern(neu);
   return neu;

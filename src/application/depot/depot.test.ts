@@ -92,6 +92,18 @@ describe("depotUebernehmen", () => {
     expect(u.gesamtwert).toBe(1_250_00);
   });
 
+  it("ordnet ein NEUES Depot dem hereingereichten Vorsorgeziel zu, ein bestehendes behält seine Wahl", async () => {
+    const mitZiel = { ...deps(), vorgabeVorsorgeziel: async () => "ziel-1" };
+    await depotUebernehmen("z1", konto, bestand(), mitZiel);
+    expect(repo.stand.depots[0].vorsorgezielId).toBe("ziel-1");
+    expect(repo.stand.depots[0].verrechnungskontoId).toBeUndefined();
+
+    // Der Nutzer wählt es ab; der nächste Abruf ändert daran nichts.
+    repo.stand.depots[0] = { ...repo.stand.depots[0], vorsorgezielId: undefined };
+    await depotUebernehmen("z1", konto, bestand({ stichtag: "2026-08-21" }), mitZiel);
+    expect(repo.stand.depots[0].vorsorgezielId).toBeUndefined();
+  });
+
   it("findet dasselbe Depot beim zweiten Abruf wieder", async () => {
     await depotUebernehmen("z1", konto, bestand(), deps());
     await depotUebernehmen("z1", konto, bestand({ stichtag: "2026-08-21" }), deps());

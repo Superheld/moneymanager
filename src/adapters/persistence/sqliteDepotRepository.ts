@@ -1,4 +1,4 @@
-// SQLite für Depots (Migration 38).
+// SQLite für Depots (Migration 38; Verrechnungskonto und Vorsorgeziel seit 83).
 //
 // Drei Tabellen hinter einem Port: `depot` (was es ist), `depotwert` (die Reihe der
 // Stichtagswerte) und `depotposition` (die Aufstellung je Stichtag). Sie werden immer
@@ -19,6 +19,8 @@ interface DepotZeile {
   schluessel: string;
   bezeichnung: string;
   waehrung: string | null;
+  verrechnungskonto_id: string | null;
+  vorsorgeziel_id: string | null;
 }
 
 interface WertZeile {
@@ -46,7 +48,8 @@ export const sqliteDepotRepository: DepotRepository = {
   async alle() {
     const db = await getDb();
     const zeilen = await db.select<DepotZeile[]>(
-      `SELECT id, zugang_id, schluessel, bezeichnung, waehrung FROM depot ORDER BY bezeichnung`,
+      `SELECT id, zugang_id, schluessel, bezeichnung, waehrung, verrechnungskonto_id, vorsorgeziel_id
+         FROM depot ORDER BY bezeichnung`,
     );
     return zeilen.map((z) => ({
       id: z.id,
@@ -54,19 +57,33 @@ export const sqliteDepotRepository: DepotRepository = {
       schluessel: z.schluessel,
       bezeichnung: z.bezeichnung,
       waehrung: z.waehrung ?? undefined,
+      verrechnungskontoId: z.verrechnungskonto_id ?? undefined,
+      vorsorgezielId: z.vorsorgeziel_id ?? undefined,
     }));
   },
 
   async speichern(d: Depot) {
     const db = await getDb();
     await db.execute(
-      `INSERT INTO depot (id, zugang_id, schluessel, bezeichnung, waehrung)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT(id) DO UPDATE SET zugang_id   = excluded.zugang_id,
-                                     schluessel  = excluded.schluessel,
-                                     bezeichnung = excluded.bezeichnung,
-                                     waehrung    = excluded.waehrung`,
-      [d.id, d.zugangId, d.schluessel, d.bezeichnung, d.waehrung ?? null],
+      // Der ganze Stand, auch Verrechnungskonto und Vorsorgeziel: wer speichert, hat das
+      // Depot vorher gelesen (`alle`) und schickt es vollständig zurück.
+      `INSERT INTO depot (id, zugang_id, schluessel, bezeichnung, waehrung, verrechnungskonto_id, vorsorgeziel_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT(id) DO UPDATE SET zugang_id            = excluded.zugang_id,
+                                     schluessel           = excluded.schluessel,
+                                     bezeichnung          = excluded.bezeichnung,
+                                     waehrung             = excluded.waehrung,
+                                     verrechnungskonto_id = excluded.verrechnungskonto_id,
+                                     vorsorgeziel_id      = excluded.vorsorgeziel_id`,
+      [
+        d.id,
+        d.zugangId,
+        d.schluessel,
+        d.bezeichnung,
+        d.waehrung ?? null,
+        d.verrechnungskontoId ?? null,
+        d.vorsorgezielId ?? null,
+      ],
     );
   },
 
