@@ -103,6 +103,14 @@ describe("Muster-Guard — was er finden MUSS", () => {
     expect(pruefe("Co-Authored-By: Jemand <vorname.nachname@irgendeinehausbank.de>").fund).toBe(true);
   });
 
+  it("die Dependabot-Adresse unter einem anderen Namen", () => {
+    expect(pruefe("Signed-off-by: Jemand <support@github.com>").fund).toBe(true);
+  });
+
+  it("eine andere Adresse unter dem Dependabot-Namen", () => {
+    expect(pruefe("Signed-off-by: dependabot[bot] <vorname.nachname@irgendeinehausbank.de>").fund).toBe(true);
+  });
+
   it("eine noreply-Adresse ausserhalb des Trailers", () => {
     expect(pruefe("Schreib an noreply@irgendeinehausbank.de, das kommt nie an.").fund).toBe(true);
   });
@@ -116,6 +124,11 @@ describe("Muster-Guard — was durchgehen MUSS", () => {
    */
   it("die noreply-Adresse im Co-Authored-By-Trailer", () => {
     expect(pruefe("Co-Authored-By: Claude <noreply@anthropic.com>").fund).toBe(false);
+  });
+
+  /** GitHub schreibt diese Zeile unter jeden Dependabot-Commit; sie kommt mit jedem Merge mit. */
+  it("die Signed-off-by-Zeile von Dependabot", () => {
+    expect(pruefe("Signed-off-by: dependabot[bot] <support@github.com>").fund).toBe(false);
   });
 
   it("eine Test-IBAN mit erfundener Bankleitzahl", () => {
