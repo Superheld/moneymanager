@@ -74,6 +74,31 @@ mod tests {
         pool.close().await;
     }
 
+    /// **Welches SQLite in SQLCipher steckt, steht nicht in der Nummer von libsqlite3-sys.**
+    ///
+    /// RUSTSEC-2026-0459 (WAL mit fremder Seitengroesse liest fremden Speicher) ist erst ab
+    /// SQLite 3.54.0 behoben. Das Advisory nennt libsqlite3-sys ab 0.39 „gepatcht" — fuer
+    /// `bundled`. In der SQLCipher-Variante buendelte 0.39 aber noch SQLite 3.53.4; cargo-deny
+    /// waere dort gruen gewesen und die Luecke offen. Deshalb fragt dieser Test das gelinkte
+    /// SQLite selbst, statt der Fassungsnummer zu glauben.
+    #[tokio::test]
+    async fn das_gebuendelte_sqlite_ist_gegen_rustsec_2026_0459_gepatcht() {
+        let datei = pfad("fassung");
+        // Mit Schluessel: `cipher_provider` antwortet nur auf einer verschluesselten Verbindung.
+        let pool = oeffnen(&datei, Some(&als_passwort(SCHLUESSEL))).await.expect("oeffnen");
+        let sqlite: String = sqlx::query_scalar("SELECT sqlite_version()").fetch_one(&pool).await.expect("sqlite");
+        let cipher: String = sqlx::query_scalar("PRAGMA cipher_version").fetch_one(&pool).await.expect("cipher");
+        let anbieter: String = sqlx::query_scalar("PRAGMA cipher_provider").fetch_one(&pool).await.expect("provider");
+        println!("SQLite {sqlite}, SQLCipher {cipher}, Krypto {anbieter}");
+        pool.close().await;
+
+        let teile: Vec<u32> = sqlite.split('.').map(|t| t.parse().expect("Fassungsteil")).collect();
+        assert!(
+            teile[..2] >= [3, 54][..],
+            "SQLite {sqlite} ist vor 3.54.0 und damit von RUSTSEC-2026-0459 betroffen."
+        );
+    }
+
     #[tokio::test]
     async fn eine_verschluesselte_datei_traegt_keinen_sqlite_kopf() {
         let datei = pfad("kopf");
@@ -310,5 +335,142 @@ mod tests {
                 "'{gesucht}' steht im Klartext in der Datei."
             );
         }
+    }
+
+    // -----------------------------------------------------------------------------
+    // Eine Datei aus einer ALTEN Fassung
+    // -----------------------------------------------------------------------------
+    //
+    // Alle Tests oben schreiben und lesen mit derselben Fassung — sie bleiben gruen, auch
+    // wenn ein Heben von libsqlite3-sys das Dateiformat oder die Vorgaben von SQLCipher
+    // (Seitengroesse, HMAC, KDF) aendert. Genau dann kaeme der echte Bestand nach dem
+    // naechsten Update nicht mehr auf. Dagegen steht hier eine Datei, die mit einer
+    // FRUEHEREN Fassung geschrieben wurde und im Repo liegt (`src-tauri/testdaten/`).
+    //
+    // Geschrieben mit libsqlite3-sys 0.30.1 (SQLCipher 4.5.7, SQLite 3.45.3), im
+    // WAL-Modus wie die App: drei Zeilen in der Hauptdatei, zwei weitere nur im `-wal`.
+    // Der Schluessel ist erfunden und steht nur hier. Die Dateien enden auf `.bin` statt
+    // `.db`, weil `.gitignore` jede `.db` abweist — und das soll so bleiben.
+    //
+    // **Vor dem naechsten Heben:** mit der dann noch alten Fassung
+    // `MONEYMANAGER_TESTVEKTOR=<ordner> cargo test --lib testvektor_schreiben -- --ignored`
+    // laufen lassen und die beiden Dateien neben die vorhandenen legen — oder diese
+    // stehen lassen, solange sie die aelteste Fassung sind, die noch ein Bestand haben kann.
+
+    /// `"4.5.7 community"` -> `"4.5.7"`, fuer den Dateinamen.
+    fn fassung(cipher_version: &str) -> &str {
+        cipher_version.split_whitespace().next().unwrap_or("unbekannt")
+    }
+
+    /// Rohschluessel in derselben Form wie `Datenschluessel::als_pragma()`.
+    const VEKTOR_SCHLUESSEL: &str =
+        "\"x'5e1f0c2a9b7d4e6f8a3c1b0d2e4f6a8c9b7d5e3f1a2c4e6b8d0f2a4c6e8b0d2f'\"";
+
+    /// Schreibt den Testvektor mit der Fassung, die gerade gebaut ist. Laeuft nur von Hand.
+    #[tokio::test]
+    #[ignore = "erzeugt den Testvektor; nur von Hand vor einem Heben von libsqlite3-sys"]
+    async fn testvektor_schreiben() {
+        use sqlx::sqlite::SqliteJournalMode;
+
+        let ziel = PathBuf::from(
+            std::env::var("MONEYMANAGER_TESTVEKTOR").expect("MONEYMANAGER_TESTVEKTOR setzen"),
+        );
+        std::fs::create_dir_all(&ziel).expect("zielordner");
+        let arbeit = pfad("vektor-arbeit");
+        let _ = std::fs::remove_file(arbeit.with_extension("db-wal"));
+
+        let opts = SqliteConnectOptions::new()
+            .filename(&arbeit)
+            .create_if_missing(true)
+            .pragma("key", VEKTOR_SCHLUESSEL)
+            .journal_mode(SqliteJournalMode::Wal);
+        let pool = SqlitePoolOptions::new().max_connections(1).connect_with(opts).await.expect("pool");
+
+        pool.execute("CREATE TABLE probe (nr INTEGER PRIMARY KEY, text TEXT NOT NULL, betrag INTEGER NOT NULL)")
+            .await
+            .expect("tabelle");
+        for (nr, text, betrag) in [(1, "erste Zeile", -1250), (2, "zweite Zeile", 99), (3, "Umlaute äöü", 0)] {
+            sqlx::query("INSERT INTO probe VALUES (?, ?, ?)")
+                .bind(nr)
+                .bind(text)
+                .bind(betrag)
+                .execute(&pool)
+                .await
+                .expect("insert");
+        }
+        // Alles bis hier in die Hauptdatei, der Rest bleibt im WAL.
+        pool.execute("PRAGMA wal_checkpoint(TRUNCATE)").await.expect("checkpoint");
+        for (nr, text, betrag) in [(4, "nur im wal", 4711), (5, "auch im wal", -1)] {
+            sqlx::query("INSERT INTO probe VALUES (?, ?, ?)")
+                .bind(nr)
+                .bind(text)
+                .bind(betrag)
+                .execute(&pool)
+                .await
+                .expect("insert");
+        }
+
+        let cipher: String = sqlx::query_scalar("PRAGMA cipher_version").fetch_one(&pool).await.expect("cipher");
+        let sqlite: String = sqlx::query_scalar("SELECT sqlite_version()").fetch_one(&pool).await.expect("sqlite");
+        println!("geschrieben mit SQLCipher {cipher}, SQLite {sqlite}");
+
+        // Kopiert, WAEHREND die Verbindung offen ist — beim Schliessen wuerde das WAL in
+        // die Hauptdatei zurueckgeschrieben und geloescht.
+        std::fs::copy(&arbeit, ziel.join(format!("sqlcipher-{}-haupt.bin", fassung(&cipher)))).expect("db kopieren");
+        std::fs::copy(arbeit.with_extension("db-wal"), ziel.join(format!("sqlcipher-{}-wal.bin", fassung(&cipher)))).expect("wal kopieren");
+        pool.close().await;
+    }
+
+    /// Legt den Testvektor in einen eigenen Ordner, damit das Oeffnen ihn nicht veraendert.
+    fn vektor_auslegen(name: &str, mit_wal: bool) -> PathBuf {
+        let ordner = std::env::temp_dir().join(format!("moneymanager-krypto-vektor-{name}"));
+        let _ = std::fs::remove_dir_all(&ordner);
+        std::fs::create_dir_all(&ordner).expect("ordner");
+        let db = ordner.join("bestand.db");
+        std::fs::write(&db, include_bytes!("../testdaten/sqlcipher-4.5.7-haupt.bin")).expect("db");
+        if mit_wal {
+            std::fs::write(ordner.join("bestand.db-wal"), include_bytes!("../testdaten/sqlcipher-4.5.7-wal.bin"))
+                .expect("wal");
+        }
+        db
+    }
+
+    async fn zeilen(datei: &PathBuf) -> Vec<(i64, String, i64)> {
+        let pool = crate::datenbank::pool_mit_schluessel(datei, VEKTOR_SCHLUESSEL)
+            .await
+            .expect("Pool auf die alte Datei");
+        let z = sqlx::query_as("SELECT nr, text, betrag FROM probe ORDER BY nr")
+            .fetch_all(&pool)
+            .await
+            .expect("Die mit einer frueheren SQLCipher-Fassung geschriebene Datei geht nicht mehr auf.");
+        pool.close().await;
+        z
+    }
+
+    #[test]
+    fn der_testvektor_ist_verschluesselt() {
+        let kopf = &include_bytes!("../testdaten/sqlcipher-4.5.7-haupt.bin")[..16];
+        assert_ne!(kopf, b"SQLite format 3\0", "Der Testvektor ist gar nicht verschluesselt.");
+    }
+
+    #[tokio::test]
+    async fn eine_datei_der_frueheren_fassung_geht_auf() {
+        let z = zeilen(&vektor_auslegen("ohne-wal", false)).await;
+        assert_eq!(
+            z,
+            vec![
+                (1, "erste Zeile".to_string(), -1250),
+                (2, "zweite Zeile".to_string(), 99),
+                (3, "Umlaute äöü".to_string(), 0),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn ihr_wal_der_frueheren_fassung_wird_mitgelesen() {
+        let z = zeilen(&vektor_auslegen("mit-wal", true)).await;
+        let nummern: Vec<i64> = z.iter().map(|(nr, _, _)| *nr).collect();
+        assert_eq!(nummern, vec![1, 2, 3, 4, 5], "Was nur im WAL stand, fehlt.");
+        assert_eq!(z[3], (4, "nur im wal".to_string(), 4711));
     }
 }
