@@ -220,6 +220,16 @@ zeigt dieselben Daten anders und steht in der Karte, die er einstellt.
 Gesteuert von aussen (`offen`, `onUmschalten`), weil ein Block beim ersten Aufklappen
 nachladen können muss. Benutzt von Herkunft, Journal und Merkmalen im Buchungsdialog.
 
+**`SchmalKlappblock`** ist derselbe `Klappblock` auf der Seite, und nur schmal (seit
+2026-11-22, Buchungen und Rücklagen): breit stehen seine Kinder einfach da, schmal hinter
+einer Zeile mit der Überschrift der Karte darin. Er hält den Zustand selbst, weil dort
+nichts beim ersten Öffnen nachlädt. Kein zweiter Mechanismus: Titel, ▸/▾, Base UI und die
+44 px des Knopfs (`.btn`) kommen aus `Klappblock`; auf der Seite steht die Zeile über die
+ganze Breite und in der Farbe des Fliesstexts (`.screen > .abschnitt` in `app.css`). Der
+Inhalt steht NEBEN der Zeile und nicht in einer Karte — was einklappt, sind selbst Karten.
+Eine Karte, die leer `null` liefert, braucht die Bedingung davor auch beim Aufrufer: sonst
+stünde schmal eine Zeile da, hinter der nichts aufgeht.
+
 ## Aufklappbereiche: zehn Zeilen breit, fünf Zeilen schmal
 
 `aufklappen.ts` hält die beiden Zahlen und sonst nichts. Sie stehen in ZEILEN und nicht in
@@ -329,12 +339,15 @@ nicht, dass hier etwas passiert, und dem Sehenden nicht, was.
 Sonst gilt: die Fensterbreite ist eine Frage, die CSS selbst beantwortet, und in `app.css`
 steht die schmale Form ohne Abfrage da. Das reicht, solange sich nur das AUSSEHEN ändert.
 
-**Benutzt wird es an zwei Stellen: von `DataTable` und von der Übersicht.** Der `Dialog`
+**Benutzt wird es von `DataTable`, `SchmalKlappblock` und den Bereichen Übersicht,
+Buchungen und Rücklagen.** Der `Dialog`
 hing bis 2026-11-10 auch daran und zeichnete seine schmale Form über Inline-Stile — obwohl
 sich dort nur das Aussehen ändert. Er steht jetzt in CSS. Ein Screen, der schmal nur
 anders AUSSIEHT, tut das in `app.css`. Die Übersicht (seit 2026-11-22) ändert schmal ihr
 Markup: „Damit die Zahlen stimmen" wird eine Zeile, die aufklappt, und rückt unter den
-laufenden Monat (`uebersicht/CLAUDE.md`).
+laufenden Monat (`uebersicht/CLAUDE.md`). Buchungen und Rücklagen ebenso: Karten rücken
+um und klappen ein, im Kopf des Auszugs steht ein Auswahlfeld statt des Namens
+(`../CLAUDE.md`, „Mobile first").
 
 Es reicht nicht, wo sich das **Markup** ändert. `DataTable` wird unter 700 px aus einer
 Tabelle mit sechs Spalten eine mit zwei, in der die übrigen Werte als zweite Zeile unter

@@ -55,6 +55,9 @@ import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
 import { Stapel } from "../bausteine/Anordnung";
 import { LeererZustand } from "../bausteine/LeererZustand";
+import { SchmalKlappblock } from "../bausteine/SchmalKlappblock";
+import { useSchmal } from "../bausteine/useSchmal";
+import { Collapsible } from "@base-ui/react/collapsible";
 
 /** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
 const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
@@ -135,22 +138,31 @@ export function RuecklagenScreen() {
     await laden();
   };
   const ausbuchenOeffnen = (r: Ruecklage) => setAusbuchen(r);
+  /**
+   * Schmal (unter 700 px) steht oben, womit man arbeitet (seit 2026-11-22): was auf eine
+   * Zuordnung wartet, dann die Rücklagen selbst — je eine kurze Zeile. Was man nachsieht,
+   * rückt darunter und klappt ein: Stand und Faustformel samt „Diesen Monat", „Wo das
+   * Geld liegt", die Vorschläge, „Schon abgeschlossen". Der Erklärtext klappt ebenfalls
+   * ein — er ist Erklärung („Drei Ränge", `ui/CLAUDE.md`). Breit ändert sich nichts.
+   *
+   * `useSchmal` statt CSS, weil sich das Markup ändert: Karten klappen ein und rücken um,
+   * und die Zeile je Rücklage ist eine andere. Geprüft in `schmal.test.tsx`.
+   */
+  const schmal = useSchmal();
+  /**
+   * Ohne eine einzige Rücklage sind die Vorschläge der Weg hinein — der leere Zustand
+   * zeigt auf sie. Dann stehen sie auch schmal offen da, nicht hinter einer Zeile.
+   */
+  const vorschlaegeOffen = nichtsDa;
+
   const anlegenKnopf = (hauptknopf: boolean) => (
     <Button variant={hauptknopf ? "primary" : undefined} plus onClick={neu}>{t("ruecklagen.ruecklage")}</Button>
   );
 
-  return (
-    <div className="screen">
-      <PageHead
-        title={t("ruecklagen.titel")}
-        subtitle={t("ruecklagen.untertitel")}
-        action={anlegenKnopf(true)}
-      />
-
-      <p style={{ color: "var(--ink-2)", fontSize: "var(--fs-body)", lineHeight: 1.55, maxWidth: 660, margin: "0 0 var(--sp-2)" }}>
-        <Trans i18nKey="ruecklagen.erklaerung" components={betont} />
-      </p>
-
+  /** Stand, Faustformel und „Diesen Monat" — breit oben, schmal eingeklappt darunter. */
+  const flussDa = fluss.bedarf > 0 || fluss.plan > 0 || fluss.ist !== 0;
+  const staendeUndMonat = (
+    <>
       {/* Oben das PAAR: links, wie die Rücklagen dastehen — die Rechnung (Ziele, Soll)
           gegen das, was auf den Konten liegt —, rechts der Massstab von aussen, die
           Faustformel. Bis 2026-11-11 standen die Zahlen als sechs Kacheln über der Seite
@@ -197,7 +209,7 @@ export function RuecklagenScreen() {
           wenig zurück"; Plan über Eingang heisst „die Überweisung ist ausgefallen".
           Die Buchungen stehen darunter: bis 2026-11-08 hiess die dritte Zahl
           „geflossen", und man musste raten, woraus sie bestand. */}
-      {(fluss.bedarf > 0 || fluss.plan > 0 || fluss.ist !== 0) && (
+      {flussDa && (
         <Card title={t("ruecklagen.flussTitel")} subtitle={t("ruecklagen.flussUntertitel")}>
           <div className="kpis">
             <KPIStat size="chip" label={t("ruecklagen.flussBedarf")} value={geld.format(fluss.bedarf)} unit={geld.symbol} />
@@ -256,6 +268,40 @@ export function RuecklagenScreen() {
           )}
         </Card>
       )}
+    </>
+  );
+  const vorschlaegeKarte = (
+    <VorschlaegeKarte
+      vorschlaege={vorschlaege}
+      onUebernehmen={vorschlagUebernehmen}
+      onVerwerfen={(v) => void vorschlagVerwerfen(v)}
+    />
+  );
+  /** Die Überschrift der eingeklappten Zeile: die Titel der Karten, die darin stehen. */
+  const staendeUndMonatTitel = [
+    items.length > 0 ? t("ruecklagen.standTitel") : null,
+    sicht ? t("ruecklagen.mindestTitel") : null,
+    flussDa ? t("ruecklagen.flussTitel") : null,
+  ].filter(Boolean).join(" · ");
+
+  return (
+    <div className="screen">
+      <PageHead
+        title={t("ruecklagen.titel")}
+        subtitle={t("ruecklagen.untertitel")}
+        action={anlegenKnopf(true)}
+      />
+
+      <SchmalKlappblock titel={t("ruecklagen.erklaerungFrage")}>
+        <p style={{ color: "var(--ink-2)", fontSize: "var(--fs-body)", lineHeight: 1.55, maxWidth: 660, margin: "0 0 var(--sp-2)" }}>
+          <Trans i18nKey="ruecklagen.erklaerung" components={betont} />
+        </p>
+      </SchmalKlappblock>
+
+      {/* Schmal ganz oben: hier ist etwas zu tun. Breit steht sie nach der Liste (unten). */}
+      {schmal && <WartetKarte zeilen={sicht?.wartend ?? LEERE_LISTE} onGewaehlt={laden} />}
+
+      {!schmal && staendeUndMonat}
 
       {deckung.nurRechnung && (
         // Ohne Kontozuordnung gibt es nur die Rechnung. Das einmal sagen, statt überall
@@ -287,51 +333,118 @@ export function RuecklagenScreen() {
             {vorschlaege.length > 0 && ` ${t("ruecklagen.leerMitVorschlaegen")}`}
           </LeererZustand>
         ) : (
-          <Stapel abstand={5}>
+          <div className="ruecklagen-liste">
+          <Stapel abstand={schmal ? 3 : 5}>
             {zeilen.map((z, idx) => {
               const r = z.ruecklage;
               const mitZiel = hatZiel(r);
               const offen = offeneRuecklage === r.id;
+              const titelVerlauf = t(offen ? "ruecklagen.verlaufZu" : "ruecklagen.verlaufAuf", { name: r.bezeichnung });
+              const umschalten = () => setOffeneRuecklage(offen ? null : r.id);
+
+              /** Sorte und „ohne Konto" — breit neben dem Namen, schmal hinter der Zeile. */
+              const pillen = (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-2)", flexWrap: "wrap" }}>
+                  <Pill variant={z.art === "fortlaufend" ? "um" : "neutral"}>{t(`ruecklagen.sorte.${z.art}`)}</Pill>
+                  {!z.kontoName && <Pill variant="neutral">{t("ruecklagen.pillNurRechnung")}</Pill>}
+                </span>
+              );
+              const rateUndKnoepfe = (
+                <span className="muted" style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-2)" }}>
+                  {t("ruecklagen.rate")} {geld.format(z.rate)} {geld.symbol}{t("ruecklagen.proMonatSuffix")}
+                  <IconLeiste>
+                    {/* Nur an einer, die abgeschlossen wird — eine, die weiterläuft,
+                        beginnt nie neu. Mit Kategorie wird sie abgeschlossen (ohne
+                        Buchungswahl), der Altbestand ohne Kategorie ausgebucht wie vorher. */}
+                    {z.abschlussweg === "abschliessen" && <IconButton icon="uebernehmen" label={t("ruecklagen.abschliessen")} onClick={() => setAbschliessen(r)} />}
+                    {z.abschlussweg === "ausbuchen" && <IconButton icon="uebernehmen" label={t("ruecklagen.ausbuchen")} onClick={() => ausbuchenOeffnen(r)} />}
+                    <IconButton icon="bearbeiten" label={t("ruecklagen.bearbeiten")} onClick={() => bearbeiten(r)} />
+                    <IconButton icon="loeschen" ton="gefahr" label={t("ruecklagen.loeschen")} onClick={() => loeschfrage.stellen({
+                        name: r.bezeichnung,
+                        folgen: t("ruecklagen.loeschenFolgen"),
+                        ausfuehren: async () => { await ruecklageLoeschen(r.id); await laden(); },
+                      })} />
+                  </IconLeiste>
+                </span>
+              );
+              /* Zweite Zeile: woran sie hängt und wo ihr Geld liegt. Fehlt die
+                 Kategorie (ein Altfall), steht es da — beim Bearbeiten wird sie Pflicht. */
+              const herkunft = (
+                <div className="hinweis" style={{ marginBottom: 6 }}>
+                  {z.kategorieName ?? t("ruecklagen.ohneKategorie")}
+                  {" · "}
+                  {z.kontoName ?? t("ruecklagen.kontoKeins")}
+                </div>
+              );
+
+              if (schmal) {
+                // Schmal EINE Zeile je Rücklage: Name, Stand (mit Ziel: Stand / Ziel) und
+                // der Balken. Die ganze Zeile ist der Knopf und öffnet, was breit der Name
+                // öffnet — den Verlauf unter der Liste —, und hier darunter Sorte, Rate,
+                // die Knöpfe und woran sie hängt. Es fällt nichts weg, es liegt dahinter.
+                return (
+                  // Base UI `Collapsible`: `aria-expanded` und `aria-controls` kommen von dort
+                  // (`bedienteile.test.ts`), der Zustand bleibt der des Screens — er öffnet
+                  // auch den Verlauf unter der Liste.
+                  <Collapsible.Root
+                    key={r.id}
+                    open={offen}
+                    onOpenChange={umschalten}
+                    style={idx > 0 ? { borderTop: "1px solid var(--line)", paddingTop: "var(--sp-3)" } : undefined}
+                  >
+                    <Collapsible.Trigger className="aufklappzeile" title={titelVerlauf}>
+                      <span className="ruecklage-kurz-kopf">
+                        <b>{r.bezeichnung} <span className="muted" aria-hidden="true">{offen ? "▾" : "▸"}</span></b>
+                        {/* Im Minus steht der Stand selbst, auch mit Ziel: „0 / Ziel" sagte
+                            nicht, dass sie mehr getragen hat, als zurückgelegt war. */}
+                        <span className="num" style={{ whiteSpace: "nowrap", fontWeight: "var(--fw-semi)", color: mitZiel && z.stand >= 0 ? "var(--ink-2)" : geldFarbe(z.stand) }}>
+                          {mitZiel && z.stand >= 0
+                            ? `${geld.format(z.stand)} / ${geld.formatMitSymbol(r.ziel as number)}`
+                            : geld.formatMitSymbol(z.stand)}
+                        </span>
+                      </span>
+                      {mitZiel && (
+                        <CoverageTrack
+                          value={Math.max(0, z.stand)}
+                          max={r.ziel as number}
+                          name={t("ruecklagen.fortschritt")}
+                          style={{ marginTop: 6 }}
+                        />
+                      )}
+                    </Collapsible.Trigger>
+                    <Collapsible.Panel>
+                      <div style={{ marginTop: "var(--sp-2)" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--sp-2)", flexWrap: "wrap", marginBottom: 6 }}>
+                          {pillen}
+                          {rateUndKnoepfe}
+                        </div>
+                        {herkunft}
+                        {z.tatsaechlich != null && (
+                          <div className="muted" style={{ fontSize: "var(--fs-sm)" }}>
+                            {t("ruecklagen.davonDa", { konto: z.kontoName ?? "?", betrag: geld.formatMitSymbol(z.tatsaechlich) })}
+                          </div>
+                        )}
+                      </div>
+                    </Collapsible.Panel>
+                  </Collapsible.Root>
+                );
+              }
+
               return (
                 // Trennlinie ab der zweiten Rücklage: der Abstand allein trennt zu schwach.
                 <div key={r.id} style={idx > 0 ? { borderTop: "1px solid var(--line)", paddingTop: "var(--sp-5)" } : undefined}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, gap: "var(--sp-3)", flexWrap: "wrap" }}>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-2)", flexWrap: "wrap" }}>
                       {/* Der Name öffnet den Verlauf darunter — derselbe Weg wie bei den Budgets. */}
-                      <Zeilenlink
-                        titel={t(offen ? "ruecklagen.verlaufZu" : "ruecklagen.verlaufAuf", { name: r.bezeichnung })}
-                        onKlick={() => setOffeneRuecklage(offen ? null : r.id)}
-                      >
+                      <Zeilenlink titel={titelVerlauf} onKlick={umschalten}>
                         <b>{r.bezeichnung}</b>
                       </Zeilenlink>
-                      <Pill variant={z.art === "fortlaufend" ? "um" : "neutral"}>{t(`ruecklagen.sorte.${z.art}`)}</Pill>
-                      {!z.kontoName && <Pill variant="neutral">{t("ruecklagen.pillNurRechnung")}</Pill>}
+                      {pillen}
                     </span>
-                    <span className="muted" style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-2)" }}>
-                      {t("ruecklagen.rate")} {geld.format(z.rate)} {geld.symbol}{t("ruecklagen.proMonatSuffix")}
-                      <IconLeiste>
-                        {/* Nur an einer, die abgeschlossen wird — eine, die weiterläuft,
-                            beginnt nie neu. Mit Kategorie wird sie abgeschlossen (ohne
-                            Buchungswahl), der Altbestand ohne Kategorie ausgebucht wie vorher. */}
-                        {z.abschlussweg === "abschliessen" && <IconButton icon="uebernehmen" label={t("ruecklagen.abschliessen")} onClick={() => setAbschliessen(r)} />}
-                        {z.abschlussweg === "ausbuchen" && <IconButton icon="uebernehmen" label={t("ruecklagen.ausbuchen")} onClick={() => ausbuchenOeffnen(r)} />}
-                        <IconButton icon="bearbeiten" label={t("ruecklagen.bearbeiten")} onClick={() => bearbeiten(r)} />
-                        <IconButton icon="loeschen" ton="gefahr" label={t("ruecklagen.loeschen")} onClick={() => loeschfrage.stellen({
-                            name: r.bezeichnung,
-                            folgen: t("ruecklagen.loeschenFolgen"),
-                            ausfuehren: async () => { await ruecklageLoeschen(r.id); await laden(); },
-                          })} />
-                      </IconLeiste>
-                    </span>
+                    {rateUndKnoepfe}
                   </div>
 
-                  {/* Zweite Zeile: woran sie hängt und wo ihr Geld liegt. Fehlt die
-                      Kategorie (ein Altfall), steht es da — beim Bearbeiten wird sie Pflicht. */}
-                  <div className="hinweis" style={{ marginBottom: 6 }}>
-                    {z.kategorieName ?? t("ruecklagen.ohneKategorie")}
-                    {" · "}
-                    {z.kontoName ?? t("ruecklagen.kontoKeins")}
-                  </div>
+                  {herkunft}
 
                   {/* Der Stand — auch im Minus: dann hat sie mehr getragen, als zurückgelegt
                       war. Mit Ziel EIN Balken gegen das Ziel, mit Konto dazu, was davon
@@ -361,6 +474,7 @@ export function RuecklagenScreen() {
               );
             })}
           </Stapel>
+          </div>
         )}
       </Card>
 
@@ -379,33 +493,49 @@ export function RuecklagenScreen() {
 
 
       {/* Was auf eine Zuordnung wartet — direkt nach der Liste, weil hier etwas zu tun ist;
-          ist nichts offen, steht die Karte nicht da (`WartetKarte`). */}
-      <WartetKarte zeilen={sicht?.wartend ?? LEERE_LISTE} onGewaehlt={laden} />
+          ist nichts offen, steht die Karte nicht da (`WartetKarte`). Schmal steht sie
+          ganz oben. */}
+      {!schmal && <WartetKarte zeilen={sicht?.wartend ?? LEERE_LISTE} onGewaehlt={laden} />}
+
+      {/* Schmal rückt hierher, was breit über der Liste steht. Die Zeile steht nur da,
+          wenn darin eine Karte steht. */}
+      {schmal && staendeUndMonatTitel && (
+        <SchmalKlappblock titel={staendeUndMonatTitel}>{staendeUndMonat}</SchmalKlappblock>
+      )}
 
       {/* Die Vorschläge unter der Liste, wie bei den Budgets: ein Nachtrag, kein
           Einstieg — wer den Bereich öffnet, will zuerst seine eigenen Rücklagen sehen.
-          Nach „Wartet auf Zuordnung", weil dort schon etwas zu tun ist. */}
-      <VorschlaegeKarte
-        vorschlaege={vorschlaege}
-        onUebernehmen={vorschlagUebernehmen}
-        onVerwerfen={(v) => void vorschlagVerwerfen(v)}
-      />
+          Nach „Wartet auf Zuordnung", weil dort schon etwas zu tun ist. Schmal stehen
+          sie eingeklappt nach „Wo das Geld liegt" — ausser es gibt noch keine Rücklage. */}
+      {(!schmal || vorschlaegeOffen) && vorschlaegeKarte}
 
       {/* Nach der Liste und nicht davor: dort wird gearbeitet (anlegen, ausbuchen),
           hier wird nachgesehen, auf welchem Konto das alles liegt. Vor den Listen schöbe
-          eine Karte mit einem Abschnitt je Konto die Handlungen aus dem ersten Blick. */}
-      {jeKonto && (
-        <GeldJeKontoKarte
-          sicht={jeKonto}
-          onBearbeiten={(r) => {
-            const ruecklage = items.find((x) => x.id === r.id);
-            if (ruecklage) setBearbeitet(ruecklage);
-          }}
-        />
+          eine Karte mit einem Abschnitt je Konto die Handlungen aus dem ersten Blick.
+          Die Bedingung ist die der Karte selbst: ohne sie stünde schmal eine Zeile da,
+          hinter der nichts aufgeht. */}
+      {jeKonto && (jeKonto.konten.length > 0 || jeKonto.ohneKonto.length > 0) && (
+        <SchmalKlappblock titel={t("ruecklagen.geldJeKonto.titel")}>
+          <GeldJeKontoKarte
+            sicht={jeKonto}
+            onBearbeiten={(r) => {
+              const ruecklage = items.find((x) => x.id === r.id);
+              if (ruecklage) setBearbeitet(ruecklage);
+            }}
+          />
+        </SchmalKlappblock>
+      )}
+
+      {schmal && !vorschlaegeOffen && vorschlaege.length > 0 && (
+        <SchmalKlappblock titel={t("ruecklagen.vorschlaege.titel")}>{vorschlaegeKarte}</SchmalKlappblock>
       )}
 
       {/* Was schon gebraucht wurde — samt der beendeten Rücklagen (`AusbuchungenKarte`). */}
-      <AusbuchungenKarte zeilen={sicht?.geschichte ?? LEERE_LISTE} onGeaendert={laden} />
+      {(sicht?.geschichte.length ?? 0) > 0 && (
+        <SchmalKlappblock titel={t("ruecklagen.ausbuchungenTitel")}>
+          <AusbuchungenKarte zeilen={sicht?.geschichte ?? LEERE_LISTE} onGeaendert={laden} />
+        </SchmalKlappblock>
+      )}
 
       {bearbeitet && (
         <RuecklageDialog

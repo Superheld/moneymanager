@@ -97,6 +97,7 @@ brauchen nichts über dem Abruf. Was beide zeigen, die Herkunft der Zeilen eines
 | Liste, die unter einer Zeile aufklappt | `Aufklapptabelle`; nur die Fläche: `Aufklappflaeche`; Höhe: `aufklappen.ts` |
 | Buchungen unter einer Auswertung (Budget, Kategorie) | `Buchungsliste` (auf `Aufklapptabelle`), Zeilen als `Buchungszeile` aus `application` |
 | Abschnitt im Dialog, auf- und zuklappbar | `Klappblock` |
+| Karte(n), die nur schmal einklappen | `SchmalKlappblock` (auf `Klappblock`) |
 | Kennzahl | `KPIStat`; Balken mit Rahmen: `CoverageTrack` (mit `marke` für ein Soll — EIN Balken statt zwei) |
 | Etikett | `Pill` — sagt, was etwas IST |
 | Wahl im Formular | `Auswahl`; in einer Tabellenzeile: `Zeilenauswahl`; Kategorie: `CategoryPicker` |
@@ -645,7 +646,24 @@ das bedeutet, ist enger als es klingt, und die Grenze gehört benannt:
   „Die Navigation in drei Stufen").
 - **Die Übersicht ist schmal eigens geordnet**: der laufende Monat oben, „Damit die
   Zahlen stimmen" darunter als eine Zeile, die aufklappt (`uebersicht/CLAUDE.md`).
-- **Die BEREICHE sind es nicht.** Ihre Raster stehen weiter als `max-width`-Abfragen
+- **Buchungen und Rücklagen ebenso** (seit 2026-11-22): oben, womit man arbeitet; was man
+  nachsieht, rückt darunter und klappt ein (`SchmalKlappblock`, eine Zeile aus
+  `Klappblock` mit der Überschrift der Karte darin). Breit ändert sich in beiden nichts.
+  - **Buchungen:** oben der Kopf des Auszugs mit einem Auswahlfeld für das Konto statt
+    des Namens, dem Stand samt Abgleich und den Knöpfen — „Abrufen" kommt aus dem Kopf
+    der Kontenliste dorthin. Dann das Gebuchte, dann „Gebunden auf …", zuletzt „Deine
+    Konten (n)" eingeklappt. Ohne Konto bleibt die Liste oben und offen (sie trägt den
+    leeren Zustand); auch über einem Depot steht der Kopf, sonst käme man vom Depot nur
+    über die eingeklappte Liste weg.
+  - **Rücklagen:** „Wartet auf Zuordnung" ganz oben, dann je Rücklage eine Zeile (Name,
+    Stand bzw. Stand / Ziel, Balken), die ganze Zeile öffnet Sorte, Rate, Knöpfe und den
+    Verlauf. Eingeklappt darunter: Stand, Faustformel und „Diesen Monat" (eine Zeile mit
+    den Überschriften der Karten darin), „Wo das Geld liegt", die Vorschläge, „Schon
+    abgeschlossen"; der Erklärtext hinter „Wie funktioniert eine Rücklage?". Ohne eine
+    einzige Rücklage stehen die Vorschläge offen — sie sind dann der Weg hinein.
+
+  Geprüft in `kontoauszug/schmal.test.tsx` und `ruecklagen/schmal.test.tsx`.
+- **Die übrigen BEREICHE sind es nicht.** Ihre Raster stehen weiter als `max-width`-Abfragen
   (`ausblick-karten`) oder tragen sich über `auto-fit` selbst (`karten-paar`, `kpis`). Sie
   funktionieren schmal, aber sie sind nicht dafür entworfen. Ein Registerband rollt
   waagerecht, mit einem Verlauf an der Kante (unten). Das ist der Stand, und die
@@ -704,7 +722,8 @@ kann:
   `app.css`, breit auf `auto` zurückgenommen. Wer einen Baustein mit Bedienteil baut,
   hängt seine Klasse dort an; `trefferflaechen.test.ts` prüft die Liste. Dasselbe gilt
   für eine Zeile, die aufklappt und selbst das Bedienteil ist, ohne Baustein zu sein
-  (Monatskarten der Übersicht, Kopfzeile je Konto im Abgleich): sie trägt
+  (Monatskarten der Übersicht, Kopfzeile je Konto im Abgleich, schmal die Zeile je
+  Rücklage): sie trägt
   `.aufklappzeile`, und der Test führt sie in einer eigenen Liste. **Keine
   Mindestbreite an Knöpfen mit Text:** in einer Flex-Zeile ersetzt sie das `auto`, das
   einen Knopf nie schmaler werden lässt als seine Beschriftung — so lief der Seitenkopf
