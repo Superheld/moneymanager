@@ -103,6 +103,15 @@ const BEDIENTEILE: [datei: string, klasse: string, auchBreite: boolean][] = [
   ["Modal.tsx", "dialog-schliessen", true],
 ];
 
+/**
+ * Zeilen, die aufklappen und selbst das Bedienteil sind — kein Baustein, sondern je
+ * Bereich gebaut. Pfade ab `ui/`.
+ */
+const AUFKLAPPZEILEN: [datei: string, klasse: string][] = [
+  ["uebersicht/ErgebnisKarten.tsx", "aufklappzeile"],
+  ["kontenverwaltung/AbgleichBereich.tsx", "aufklappzeile"],
+];
+
 /** Felder, die den Fokus bekommen und tippen oder wählen lassen. */
 const FELDER: [datei: string, klasse: string][] = [
   ["FormField.tsx", "field"],
@@ -148,6 +157,16 @@ describe("Trefferflächen schmal", () => {
     }
     // Die Filterleiste gibt einer Auswahl eine Mindestbreite von 10rem — grösser, also gut.
     expect(funde.filter((f) => !f.includes("10rem"))).toEqual([]);
+  });
+
+  it.each(AUFKLAPPZEILEN)("%s trägt die Klasse .%s", (datei, klasse) => {
+    expect(readFileSync(join(__dirname, datei), "utf8")).toContain(`className="${klasse}"`);
+  });
+
+  it.each(AUFKLAPPZEILEN)("%s: .%s ist schmal mindestens 44 px hoch, breit wie vorher", (_datei, klasse) => {
+    expect(wert(klasse, "min-height", SCHMAL)).toBe("var(--trefferflaeche)");
+    expect(wert(klasse, "min-height", BREIT)).toBe("auto");
+    expect(regelnAm(klasse, SCHMAL).filter((r) => r.dekl.has("min-height")).map((r) => r.dekl.get("min-height"))).toEqual(["var(--trefferflaeche)"]);
   });
 
   it("legt um ein Kästchen ohne Text eine unsichtbare Fläche von 44 px", () => {

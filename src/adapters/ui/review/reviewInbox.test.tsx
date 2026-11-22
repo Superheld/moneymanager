@@ -224,4 +224,18 @@ describe("Zeilen weglegen und eingrenzen", () => {
     await waitFor(() => expect(screen.queryByText("Ohlert")).not.toBeInTheDocument());
     expect(screen.getByText("Halvern")).toBeInTheDocument();
   });
+
+  /**
+   * Das Suchfeld trägt die Form der Tabellenfilter und keinen eigenen Inline-Stil: der
+   * kannte keine Breite und stand schmal in 13 px — iOS zoomte beim Antippen. Ob die
+   * Klasse schmal 16 px und 44 px Höhe hat, prüft `trefferflaechen.test.ts`.
+   */
+  it("gibt dem Suchfeld die Form eines Tabellenfilters", async () => {
+    await zwei();
+    rendere(<ReviewScreen />);
+    await screen.findByText("Ohlert");
+    const suche = screen.getByPlaceholderText(i18n.t("review.suche"));
+    expect(suche).toHaveClass("field", "tabellenfilter");
+    expect(suche.style.fontSize).toBe("");
+  });
 });

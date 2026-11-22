@@ -620,13 +620,30 @@ select.field {
    einem Bedienteil darin kürzt sich nie — ein abgeschnittener Knopf ist keiner, und
    `overflow: hidden` schnitte auch seinen Fokusrahmen ab. Gibt es nur schmal (das Markup
    entsteht nur dort, siehe `zelleZweitzeile` in `DataTable.tsx`). */
+/* Der Trenner „·" zwischen zwei Stücken steht nie am Rand einer Zeile — ohne dass
+   JavaScript messen muss, wo umgebrochen wurde:
+
+   - Er ist ein `::before` am Anfang jedes Stücks ausser dem ersten, so breit wie der
+     Abstand (`--zweitzeile-abstand`), und das Stück rückt um genau diese Breite nach
+     links (negativer Rand). Mitten in der Zeile liegt er so im Abstand zum Vorgänger.
+   - Beginnt ein Stück eine neue Zeile, liegt sein Trenner links AUSSERHALB der Zeile.
+     `clip-path` schneidet dort ab. Das Polster links (mit gleich grossem negativem Rand)
+     lässt dabei 4 px stehen, damit der Fokusrahmen eines Bedienteils am Zeilenanfang
+     ganz bleibt; der Punkt selbst sitzt mittig im Abstand, also weiter links.
+
+   Bis 2026-11-22 hing der Trenner als Text HINTER dem Stück; brach das nächste Stück
+   um, stand er allein am Ende der oberen Zeile. */
 .datentabelle-zweitzeile {
+  --zweitzeile-abstand: var(--sp-3);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  column-gap: var(--sp-1);
+  column-gap: var(--zweitzeile-abstand);
   row-gap: var(--sp-1);
   margin-top: 2px;
+  margin-left: calc(-1 * var(--sp-1));
+  padding-left: var(--sp-1);
+  clip-path: inset(-1em -1em -1em 0);
   font-size: var(--fs-xs);
   font-weight: var(--fw-regular);
   color: var(--ink-3);
@@ -638,12 +655,28 @@ select.field {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.datentabelle-zweitteil + .datentabelle-zweitteil {
+  margin-left: calc(-1 * var(--zweitzeile-abstand));
+}
+.datentabelle-zweitteil + .datentabelle-zweitteil::before {
+  content: "·" / "";
+  display: inline-block;
+  width: var(--zweitzeile-abstand);
+  text-align: center;
+  opacity: 0.45;
+}
+/* Ein Stück mit Bedienteil wird selbst ein Flex-Behälter: seine Grundlinie ist sonst die
+   Unterkante eines Symbols, und der Trenner davor sässe dort wie ein Schlusspunkt hinter
+   dem vorigen Stück („01.05.2026 ."). So steht er mittig, wie neben Text. */
 .datentabelle-zweitteil:has(button, select, input, [role="combobox"], [role="checkbox"]) {
   flex-shrink: 0;
   overflow: visible;
+  display: inline-flex;
+  align-items: center;
 }
-.datentabelle-trenner {
-  opacity: 0.45;
+/* Im Flex-Behälter fällt das Leerzeichen hinter dem Namen weg; der Abstand ersetzt es. */
+.datentabelle-zweitteil:has(button, select, input, [role="combobox"], [role="checkbox"]) > .zweitzeile-beschriftung {
+  margin-right: 0.25em;
 }
 
 /* Die Beschriftung eines Werts, der schmal in die zweite Zeile wandert: breit sagt der
@@ -979,10 +1012,20 @@ select.field.tabellenfilter {
   padding: 8px 0;
   border-bottom: 1px solid var(--line-soft);
 }
+/* Name und Pille brechen um, die Knöpfe bleiben ganz: in einer eingerückten Zeile
+   drückten Name, Pille und zwei Knöpfe die Knöpfe schmal über den Kartenrand. Wo Platz
+   ist (breit immer), bricht nichts um, und es sieht aus wie vorher. */
 .katrow .nm {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--sp-2);
+  min-width: 0;
+}
+.katrow-aktionen {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--sp-3);
 }
 .katmain .nm {
   font-weight: var(--fw-bold);
@@ -1172,8 +1215,14 @@ select.field.tabellenfilter {
 /* --- Umschalter (bausteine/Umschalter.tsx) ---
    Masse aus den drei Leisten, die vorher von Hand dastanden. Gedrueckt heisst bei Base UI
    `[data-pressed]`. */
+/* Schmal bricht die Beschriftung eines Knopfs um, statt die Leiste breiter als den
+   Bildschirm zu machen: „Wofür ging Geld raus?" neben „Was hat der Monat gekostet?" lief
+   in der Analyse seitlich aus dem Bild. Die Leiste endet an der Kante ihres Behälters,
+   die Knöpfe teilen sich den Platz und werden dafür zweizeilig. Ab 700 px wieder eine
+   Zeile je Knopf, wie vorher. */
 .umschalter {
   display: inline-flex;
+  max-width: 100%;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   overflow: hidden;
@@ -1188,7 +1237,15 @@ select.field.tabellenfilter {
   background: transparent;
   color: var(--ink-2);
   cursor: pointer;
-  white-space: nowrap;
+  white-space: normal;
+}
+@media (min-width: 700px) {
+  .umschalter {
+    max-width: none;
+  }
+  .umschalter-knopf {
+    white-space: nowrap;
+  }
 }
 .umschalter-knopf + .umschalter-knopf {
   border-left: 1px solid var(--line-soft);
@@ -1225,6 +1282,38 @@ select.field.tabellenfilter {
      fuer einen senkrechten Rollbalken an einer Leiste, die nur eine Zeile hoch ist. */
   overflow-x: auto;
   overflow-y: hidden;
+  /* Der Rand, den `Registerleiste.tsx` freihält, wenn es den aktiven Reiter ins Bild
+     rückt: so breit wie der Verlauf unten, sonst läge der Reiter darunter. */
+  scroll-padding-inline-end: var(--sp-7);
+}
+/* Schmal: ein Verlauf an der rechten Kante sagt, dass dort noch Reiter kommen. Am
+   Telefon passen die Reiter der Analyse und der Einstellungen nicht in eine Zeile, und
+   eine Rollleiste ohne Balken sieht aus, als ende sie an der Kante — der letzte
+   sichtbare Reiter schliesst oft glatt ab. Umbrechen statt rollen wäre die andere Wahl
+   gewesen; zwei Reiterzeilen über einer Trennlinie lesen sich aber als zwei Ebenen.
+
+   Ohne Messung: der Verlauf ist das letzte Kind der Leiste und klebt per `sticky` an
+   ihrer rechten Kante. Ist man am Ende angekommen, steht er an seinem eigenen Platz
+   HINTER dem letzten Reiter, über leerer Fläche — und ist damit unsichtbar, ebenso in
+   jeder Leiste, deren Reiter ohnehin passen. Der negative Rand nimmt den Abstand der
+   Leiste vor ihm zurück, damit er eine knapp passende Leiste nicht erst zum Rollen
+   bringt. */
+.registerleiste::after {
+  content: "";
+  position: sticky;
+  right: 0;
+  flex: 0 0 var(--sp-7);
+  margin-left: calc(-1 * var(--sp-4));
+  background: linear-gradient(to right, transparent, var(--cream) 75%);
+  pointer-events: none;
+}
+@media (min-width: 700px) {
+  .registerleiste {
+    scroll-padding-inline-end: 0;
+  }
+  .registerleiste::after {
+    content: none;
+  }
 }
 .registerleiste-reiter {
   background: none;
@@ -2112,6 +2201,14 @@ select.field.tabellenfilter {
 .registerleiste-reiter {
   flex-shrink: 0;
 }
+/* Eine Zeile, die aufklappt, ist selbst das Bedienteil — und kein Baustein, sondern je
+   Bereich gebaut: die Zeilen der Monatskarten in der Übersicht (40 px) und die Kopfzeile
+   je Konto im Abgleich (23 px). Der Inhalt rückt in die Mitte der gewonnenen Höhe; ohne
+   `align-content` stünde die Abgleichzeile (Flex mit Umbruch) oben und darunter Leere. */
+.aufklappzeile {
+  min-height: var(--trefferflaeche);
+  align-content: center;
+}
 /* Ein Kästchen ohne Text bleibt 16 px gross zu sehen — als 44er Kasten sähe es aus wie
    ein Knopf. Die Fläche liegt deshalb unsichtbar darum. Mit Text trifft man das Label,
    und das trägt oben schon die Mindesthöhe. */
@@ -2149,6 +2246,10 @@ select.field.tabellenfilter {
   }
   .registerleiste-reiter {
     flex-shrink: 1;
+  }
+  .aufklappzeile {
+    min-height: auto;
+    align-content: normal;
   }
   .kaestchen-feld:not(.kaestchen > .kaestchen-feld)::after {
     content: none;

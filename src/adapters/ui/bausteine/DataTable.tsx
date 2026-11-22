@@ -331,13 +331,14 @@ export function DataTable<T>({
     if (!teile.length) return null;
     return (
       <div className="datentabelle-zweitzeile" title={texte.length ? texte.join(" · ") : undefined}>
-        {teile.map((teil, k) => (
+        {/* Der Trenner „·" steht nicht im Markup, sondern vor jedem Stück ausser dem
+            ersten, links im Abstand (`app.css`). Beginnt ein Stück eine neue Zeile, liegt
+            er links ausserhalb und wird abgeschnitten — so steht er nie am Zeilenende
+            und nie am Zeilenanfang, ohne dass jemand messen muss, wo umgebrochen wird. */}
+        {teile.map((teil) => (
           <span key={teil.n} className="datentabelle-zweitteil">
             {teil.name !== null && <span className="zweitzeile-beschriftung">{teil.name} </span>}
             {teil.v}
-            {/* Der Trenner hängt HINTER dem Stück: bricht die Zeile um, steht er am Ende
-                der oberen, nicht allein am Anfang der unteren. */}
-            {k < teile.length - 1 && <span className="datentabelle-trenner" aria-hidden="true"> ·</span>}
           </span>
         ))}
       </div>

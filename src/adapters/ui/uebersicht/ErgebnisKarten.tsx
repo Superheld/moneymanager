@@ -283,6 +283,7 @@ function ZeileMitPosten({
       <Collapsible.Trigger
         nativeButton={false}
         render={<div />}
+        className="aufklappzeile"
         style={{
           ...zeileGrid(zweiSpalten),
           padding: "9px 0",

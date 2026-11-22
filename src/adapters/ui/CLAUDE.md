@@ -483,6 +483,12 @@ einmal, ein einzelner Monatswähler in einer Kartenkopfzeile braucht dafür kein
 es sonst nicht gäbe. Die Masse sind nicht erfunden — die Filterleiste der Import-Durchsicht
 trug sie längst als eigenen Inline-Stil und sah als einzige richtig aus.
 
+**Seit 2026-11-22 trägt auch deren Suchfeld die Klasse** (`field tabellenfilter`) statt
+des Inline-Stils. Der kannte keine Breite: schmal stand das Feld in 13 px — iOS zoomte
+beim Antippen — und 28 px hoch. Breit verschiebt sich dadurch die Polsterung um einen
+Pixel (5/9 statt 5/8), bewusst in Kauf genommen: ein Filter, der als einziger anders
+aussieht, ist genau das, was die Klasse abschaffen sollte.
+
 Die Regel dahinter ist dieselbe wie bei `Zeilenauswahl`: **die Grösse eines Bedienteils
 folgt dem, wo es steht, nicht dem, was es tut.**
 
@@ -638,11 +644,12 @@ das bedeutet, ist enger als es klingt, und die Grenze gehört benannt:
   `.form-grid`. Schmal führt eine Leiste unten in die vier häufigsten Bereiche (unten,
   „Die Navigation in drei Stufen").
 - **Die Übersicht ist schmal eigens geordnet**: der laufende Monat oben, „Damit die
-  Zahlen stimmen" darunter als eine Zeile, die aufklappt (`uebersicht/CLAUDE.md`).- **Die BEREICHE sind es nicht.** Ihre Raster stehen weiter als `max-width`-Abfragen
+  Zahlen stimmen" darunter als eine Zeile, die aufklappt (`uebersicht/CLAUDE.md`).
+- **Die BEREICHE sind es nicht.** Ihre Raster stehen weiter als `max-width`-Abfragen
   (`ausblick-karten`) oder tragen sich über `auto-fit` selbst (`karten-paar`, `kpis`). Sie
-  funktionieren schmal, aber sie sind nicht dafür entworfen — eine Tabelle scrollt dort
-  waagerecht, ein Registerband ebenso. Das ist der Stand, und die Neuaufteilung kommt
-  danach.
+  funktionieren schmal, aber sie sind nicht dafür entworfen. Ein Registerband rollt
+  waagerecht, mit einem Verlauf an der Kante (unten). Das ist der Stand, und die
+  Neuaufteilung kommt danach.
 
 **Eine Tabelle von Hand fällt schmal nicht zusammen.** Die zwei Spalten der schmalen Form
 gibt es nur in der `DataTable`; eine eigene `<table>` behält alle Spalten und läuft
@@ -651,6 +658,39 @@ eigene Tabelle — ihre Zellen müssen umbrechen (Gründe einer Dublette, Herkun
 Vorschlags), die `DataTable` kürzt jede auf eine Zeile — und ordnet ihre Zellen schmal per
 CSS in dieselbe Form um (`.inbox-tabelle` in `app.css`). Eine neue Tabelle nimmt die
 `DataTable`; wer davon abweicht, baut die schmale Form selbst mit.
+
+**Was nicht passt, bricht um oder wird kleiner — es läuft nicht seitlich hinaus** (seit
+2026-11-22 in allen Bereichen und Reitern bei 390 px nachgemessen). Drei Stellen taten
+es bis dahin, und jede steht für eine Art:
+
+- **Eine Leiste, deren Knöpfe zusammen zu breit sind** (`Umschalter` in der Analyse):
+  schmal endet sie am Behälter, und die Beschriftung jedes Knopfs bricht um. Ab 700 px
+  wieder einzeilig.
+- **Eine Zahl, die allein breiter ist als die Karte** (die grosse Zahl im Vermögen):
+  `KPIStat` setzt die grosse Zahl auf `min(var(--fs-display), 12vw)`. Die 64 px gelten
+  ab gut 530 px Fensterbreite, breit ändert sich nichts. Eine Zahl umbrechen geht nicht,
+  kürzen darf man sie nicht — bleibt nur die Grösse.
+- **Eine Zeile aus Text und Knöpfen** (Kategorien in den Einstellungen): der Text bricht
+  um (`flex-wrap` und `min-width: 0` am Namen), die Knöpfe schrumpfen nicht
+  (`.katrow-aktionen`). Ohne beides schob der Name die Knöpfe über den Kartenrand.
+
+**Eine Reiterleiste rollt schmal, und man sieht es ihr an** (`Registerleiste`, seit
+2026-11-22). Die Reiter der Analyse und der Einstellungen passen bei 390 px nicht in
+eine Zeile, auch nicht mit kleinerem Abstand. Umbrechen wäre die andere Wahl gewesen;
+zwei Reiterzeilen über einer Trennlinie lesen sich aber als zwei Ebenen. Zwei Dinge
+machen das Rollen sichtbar:
+
+- **Ein Verlauf an der rechten Kante**, ohne Messung: `::after` der Leiste klebt per
+  `sticky` rechts. Am Ende der Leiste steht er an seinem eigenen Platz hinter dem
+  letzten Reiter, über leerer Fläche, und ist damit weg — ebenso in jeder Leiste, die
+  ohnehin passt. Er nimmt die Farbe des Seitengrunds (`--cream`); eine Leiste auf einer
+  Karte bräuchte eine andere.
+- **Der aktive Reiter rückt ins Bild**, beim Öffnen und bei jedem Wechsel
+  (`aktivenReiterZeigen`), und zwar links vom Verlauf (`scroll-padding-inline-end`).
+  Nur die Leiste rollt, nie die Seite: `scrollIntoView` hätte auch senkrecht
+  gerollt, sobald die Leiste nicht ganz im Bild ist.
+
+Breit gibt es beides nicht; dort passen die Reiter.
 
 Vier Dinge, die bei jedem neuen Stück ab jetzt gelten und die man schmal nicht nachholen
 kann:
@@ -662,7 +702,10 @@ kann:
   Die Bausteine tragen sie seit 2026-11-22 selbst, als `min-height` (wo der Inhalt
   schmaler sein kann, auch `min-width`) im Abschnitt „Trefferflächen" am Ende von
   `app.css`, breit auf `auto` zurückgenommen. Wer einen Baustein mit Bedienteil baut,
-  hängt seine Klasse dort an; `trefferflaechen.test.ts` prüft die Liste. **Keine
+  hängt seine Klasse dort an; `trefferflaechen.test.ts` prüft die Liste. Dasselbe gilt
+  für eine Zeile, die aufklappt und selbst das Bedienteil ist, ohne Baustein zu sein
+  (Monatskarten der Übersicht, Kopfzeile je Konto im Abgleich): sie trägt
+  `.aufklappzeile`, und der Test führt sie in einer eigenen Liste. **Keine
   Mindestbreite an Knöpfen mit Text:** in einer Flex-Zeile ersetzt sie das `auto`, das
   einen Knopf nie schmaler werden lässt als seine Beschriftung — so lief der Seitenkopf
   aus dem Bild.

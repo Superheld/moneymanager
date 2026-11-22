@@ -18,7 +18,7 @@
 // Deshalb gibt es genau ein Panel, und es zeigt, was der Aufrufer hineingibt.
 
 import { Tabs } from "@base-ui/react/tabs";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 export interface Register {
   /** Stabiler technischer Schlüssel — nicht der Anzeigename. */
@@ -49,9 +49,13 @@ export function Registerleiste({
   // als zwei Kinder in `.screen`, und der Abstand dazwischen kam von dort. Seit beides in
   // EINER Wurzel steht, muss sie ihn selbst tragen — sonst rückt der Inhalt um genau
   // diesen Abstand an die Leiste heran (am Bildschirmvergleich gefunden).
+  const leiste = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (leiste.current) aktivenReiterZeigen(leiste.current);
+  }, [aktiv]);
   return (
     <Tabs.Root className="registerbereich" value={aktiv ?? null} onValueChange={(id) => onWahl(String(id))}>
-      <Tabs.List className="registerleiste">
+      <Tabs.List ref={leiste} className="registerleiste">
         {register.map((r) => (
           <Tabs.Tab key={r.id} value={r.id} className="registerleiste-reiter">
             {r.label}
@@ -65,4 +69,26 @@ export function Registerleiste({
       )}
     </Tabs.Root>
   );
+}
+
+/**
+ * Rückt den aktiven Reiter in den sichtbaren Teil der Leiste — schmal, wo sie rollt.
+ * Öffnet man einen Bereich, dessen gewähltes Register hinter der Kante liegt (in den
+ * Einstellungen „Über die App"), sah man sonst gar keinen markierten Reiter und musste
+ * raten, wo man ist.
+ *
+ * Nur waagerecht und nur an der Leiste: `scrollIntoView` rollte auch die Seite, sobald
+ * die Leiste nicht ganz im Bild ist — ein Reiterwechsel aus dem Inhalt heraus liesse
+ * die Seite springen. Rechts bleibt der Rand frei, den `scroll-padding-inline-end`
+ * nennt (`app.css`): dort liegt der Verlauf, der weitere Reiter anzeigt. Breit rollt
+ * nichts, und die Rechnung ändert nichts.
+ */
+export function aktivenReiterZeigen(liste: HTMLElement): void {
+  const reiter = liste.querySelector<HTMLElement>("[data-active]");
+  if (!reiter) return;
+  const l = liste.getBoundingClientRect();
+  const r = reiter.getBoundingClientRect();
+  const rand = parseFloat(getComputedStyle(liste).scrollPaddingInlineEnd) || 0;
+  if (r.right > l.right - rand) liste.scrollLeft += r.right - (l.right - rand);
+  else if (r.left < l.left) liste.scrollLeft -= l.left - r.left;
 }

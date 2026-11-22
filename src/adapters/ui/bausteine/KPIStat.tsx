@@ -35,7 +35,10 @@ const TON: Record<NonNullable<KPIStatProps["tone"]>, string> = {
 
 export function KPIStat({ label, value, unit, meta, tone = "default", size = "chip", tag, style }: KPIStatProps) {
   const tonFarbe = TON[tone] ?? TON.default;
-  const wertGroesse = size === "hero" ? "var(--fs-display)" : size === "tile" ? "var(--fs-h1)" : "var(--fs-h2)";
+  // Die grosse Zahl folgt schmal der Fensterbreite: in 64 px lief ein sechsstelliger
+  // Betrag auf einem Telefon über den Kartenrand (Vermögen). 12vw erreicht die 64 px ab
+  // gut 530 px Fensterbreite — breit, und ab 700 px sowieso, bleibt sie, wie sie war.
+  const wertGroesse = size === "hero" ? "min(var(--fs-display), 12vw)" : size === "tile" ? "var(--fs-h1)" : "var(--fs-h2)";
   // Die Einheit steht eine Stufe unter der Zahl. Bei der grossen Zahl liegt das zwischen
   // zwei Textstufen (h1 30, h2 20) und ist deshalb eine eigene Zahl, keine Stufe.
   const einheitGroesse = size === "hero" ? "28px" : "var(--fs-body)";

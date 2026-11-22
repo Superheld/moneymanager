@@ -178,7 +178,7 @@ export function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie
         <span className="nm">
           {k.name} <Pill variant={CHARAKTER_PILL[k.defaultCharakter]}>{t(`charakter.${k.defaultCharakter}`)}</Pill>
         </span>
-        <span style={{ display: "flex", gap: "var(--sp-3)" }}>
+        <span className="katrow-aktionen">
           <IconButton icon="bearbeiten" label={t("einstellungen.bearbeiten")} onClick={() => bearbeiten(k)} />
           <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} onClick={() => loeschfrage.stellen({
             name: k.name,
