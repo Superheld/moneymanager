@@ -64,8 +64,13 @@ und der Rest läuft nie. Danach am Spielstand nachsehen, ob sie gewirkt hat.
 npx vite-node scripts/migrationsprobe.mjs -- /pfad/kopie.db
 ```
 
-Es fährt die Kette, meldet jede Tabelle, deren Zeilenzahl sich verändert hat, und prüft am
-Ende die Fremdschlüssel. **Das ist kein Ersatz für `npm test`, sondern die Prüfung, die
+Es fährt `migrate()` selbst (über `src/testwerkzeug/migrationsprobe.ts`), so wie die App
+beim Öffnen: Fremdschlüssel aus, je Version eine Transaktion samt Eintrag in `_migration`,
+`fremdschluesselPruefen` nach der Kette. Dazu meldet es jede Tabelle, deren Zeilenzahl
+sich verändert hat, und nennt die Tabellen verletzter Fremdschlüssel. Bis 2026-11-22 baute
+es die Schleife nach und wich dabei ab (keine Transaktion, keine Versionen, kein
+`@wennSpalte`); `migrationsprobe.test.ts` hält es jetzt gegen `migrate()` auf einer frischen
+Datenbank. **Das ist kein Ersatz für `npm test`, sondern die Prüfung, die
 `npm test` nicht leisten kann** — der Grund steht unten bei den Fremdschlüsseln.
 
 **Die Kopie muss ein ÄLTERES Schema tragen, sonst prüft sie nichts.** Ein frisch geseedeter
