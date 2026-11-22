@@ -228,18 +228,30 @@ pub fn einwickeln(dk: &Datenschluessel, passphrase: &str) -> Result<Huelle, Schl
         p_spuren: P_SPUREN,
         salz: BASE64.encode(&salz),
     };
+    einwickeln_mit(dk, passphrase, &salz, &nonce, angaben)
+}
 
-    let mut schluessel = kek(passphrase, &salz, &angaben)?;
+/// Der Teil von `einwickeln`, der nichts wuerfelt. Getrennt, damit die Testvektoren
+/// (`mod testvektoren`) mit festem Salz und fester Nonce genau diesen Weg gehen koennen
+/// und nicht einen nachgebauten.
+fn einwickeln_mit(
+    dk: &Datenschluessel,
+    passphrase: &str,
+    salz: &[u8; SALZ_BYTES],
+    nonce: &[u8; NONCE_BYTES],
+    angaben: KdfAngaben,
+) -> Result<Huelle, SchluesselFehler> {
+    let mut schluessel = kek(passphrase, salz, &angaben)?;
     let aead = XChaCha20Poly1305::new((&schluessel).into());
     let geheimtext = aead
-        .encrypt(XNonce::from_slice(&nonce), dk.0.as_slice())
+        .encrypt(&XNonce::from(*nonce), dk.0.as_slice())
         .map_err(|_| SchluesselFehler::HuelleKaputt)?;
     schluessel.zeroize();
 
     Ok(Huelle {
         fassung: FASSUNG,
         kdf: angaben,
-        nonce: BASE64.encode(&nonce),
+        nonce: BASE64.encode(nonce),
         geheimtext: BASE64.encode(&geheimtext),
     })
 }
@@ -258,14 +270,13 @@ pub fn auswickeln(huelle: &Huelle, passphrase: &str) -> Result<Datenschluessel, 
     let geheimtext = BASE64
         .decode(huelle.geheimtext.as_bytes())
         .map_err(|_| SchluesselFehler::HuelleKaputt)?;
-    if nonce.len() != NONCE_BYTES {
-        return Err(SchluesselFehler::HuelleKaputt);
-    }
+    // Eine Nonce falscher Laenge faellt hier auf, VOR der teuren Ableitung.
+    let nonce = XNonce::try_from(nonce.as_slice()).map_err(|_| SchluesselFehler::HuelleKaputt)?;
 
     let mut schluessel = kek(passphrase, &salz, &huelle.kdf)?;
     let aead = XChaCha20Poly1305::new((&schluessel).into());
     let klartext = aead
-        .decrypt(XNonce::from_slice(&nonce), geheimtext.as_slice())
+        .decrypt(&nonce, geheimtext.as_slice())
         // Ab hier ist nicht mehr unterscheidbar, ob die Passphrase falsch war oder jemand
         // an der Datei gedreht hat. Das ist Absicht: Poly1305 prueft beides in einem, und
         // zwei verschiedene Meldungen waeren ein Orakel.
@@ -296,7 +307,9 @@ mod tests {
         let aead = XChaCha20Poly1305::new((&k).into());
         let nonce = BASE64.decode(h.nonce.as_bytes()).unwrap();
         h.geheimtext = BASE64.encode(
-            &aead.encrypt(XNonce::from_slice(&nonce), dk.bytes().as_slice()).unwrap(),
+            &aead
+                .encrypt(&XNonce::try_from(nonce.as_slice()).unwrap(), dk.bytes().as_slice())
+                .unwrap(),
         );
         k.zeroize();
         h
@@ -386,6 +399,16 @@ mod tests {
     }
 
     #[test]
+    fn eine_nonce_falscher_laenge_ist_eine_kaputte_huelle() {
+        let dk = Datenschluessel::wuerfeln();
+        let mut h = schnelle_huelle(&dk, "kennwort");
+        // 12 Byte: die Nonce von ChaCha20 ohne X. Wer sie unterschiebt, bekommt keinen
+        // Absturz und keinen Versuch, sondern eine Absage.
+        h.nonce = BASE64.encode(&[0u8; 12]);
+        assert_eq!(auswickeln(&h, "kennwort").unwrap_err(), SchluesselFehler::HuelleKaputt);
+    }
+
+    #[test]
     fn eine_unbekannte_fassung_wird_abgewiesen_statt_geraten() {
         let dk = Datenschluessel::wuerfeln();
         let mut h = schnelle_huelle(&dk, "kennwort");
@@ -441,5 +464,145 @@ mod tests {
             assert!(gruppe.len() <= 4, "{gruppe}");
             assert!(gruppe.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()));
         }
+    }
+}
+
+/// **Feste Testvektoren: eine Huelle, die eine FRUEHERE Fassung geschrieben hat, geht auf.**
+///
+/// Die Tests oben wickeln ein und wieder aus — mit derselben Fassung der Kisten. Das
+/// faellt nicht auf, wenn eine neue Fassung von argon2 oder chacha20poly1305 anders
+/// rechnet: beide Richtungen rechnen dann gemeinsam falsch, und der Test bleibt gruen,
+/// waehrend jede schon geschriebene Huelle nicht mehr aufgeht. Genau dieser Fall muss
+/// ausgeschlossen sein, denn ohne Huelle ist der Bestand nur noch mit dem
+/// Wiederherstellungscode zu oeffnen.
+///
+/// Die Werte unten sind deshalb KEINE Ausgabe des heutigen Codes, sondern festgehalten:
+/// erzeugt mit argon2 0.5.3 und chacha20poly1305 0.10.1, vor dem Heben auf 0.6/0.11, und
+/// gegengeprueft mit zwei fremden Umsetzungen — Argon2id mit `openssl kdf … ARGON2ID`
+/// (OpenSSL 4.1), XChaCha20-Poly1305 mit libsodium
+/// (`crypto_aead_xchacha20poly1305_ietf_encrypt` ueber PyNaCl). Alle drei ergeben
+/// dieselben Bytes. **Wer hier einen Wert anpasst, damit der Test gruen wird, gibt jede
+/// bestehende Huelle auf.**
+///
+/// Alle Eingaben sind erfunden: Passphrase, Salz, Nonce und Datenschluessel haben mit
+/// keinem echten Bestand etwas zu tun.
+#[cfg(test)]
+mod testvektoren {
+    use super::*;
+
+    const PASSPHRASE: &str = "testpassphrase-alt";
+    const SALZ: [u8; SALZ_BYTES] = *b"festes-salz-0001";
+    const NONCE: [u8; NONCE_BYTES] = *b"feste-nonce-fuer-testvek";
+
+    /// 00 01 02 … 1f.
+    fn datenschluessel() -> Datenschluessel {
+        Datenschluessel(core::array::from_fn(|i| i as u8))
+    }
+
+    struct Vektor {
+        m_kib: u32,
+        t_durchgaenge: u32,
+        p_spuren: u32,
+        /// Was Argon2id aus Passphrase und Salz ableitet, hex.
+        kek: &'static str,
+        /// Der eingewickelte Datenschluessel samt Poly1305-Tag, Base64.
+        geheimtext: &'static str,
+    }
+
+    /// Kleine Parameter, aber mehrere Spuren — damit auch der Weg ueber `p > 1` ohne
+    /// Wartezeit geprueft ist.
+    const KLEIN: Vektor = Vektor {
+        m_kib: 32,
+        t_durchgaenge: 2,
+        p_spuren: 4,
+        kek: "62ea75ae1c1901993696e24ca7a4d3830ceff339867c9ed48a703caddb269892",
+        geheimtext: "lSJkgs/Eo4VtVG1F87AICIDRfZkSdGEqMr1wSD/rDv2trYaD3jgTDetfodBU36CQ",
+    };
+
+    /// **Die Parameter, mit denen die App wirklich schreibt.** Kostet im Debug-Build ein
+    /// paar Sekunden und laeuft trotzdem immer mit: das ist der Fall, der einen echten
+    /// Bestand betrifft, und den mit kleineren Werten zu ersetzen hiesse, genau ihn nicht
+    /// zu pruefen.
+    const ECHT: Vektor = Vektor {
+        m_kib: 65_536,
+        t_durchgaenge: 3,
+        p_spuren: 4,
+        kek: "96fefb88b6e004b2314c18e6de5eb51bd77fbb941c359612a50467b9e63a8e0e",
+        geheimtext: "/7VaLuEaEt9mFOSFXLb4C+vCYv0VUxY4LJvqCFaf15JCjAf+HdErM6y983lxxOib",
+    };
+
+    fn angaben(v: &Vektor) -> KdfAngaben {
+        KdfAngaben {
+            art: "argon2id".into(),
+            m_kib: v.m_kib,
+            t_durchgaenge: v.t_durchgaenge,
+            p_spuren: v.p_spuren,
+            salz: BASE64.encode(&SALZ),
+        }
+    }
+
+    /// Die Huelle so, wie sie als `<name>.schluessel.json` auf der Platte laege — als
+    /// JSON-Text, damit auch die Feldnamen der Datei festgehalten sind.
+    fn huelle_als_json(v: &Vektor) -> String {
+        format!(
+            r#"{{"fassung":1,"kdf":{{"art":"argon2id","m_kib":{},"t_durchgaenge":{},"p_spuren":{},"salz":"{}"}},"nonce":"{}","geheimtext":"{}"}}"#,
+            v.m_kib,
+            v.t_durchgaenge,
+            v.p_spuren,
+            BASE64.encode(&SALZ),
+            BASE64.encode(&NONCE),
+            v.geheimtext,
+        )
+    }
+
+    fn hex(bytes: &[u8]) -> String {
+        bytes.iter().map(|b| format!("{b:02x}")).collect()
+    }
+
+    fn pruefen(v: &Vektor) {
+        // 1. Die Ableitung allein: dieselben Bytes wie die alte Fassung.
+        let kek = kek(PASSPHRASE, &SALZ, &angaben(v)).expect("ableiten");
+        assert_eq!(hex(&kek), v.kek, "Argon2id rechnet anders als die alte Fassung");
+
+        // 2. Eine Huelle der alten Fassung geht auf und ergibt denselben Datenschluessel.
+        let huelle: Huelle = serde_json::from_str(&huelle_als_json(v)).expect("json");
+        let dk = auswickeln(&huelle, PASSPHRASE).expect("alte Huelle geht nicht mehr auf");
+        assert_eq!(dk.bytes(), datenschluessel().bytes());
+
+        // 3. Und in die andere Richtung: mit festem Salz und fester Nonce wickelt der
+        //    heutige Code genau so ein wie die alte Fassung.
+        let neu = einwickeln_mit(&datenschluessel(), PASSPHRASE, &SALZ, &NONCE, angaben(v))
+            .expect("einwickeln");
+        assert_eq!(neu.geheimtext, v.geheimtext, "XChaCha20-Poly1305 wickelt anders ein");
+        assert_eq!(neu.nonce, BASE64.encode(&NONCE));
+        assert_eq!(neu.kdf.salz, BASE64.encode(&SALZ));
+
+        // 4. Mit falscher Passphrase geht dieselbe Huelle nicht auf.
+        assert_eq!(
+            auswickeln(&huelle, "testpassphrase-neu").unwrap_err(),
+            SchluesselFehler::PassphraseFalsch
+        );
+    }
+
+    #[test]
+    fn eine_huelle_der_alten_fassung_geht_auf_kleine_parameter() {
+        pruefen(&KLEIN);
+    }
+
+    #[test]
+    fn eine_huelle_der_alten_fassung_geht_auf_echte_parameter() {
+        pruefen(&ECHT);
+    }
+
+    #[test]
+    fn der_vektor_mit_echten_parametern_folgt_dem_was_die_app_schreibt() {
+        // Hebt jemand die Parameter, bleibt der Vektor oben trotzdem gueltig — alte
+        // Huellen tragen ihre Werte selbst. Dann aber prueft er nicht mehr, was die App
+        // HEUTE schreibt, und dafuer gehoert ein zweiter Vektor daneben, nicht dieser
+        // umgeschrieben.
+        assert_eq!(
+            (M_KIB, T_DURCHGAENGE, P_SPUREN),
+            (ECHT.m_kib, ECHT.t_durchgaenge, ECHT.p_spuren)
+        );
     }
 }
