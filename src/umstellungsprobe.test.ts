@@ -524,8 +524,10 @@ beforeAll(async () => {
  * verglichen wird; eine Migration, die Daten umbaut, gehört NICHT hierher.
  *
  *   • 82 — Kauf und Nutzungsdauer an der Rücklage, nur für die Anzeige des Wertverlusts.
+ *   • 83 — Vorsorgeziel und Verrechnungskonto am Depot. Ihr UPDATE trifft hier nichts: sie
+ *     läuft vor dem Einspielen, es gibt noch kein Depot. Die Probe rechnet über kein Depot.
  */
-const NUR_SCHEMA_DANACH = new Set([82]);
+const NUR_SCHEMA_DANACH = new Set([82, 83]);
 
 function migrationen(db: Database, filter: (version: number) => boolean): void {
   for (const m of MIGRATIONS.filter((x) => filter(x.version))) for (const sql of m.sql) db.run(sql);
@@ -537,6 +539,10 @@ function migrationen(db: Database, filter: (version: number) => boolean): void {
  * aufbauende Budget steht wieder als Budget in `budget` und `budget_betrag` — mit dem
  * Start, der Kategorie, dem Konto und der Reihe, die der Spielstand heute der Rücklage
  * gibt. Daraus macht Migration 81 genau die Rücklage, die der Spielstand heute schreibt.
+ *
+ * Dazu das Schema ab Migration 83 (Verrechnungskonto und Vorsorgeziel am Depot): der
+ * Spielstand von heute schreibt in diese Spalten, und ohne sie liesse er sich nicht
+ * einspielen. Die Probe rechnet über kein Depot; was 83 anlegt, berührt ihre Zahlen nicht.
  */
 function alterSpielstand(bis: number): Database {
   const db = new SQL.Database();

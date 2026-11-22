@@ -184,6 +184,7 @@ describe("vermoegensvergleich", () => {
       { id: "a", datum: "2025-05-10", betrag: -20000, kontoId: "giro", charakter: "Aufwand", quelle: "import" },
       { id: "b", datum: "2025-06-10", betrag: 50000, kontoId: "giro", charakter: "Ertrag", quelle: "import" },
     ],
+    depots: [],
     depotwerte: [{ depotId: "d", stichtag: "2025-05-20", gesamtwert: 300000 }],
     gegenstaende: [{ id: "g", bezeichnung: "Kesselmann", art: "sonstiges" }],
     werte: [{ gegenstandId: "g", stichtag: "2025-01-01", wert: 500000 }],

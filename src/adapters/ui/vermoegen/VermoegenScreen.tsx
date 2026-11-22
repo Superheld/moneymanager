@@ -1,7 +1,8 @@
 // Vermögen — was du besitzt und was du schuldest, und was davon unterm Strich bleibt.
 //
-// Oben das Nettovermögen mit seinen vier Teilen, darunter sein Verlauf, dann die beiden
-// Listen: Vermögenswerte und Schulden. Beide sind BEOBACHTUNGEN — ein Wert bzw. eine
+// Oben das Nettovermögen mit seinen vier Teilen, darunter sein Verlauf, die Vorsorge, die
+// abgerufenen Depots mit ihrem Verrechnungskonto, dann die beiden Listen: Vermögenswerte
+// und Schulden. Beide sind BEOBACHTUNGEN — ein Wert bzw. eine
 // Restschuld zu einem Stichtag, von Hand eingetragen. Gebucht wird hier nichts.
 //
 // Die Grenze zur Übersicht: deren Karte „Was da ist" zeigt die Konten je Klasse. Hier
@@ -13,6 +14,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type {
   Beobachtungszeile,
+  Depotzeile,
   Schuldzeile,
   Vermoegenssicht,
   Vermoegenswertzeile,
@@ -37,6 +39,7 @@ import { PageHead } from "../bausteine/PageHead";
 import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { warnTon } from "../bausteine/geldFarbe";
 import { BeobachtungDialog } from "./BeobachtungDialog";
+import { DepotDialog } from "./DepotDialog";
 import { NettoVerlaufChart } from "./NettoVerlaufChart";
 import { SchuldDialog, VermoegenswertDialog } from "./StammDialoge";
 import { VorsorgeDialog } from "./VorsorgeDialog";
@@ -78,6 +81,7 @@ export function VermoegenScreen() {
   // für welchen Eintrag.
   const [wertDialog, setWertDialog] = useState<Vermoegenswertzeile | "neu" | null>(null);
   const [schuldDialog, setSchuldDialog] = useState<Schuldzeile | "neu" | null>(null);
+  const [depotDialog, setDepotDialog] = useState<Depotzeile | null>(null);
   const [eintragen, setEintragen] = useState<{ seite: Seite; id: string; name: string } | null>(null);
   // Welche Zeile ihre Reihe zeigt — je Liste eine, damit das Aufklappen der einen die
   // andere nicht zuklappt.
@@ -118,6 +122,107 @@ export function VermoegenScreen() {
     verknuepft: [z.gegenstandName, z.vertragName].filter(Boolean).join(" · ") || undefined,
     tilgungImMonat: z.tilgungImMonat,
   }));
+
+  const zielId = vorsorge?.ziel.id;
+  /** Zählt das Depot zum Vorsorgeziel? Gefragt nur, wenn es ein Ziel gibt. */
+  const zaehlt = (z: Depotzeile) => zielId !== undefined && z.depot.vorsorgezielId === zielId;
+
+  /**
+   * Die Depots, je mit ihrem Verrechnungskonto. Gepflegt wird nur, was die Bank nicht
+   * weiss (`DepotDialog`); Wert und Bestand stehen in Übersicht und Analyse.
+   *
+   * Schmal bleiben Name und die Summe; Verrechnungskonto, Stichtag und Depotwert rücken
+   * beschriftet in die zweite Zeile, die Aktion bleibt.
+   */
+  function depotliste() {
+    const spalten = [
+      {
+        key: "bezeichnung",
+        label: t("vermoegen.depots.spalteDepot"),
+        schmal: "titel" as const,
+        sortValue: (z: Depotzeile) => z.depot.bezeichnung,
+        render: (z: Depotzeile) => (
+          <Zeile inline abstand={2}>
+            {z.depot.bezeichnung}
+            {zaehlt(z) && <Pill variant="neutral">{t("vermoegen.vorsorge.zaehlt")}</Pill>}
+          </Zeile>
+        ),
+      },
+      {
+        key: "verrechnungskonto",
+        label: t("vermoegen.depots.spalteVerrechnungskonto"),
+        schmal: "zweitzeile" as const,
+        sortValue: (z: Depotzeile) => z.verrechnungskonto?.bezeichnung ?? "",
+        render: (z: Depotzeile) => {
+          const k = z.verrechnungskonto;
+          if (!k) return <span className="muted">{t("vermoegen.depots.keinVerrechnungskonto")}</span>;
+          return (
+            <>
+              {k.bezeichnung}
+              {/* Eine Einschränkung: das Konto steht am Depot, zählt aber nicht zur
+                  Vorsorge. Der Weg dorthin steht im Dialog. */}
+              {zaehlt(z) && !k.zaehltZurVorsorge && (
+                <span className="hinweis" style={{ display: "block" }}>
+                  {t("vermoegen.vorsorge.zaehltNichtKurz", { klasse: t(`einstellungen.konto.klasse.${k.klasse}`) })}
+                </span>
+              )}
+            </>
+          );
+        },
+      },
+      {
+        key: "kontostand",
+        label: `${t("vermoegen.depots.spalteStand")} ${geld.symbol}`,
+        align: "right" as const,
+        schmal: "zweitzeile" as const,
+        zweitzeileName: t("vermoegen.depots.spalteStand"),
+        sortValue: (z: Depotzeile) => z.verrechnungskonto?.stand ?? -1,
+        render: (z: Depotzeile) => (z.verrechnungskonto ? geld.format(z.verrechnungskonto.stand) : ""),
+      },
+      {
+        key: "stichtag",
+        label: t("vermoegen.spalteStichtag"),
+        schmal: "zweitzeile" as const,
+        sortValue: (z: Depotzeile) => z.aktuell?.stichtag ?? "",
+        render: (z: Depotzeile) =>
+          z.aktuell ? datum.mitJahr(z.aktuell.stichtag) : <span className="muted">{t("depot.nieAbgerufen")}</span>,
+      },
+      {
+        key: "depotwert",
+        label: `${t("vermoegen.depots.spalteDepotwert")} ${geld.symbol}`,
+        align: "right" as const,
+        schmal: "zweitzeile" as const,
+        zweitzeileName: t("vermoegen.depots.spalteDepotwert"),
+        sortValue: (z: Depotzeile) => z.aktuell?.betrag ?? -1,
+        render: (z: Depotzeile) => (z.aktuell ? geld.format(z.aktuell.betrag) : ""),
+      },
+      {
+        key: "summe",
+        label: `${t("vermoegen.depots.spalteSumme")} ${geld.symbol}`,
+        align: "right" as const,
+        schmal: "wert" as const,
+        sortValue: (z: Depotzeile) => z.summe,
+        render: (z: Depotzeile) => <span style={{ fontWeight: "var(--fw-bold)" }}>{geld.format(z.summe)}</span>,
+      },
+      {
+        key: "aktionen",
+        label: "",
+        align: "right" as const,
+        sortable: false,
+        schmal: "zweitzeile" as const,
+        render: (z: Depotzeile) => (
+          <IconLeiste>
+            <IconButton icon="bearbeiten" label={t("vermoegen.bearbeiten", { name: z.depot.bezeichnung })} onClick={() => setDepotDialog(z)} />
+          </IconLeiste>
+        ),
+      },
+    ];
+    return (
+      <Card title={t("vermoegen.depots.titel")} subtitle={t("vermoegen.depots.untertitel")}>
+        <DataTable columns={spalten} rows={sicht!.depots} sortable />
+      </Card>
+    );
+  }
 
   /** Eine der beiden Listen samt der aufgeklappten Reihe darunter. */
   function liste(seite: Seite, zeilen: Listenzeile[], offen: string | null, setOffen: (id: string | null) => void) {
@@ -372,6 +477,9 @@ export function VermoegenScreen() {
         }
       />
 
+      {/* Auch ohne Vermögenswert und Schuld: ein Depot kommt aus dem Abruf. */}
+      {sicht.depots.length > 0 && depotliste()}
+
       {!leer && liste("wert", wertzeilen, offenerWert, setOffenerWert)}
       {!leer && liste("restschuld", schuldzeilen, offeneSchuld, setOffeneSchuld)}
 
@@ -390,6 +498,15 @@ export function VermoegenScreen() {
           vermoegenswerte={sicht.vermoegenswerte}
           onClose={() => setSchuldDialog(null)}
           onGespeichert={async () => { setSchuldDialog(null); await laden(); }}
+        />
+      )}
+      {depotDialog && (
+        <DepotDialog
+          zeile={depotDialog}
+          konten={sicht.kontenZurWahl}
+          vorsorgeziel={vorsorge?.ziel}
+          onClose={() => setDepotDialog(null)}
+          onGespeichert={async () => { setDepotDialog(null); await laden(); }}
         />
       )}
       {eintragen && (

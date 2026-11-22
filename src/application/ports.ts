@@ -380,7 +380,7 @@ export interface VermoegenRepository {
 export interface VorsorgeRepository {
   ziele(): Promise<Vorsorgeziel[]>;
   zielSpeichern(ziel: Vorsorgeziel, erfasstAm: string): Promise<void>;
-  /** Nimmt die Annahmen mit und löst die Zuordnung der Vermögenswerte. */
+  /** Nimmt die Annahmen mit und löst die Zuordnung der Vermögenswerte und Depots. */
   zielLoeschen(id: string): Promise<void>;
   annahmen(): Promise<Vorsorgezielannahme[]>;
   annahmeSpeichern(annahme: Vorsorgezielannahme): Promise<void>;

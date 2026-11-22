@@ -6,7 +6,7 @@
 // davon ab, an welchem Tag der Test läuft. Alle Namen und Beträge sind erfunden.
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Database } from "sql.js";
 
@@ -106,6 +106,49 @@ describe("Vorsorge — Annahmen gelten ab einem Monat", () => {
     expect(await repo.ziele()).toHaveLength(1);
     // Im Februar gilt noch, was im Januar festgelegt wurde.
     expect((await vorsorge("2026-02-15"))?.annahme.wunschMonatlich).toBe(2_200_00);
+  });
+});
+
+/** Ein abgerufenes Depot mit einem Wert — so, wie der Abruf es hinterlässt. */
+function mitDepot(id: string, bezeichnung: string, wert: number) {
+  db.run("INSERT OR IGNORE INTO bankzugang (id, bezeichnung, url, blz, benutzer, angelegt_am) VALUES ('z','Ormelbank','https://example.invalid','99999990','u','2026-01-01')");
+  db.run("INSERT INTO depot (id, zugang_id, schluessel, bezeichnung) VALUES (?, 'z', ?, ?)", [id, `${id}|`, bezeichnung]);
+  db.run("INSERT INTO depotwert (depot_id, stichtag, gesamtwert, erfasst_am) VALUES (?, '2026-01-02', ?, '2026-01-02')", [id, wert]);
+}
+
+describe("Vorsorge — Depots", () => {
+  it("ordnet beim Anlegen des Ziels alle Depots zu, und das Löschen löst die Zuordnung", async () => {
+    mitDepot("d1", "Depot Kranich", 40_000_00);
+    mitDepot("d2", "Depot Hollerbusch", 10_000_00);
+    const ziel = await vorsorgezielFestlegen(EINGABE, "2026-01-10");
+    expect((await vorsorge("2026-01-10"))?.vermoegen.depots).toBe(50_000_00);
+    expect(db.exec("SELECT DISTINCT vorsorgeziel_id FROM depot")[0].values).toEqual([[ziel.id]]);
+
+    await vorsorgezielLoeschen();
+    expect(db.exec("SELECT DISTINCT vorsorgeziel_id FROM depot")[0].values).toEqual([[null]]);
+  });
+
+  it("listet unter „Heute dafür da“ das Depot mit Verrechnungskonto und sagt, wenn dessen Klasse nicht zählt", async () => {
+    mitDepot("d1", "Depot Kranich", 40_000_00);
+    mitDepot("d2", "Depot Hollerbusch", 10_000_00);
+    await kontoRepo.speichern({ id: "verr", bezeichnung: "Konto Tannrode", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 2_500_00 });
+    await mitVorsorgekonto(20_000_00);
+    await vorsorgezielFestlegen(EINGABE, "2026-01-10");
+    db.run("UPDATE depot SET verrechnungskonto_id = 'verr' WHERE id = 'd1'");
+    // Das zweite Depot zählt nicht zum Ziel.
+    db.run("UPDATE depot SET vorsorgeziel_id = NULL WHERE id = 'd2'");
+
+    rendere(<VermoegenScreen />);
+    const karte = (await screen.findByText(t("vermoegen.vorsorge.spaltePosten"))).closest(".abschnitt") as HTMLElement;
+    expect(within(karte).getAllByText("Depot Kranich").length).toBeGreaterThan(0);
+    expect(within(karte).getByText("Konto Tannrode")).toBeTruthy();
+    expect(within(karte).getByText("Vorsorgekonto")).toBeTruthy();
+    expect(within(karte).queryByText("Depot Hollerbusch")).toBeNull();
+    expect(
+      within(karte).getByText(t("vermoegen.vorsorge.zaehltNichtKurz", { klasse: t("einstellungen.konto.klasse.liquide") })),
+    ).toBeTruthy();
+    // Die Summe bleibt, was zählt: Depot und Vorsorgekonto, nicht das Konto der Klasse Liquidität.
+    expect((await vorsorge("2026-01-10"))?.vermoegen.netto).toBe(40_000_00 + 20_000_00);
   });
 });
 

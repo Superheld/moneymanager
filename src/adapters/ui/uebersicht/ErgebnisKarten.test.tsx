@@ -267,7 +267,7 @@ describe("ErgebnisKarten", () => {
       zielId: "z1",
       bezeichnung: "Hasselbrink",
       annahmen: [{ zielId: "z1", abMonat: "2026-08", zielMonat: "2027-08", wunschMonatlich: 250000, renteMonatlich: 150000, entnahmeMonate: 12, renditeBp: 0 }],
-      bestand: { konten, buchungen: ist, depotwerte: [], gegenstaende: [], werte: [] },
+      bestand: { konten, buchungen: ist, depots: [], depotwerte: [], gegenstaende: [], werte: [] },
     };
     rendere(<ErgebnisKarten {...props()} ergebnisse={monatsErgebnisse(ergebnisbasis({ ...ROH, konten, ist, vorsorge }))} />);
     const august = await karte("August 2026");

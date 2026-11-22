@@ -605,7 +605,7 @@ describe("analyseBericht", () => {
       {
         ...b,
         vermoegen: {
-          konten: b.konten, buchungen: b.buchungen, depotwerte: [],
+          konten: b.konten, buchungen: b.buchungen, depots: [], depotwerte: [],
           gegenstaende: [{ id: "g", bezeichnung: "Vibora", art: "sonstiges" }],
           werte: [{ gegenstandId: "g", stichtag: "2026-07-10", wert: 400000 }],
           verbindlichkeiten: [], staende: [],

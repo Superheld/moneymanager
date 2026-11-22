@@ -79,7 +79,7 @@ import { entnahmeIm, ruecklagenart, zyklenpostenIm, type Ruecklagenentnahme, typ
 import type { Ruecklagenzuordnung } from "./ruecklagen/zuordnung";
 import { tilgungIm } from "./vermoegen/tilgung";
 import { wirdGefuehrt, type VermoegensEingabe } from "./vermoegen/vermoegen";
-import { annahmeIm, vorsorgestand, vorsorgevermoegen, type Vorsorgezielannahme } from "./vorsorge/vorsorge";
+import { annahmeIm, vorsorgestand, vorsorgevermoegen, type Vorsorgebestand, type Vorsorgezielannahme } from "./vorsorge/vorsorge";
 
 export type ErgebnisZeileId =
   | "einnahmen"
@@ -249,7 +249,7 @@ export interface ErgebnisVorsorge {
   /** Die Reihe der Annahmen dieses Ziels (`annahmeIm` wählt je Monat). */
   readonly annahmen: readonly Vorsorgezielannahme[];
   /** Der Bestand, über den `vorsorgevermoegen` rechnet — dieselbe Auswahl wie im Bereich Vermögen. */
-  readonly bestand: Pick<VermoegensEingabe, "konten" | "buchungen" | "depotwerte" | "gegenstaende" | "werte">;
+  readonly bestand: Vorsorgebestand;
 }
 
 /**

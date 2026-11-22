@@ -17,7 +17,7 @@
 import type { Cent } from "../basis/geld";
 import { addMonate, parseIso, tageImMonat, toIso } from "../basis/datum";
 import type { IstBuchung } from "../buchung/istbuchung";
-import type { Depotwert } from "../depot/depot";
+import type { Depot, Depotwert } from "../depot/depot";
 import { istSummeBis } from "../buchung/kontostand";
 import type { Zahlungskonto } from "../konten/konto";
 
@@ -161,6 +161,11 @@ export interface VermoegensEingabe {
   /** Alle Konten, jede Klasse. Welche zählen, entscheidet der Aufrufer über die Liste. */
   readonly konten: readonly Zahlungskonto[];
   readonly buchungen: readonly IstBuchung[];
+  /**
+   * Die Depots selbst. Das Nettovermögen rechnet nur über ihre Wertreihen; gebraucht
+   * werden sie für die Vorsorge, die je Depot fragt, ob es zum Ziel zählt.
+   */
+  readonly depots: readonly Depot[];
   /** Die Wertreihen aller Depots. */
   readonly depotwerte: readonly Depotwert[];
   readonly gegenstaende: readonly Vermoegensgegenstand[];

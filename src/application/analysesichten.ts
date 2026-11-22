@@ -958,7 +958,7 @@ export function analyseBericht(
   const davor = vorher ? berichtszeitraum(art, vorher).monate.map((m) => monatsErgebnis(rechenbasis, m)) : null;
 
   const bestand: VermoegensEingabe = basis.vermoegen ?? {
-    konten: basis.konten, buchungen: basis.buchungen, depotwerte: [], gegenstaende: [], werte: [], verbindlichkeiten: [], staende: [],
+    konten: basis.konten, buchungen: basis.buchungen, depots: [], depotwerte: [], gegenstaende: [], werte: [], verbindlichkeiten: [], staende: [],
   };
   const { anfang, ende } = berichtsstichtage(zeitraum);
 

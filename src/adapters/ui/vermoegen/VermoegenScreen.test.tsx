@@ -267,3 +267,34 @@ describe("Vermögen — die Tilgung an der Schuld", () => {
     expect(screen.queryByText((inhalt) => inhalt.startsWith(tilgungstext()))).toBeNull();
   });
 });
+
+describe("Vermögen — Depots mit Verrechnungskonto", () => {
+  function mitDepot() {
+    db.run("INSERT INTO bankzugang (id, bezeichnung, url, blz, benutzer, angelegt_am) VALUES ('z','Ormelbank','https://example.invalid','99999990','u','2026-01-01')");
+    db.run("INSERT INTO depot (id, zugang_id, schluessel, bezeichnung) VALUES ('d1', 'z', 'd1|', 'Depot Kranich')");
+    db.run("INSERT INTO depotwert (depot_id, stichtag, gesamtwert, erfasst_am) VALUES ('d1', '2026-01-02', 40000000, '2026-01-02')");
+  }
+
+  it("zeigt ein Depot auch ohne Vermögenswert und wählt sein Verrechnungskonto", async () => {
+    const nutzer = userEvent.setup();
+    mitDepot();
+    await mitGiro(1_000_00);
+    await kontoRepo.speichern({ id: "verr", bezeichnung: "Konto Tannrode", typ: "Giro", klasse: "investment", inhaberIds: [], saldo: 2_500_00 });
+    rendere(<VermoegenScreen />);
+
+    expect(await screen.findByText(t("vermoegen.depots.untertitel"))).toBeTruthy();
+    expect(screen.getByText(t("vermoegen.depots.keinVerrechnungskonto"))).toBeTruthy();
+
+    await nutzer.click(screen.getByRole("button", { name: t("vermoegen.bearbeiten", { name: "Depot Kranich" }) }));
+    await auswahlWaehlen(nutzer, t("vermoegen.depots.feldVerrechnungskonto"), "Konto Tannrode");
+    await nutzer.click(speichern());
+
+    await waitFor(() =>
+      expect(db.exec("SELECT verrechnungskonto_id FROM depot WHERE id = 'd1'")[0].values).toEqual([["verr"]]),
+    );
+    // Depotwert, Stand des Verrechnungskontos und die Summe stehen in der Zeile.
+    await waitFor(() => expect(document.body.textContent).toMatch(/Konto Tannrode/));
+    expect(document.body.textContent).toMatch(/2\.500,00/);
+    expect(document.body.textContent).toMatch(/402\.500,00/);
+  });
+});

@@ -20,12 +20,18 @@ import {
   istCent,
   parseIso,
   type Cent,
+  type Depot,
   type Verbindlichkeit,
   type Verbindlichkeitsart,
   type Vermoegensart,
   type Vermoegensgegenstand,
 } from "../../core";
-import type { VermoegenRepository, VertragRepository } from "../ports";
+import type {
+  DepotRepository,
+  VermoegenRepository,
+  VertragRepository,
+  ZahlungskontoRepository,
+} from "../ports";
 
 export interface VermoegenPflegeDeps {
   readonly vermoegenRepo: VermoegenRepository;
@@ -239,4 +245,40 @@ export async function restschuldEntfernen(
   stichtag: string,
 ): Promise<void> {
   await deps.vermoegenRepo.standEntfernen(verbindlichkeitId, stichtag);
+}
+
+// --- Depots ------------------------------------------------------------------
+//
+// Ein Depot wird nicht hier angelegt — es kommt aus dem Abruf (`depot/depotUebernehmen`).
+// Gepflegt werden nur die beiden Angaben, die nur der Nutzer kennt: über welches Konto
+// gekauft und verkauft wird, und ob das Depot zum Vorsorgeziel zählt.
+
+export interface DepotPflegeDeps {
+  readonly depotRepo: DepotRepository;
+  /** Nur um zu prüfen, dass ein gewähltes Verrechnungskonto existiert. */
+  readonly kontoRepo: ZahlungskontoRepository;
+}
+
+export interface DepotEingabe {
+  /** Das Verrechnungskonto. Fehlt die Angabe, hat das Depot keines — die Maske schickt immer den ganzen Stand. */
+  verrechnungskontoId?: string;
+  /** Das Vorsorgeziel, zu dem es zählt. Fehlt die Angabe, zählt es zu keinem. */
+  vorsorgezielId?: string;
+}
+
+export async function depotAendern(deps: DepotPflegeDeps, id: string, e: DepotEingabe): Promise<Depot> {
+  const bisher = (await deps.depotRepo.alle()).find((d) => d.id === id);
+  if (!bisher) throw new FachlicherFehler("vermoegen.unbekannt");
+  if (e.verrechnungskontoId && !(await deps.kontoRepo.alle()).some((k) => k.id === e.verrechnungskontoId)) {
+    throw new FachlicherFehler("vermoegen.verrechnungskontoUnbekannt");
+  }
+  // Bewusst KEINE Prüfung der Kontoklasse: ein Verrechnungskonto, das nicht zur Vorsorge
+  // zählt, ist eine zulässige Wahl. Die Oberfläche sagt dazu, dass es so nicht mitzählt.
+  const depot: Depot = {
+    ...bisher,
+    verrechnungskontoId: e.verrechnungskontoId || undefined,
+    vorsorgezielId: e.vorsorgezielId || undefined,
+  };
+  await deps.depotRepo.speichern(depot);
+  return depot;
 }

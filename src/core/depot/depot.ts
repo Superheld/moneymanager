@@ -22,6 +22,18 @@ export interface Depot {
   readonly schluessel: string;
   readonly bezeichnung: string;
   readonly waehrung?: string;
+  /**
+   * Das Zahlungskonto, über das gekauft und verkauft wird. Ein Verweis, keine Rechnung:
+   * sein Stand bleibt der des Kontos und zählt dort, wo seine Klasse ihn hinstellt. Fehlt
+   * es, hat es niemand gewählt — die App rät es nicht.
+   */
+  readonly verrechnungskontoId?: string;
+  /**
+   * Das Vorsorgeziel, zu dem das Depot zählt (`../vorsorge/vorsorge.ts`). Dieselbe Form wie
+   * am Vermögenswert; entschieden wird es im Bereich Vermögen, das Depot trägt nur die
+   * Angabe. Fehlt es, zählt das Depot nur zum Nettovermögen.
+   */
+  readonly vorsorgezielId?: string;
 }
 
 /** Der Gesamtwert eines Depots zu einem Stichtag — eine Beobachtung. */

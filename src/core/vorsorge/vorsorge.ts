@@ -25,8 +25,13 @@
 
 import { monateZwischen } from "../basis/datum";
 import type { Cent } from "../basis/geld";
-import { istVorsorgekonto } from "../konten/konto";
-import { nettovermoegen, type Nettovermoegen, type VermoegensEingabe } from "../vermoegen/vermoegen";
+import { istVorsorgekonto, type Kontoklasse, type Zahlungskonto } from "../konten/konto";
+import {
+  nettovermoegen,
+  wirdGefuehrt,
+  type Nettovermoegen,
+  type VermoegensEingabe,
+} from "../vermoegen/vermoegen";
 
 /** Die Annahmen eines Ziels — was der Nutzer einträgt. */
 export interface Vorsorgeannahmen {
@@ -203,6 +208,12 @@ export function annahmeIm<T extends { readonly abMonat: string }>(
   return treffer;
 }
 
+/** Der Teil des Bestands, über den die Vorsorge rechnet — Schulden gehören nicht dazu. */
+export type Vorsorgebestand = Pick<
+  VermoegensEingabe,
+  "konten" | "buchungen" | "depots" | "depotwerte" | "gegenstaende" | "werte"
+>;
+
 /**
  * Was zum Stichtag für das Ziel da ist.
  *
@@ -210,25 +221,29 @@ export function annahmeIm<T extends { readonly abMonat: string }>(
  * eine engere Auswahl, damit die Zahl nie von der im Bereich Vermögen weglaufen kann:
  *
  *   • KONTEN der Klassen Vorsorge und Investment (`istVorsorgekonto`, dieselbe Grenze,
- *     nach der die Ergebnisrechnung eine Umbuchung als Vorsorge zählt),
- *   • alle DEPOTS,
- *   • die VERMÖGENSWERTE, die jemand dem Ziel zugeordnet hat — die Versicherung mit
- *     Rückkaufswert ja, das Auto nein. Das kann nur der Nutzer wissen.
+ *     nach der die Ergebnisrechnung eine Umbuchung als Vorsorge zählt). Das gilt auch
+ *     für das Verrechnungskonto eines Depots: es zählt über seine Klasse, nicht über das
+ *     Depot. Eine zweite Regel daneben („weil es am Depot hängt") hiesse, dass ein Konto
+ *     an einer Stelle zählt und an einer anderen nicht.
+ *   • die DEPOTS, die dem Ziel zugeordnet sind (seit Migration 83; davor alle),
+ *   • die VERMÖGENSWERTE, die dem Ziel zugeordnet sind — die Versicherung mit
+ *     Rückkaufswert ja, das Auto nein. Beides kann nur der Nutzer wissen.
+ *
+ * Jedes Konto steht in `konten` höchstens einmal, auch wenn es das Verrechnungskonto
+ * mehrerer Depots ist — doppelt zählen kann es deshalb nicht.
  *
  * Schulden werden NICHT abgezogen. Ein Kredit mindert das Nettovermögen, aber nicht das,
  * was im Ruhestand entnommen werden kann — es sei denn, er läuft dann noch, und das
  * gehört in den Wunschbetrag.
  */
-export function vorsorgevermoegen(
-  e: Pick<VermoegensEingabe, "konten" | "buchungen" | "depotwerte" | "gegenstaende" | "werte">,
-  zielId: string,
-  stichtag: string,
-): Nettovermoegen {
+export function vorsorgevermoegen(e: Vorsorgebestand, zielId: string, stichtag: string): Nettovermoegen {
+  const depots = new Set(e.depots.filter((d) => d.vorsorgezielId === zielId).map((d) => d.id));
   return nettovermoegen(
     {
       konten: e.konten.filter(istVorsorgekonto),
       buchungen: e.buchungen,
-      depotwerte: e.depotwerte,
+      depots: e.depots.filter((d) => depots.has(d.id)),
+      depotwerte: e.depotwerte.filter((w) => depots.has(w.depotId)),
       gegenstaende: e.gegenstaende.filter((g) => g.vorsorgezielId === zielId),
       werte: e.werte,
       verbindlichkeiten: [],
@@ -236,4 +251,87 @@ export function vorsorgevermoegen(
     },
     stichtag,
   );
+}
+
+/** Das Verrechnungskonto unter einem Depot in der Liste der Vorsorge. */
+export interface Verrechnungskontoposten {
+  readonly id: string;
+  readonly bezeichnung: string;
+  /** Seine Klasse — die Oberfläche nennt sie, wenn das Konto nicht mitzählt. */
+  readonly klasse: Kontoklasse;
+  /** Sein Stand zum Stichtag — ob er mitzählt, sagt `zaehlt`. */
+  readonly betrag: Cent;
+  /** Zählt es zur Vorsorge? Über seine Klasse (`istVorsorgekonto`), keine eigene Regel. */
+  readonly zaehlt: boolean;
+}
+
+/** Eine Zeile in der Liste dessen, was für das Ziel da ist. */
+export interface Vorsorgeposten {
+  readonly art: "depot" | "konto" | "vermoegenswert";
+  readonly id: string;
+  readonly bezeichnung: string;
+  /** Was der Posten zum Stichtag beiträgt. */
+  readonly betrag: Cent;
+  /** Nur am Depot: sein Verrechnungskonto, wenn eines gewählt ist und es das Konto gibt. */
+  readonly verrechnungskonto?: Verrechnungskontoposten;
+}
+
+/**
+ * Woraus `vorsorgevermoegen` besteht, Posten für Posten — damit die Karte zeigen kann,
+ * WAS zählt, und nicht nur wie viel.
+ *
+ * Jeder Betrag ist ein eigener Aufruf von `nettovermoegen` über genau diesen einen Posten;
+ * die Liste kann deshalb nicht von der Summe weglaufen: Σ `betrag` plus Σ der
+ * Verrechnungskonten, die zählen, ist `vorsorgevermoegen(…).netto`.
+ *
+ * Ein Konto steht EINMAL in der Liste. Ist es das Verrechnungskonto eines Depots, das
+ * zählt, steht es unter dem ersten solchen Depot — sonst, wenn seine Klasse es zur
+ * Vorsorge stellt, für sich. Ein Verrechnungskonto, dessen Klasse nicht zählt, steht unter
+ * seinem Depot mit `zaehlt: false`: es fehlt in der Summe, und die Oberfläche sagt warum.
+ */
+export function vorsorgeposten(e: Vorsorgebestand, zielId: string, stichtag: string): Vorsorgeposten[] {
+  const leer: VermoegensEingabe = {
+    konten: [], buchungen: e.buchungen, depots: [], depotwerte: [], gegenstaende: [], werte: [],
+    verbindlichkeiten: [], staende: [],
+  };
+  const kontostand = (k: Zahlungskonto) => nettovermoegen({ ...leer, konten: [k] }, stichtag).netto;
+  const kontoNach = new Map(e.konten.map((k) => [k.id, k]));
+
+  const posten: Vorsorgeposten[] = [];
+  const untergebracht = new Set<string>();
+  for (const d of e.depots) {
+    if (d.vorsorgezielId !== zielId) continue;
+    const betrag = nettovermoegen(
+      { ...leer, depots: [d], depotwerte: e.depotwerte.filter((w) => w.depotId === d.id) },
+      stichtag,
+    ).netto;
+    const konto = d.verrechnungskontoId ? kontoNach.get(d.verrechnungskontoId) : undefined;
+    // Ein zweites Depot mit demselben Verrechnungskonto zeigt es nicht noch einmal —
+    // sonst ginge die Liste nicht mehr auf die Summe auf.
+    const verrechnungskonto =
+      konto && !untergebracht.has(konto.id)
+        ? {
+            id: konto.id,
+            bezeichnung: konto.bezeichnung,
+            klasse: konto.klasse,
+            betrag: kontostand(konto),
+            zaehlt: istVorsorgekonto(konto),
+          }
+        : undefined;
+    if (verrechnungskonto) untergebracht.add(verrechnungskonto.id);
+    posten.push({ art: "depot", id: d.id, bezeichnung: d.bezeichnung, betrag, verrechnungskonto });
+  }
+  for (const k of e.konten) {
+    if (!istVorsorgekonto(k) || untergebracht.has(k.id)) continue;
+    posten.push({ art: "konto", id: k.id, bezeichnung: k.bezeichnung, betrag: kontostand(k) });
+  }
+  for (const g of e.gegenstaende) {
+    if (g.vorsorgezielId !== zielId) continue;
+    const betrag = nettovermoegen({ ...leer, gegenstaende: [g], werte: e.werte }, stichtag).netto;
+    // Was verkauft ist und nichts mehr beiträgt, ist kein Posten mehr; die Summe sieht es
+    // genauso.
+    if (!wirdGefuehrt(g) && betrag === 0) continue;
+    posten.push({ art: "vermoegenswert", id: g.id, bezeichnung: g.bezeichnung, betrag });
+  }
+  return posten;
 }

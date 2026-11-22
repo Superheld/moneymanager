@@ -53,6 +53,7 @@ export const sqliteVorsorgeRepository: VorsorgeRepository = {
       "UPDATE vermoegensgegenstand SET vorsorgeziel_id = NULL WHERE vorsorgeziel_id = $1",
       [id],
     );
+    await db.execute("UPDATE depot SET vorsorgeziel_id = NULL WHERE vorsorgeziel_id = $1", [id]);
     await db.execute("DELETE FROM vorsorgeziel WHERE id = $1", [id]);
   },
 

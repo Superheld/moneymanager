@@ -18,12 +18,14 @@ import {
   annahmeIm,
   istCent,
   moeglicheEntnahme,
+  vorsorgeposten,
   vorsorgestand,
   vorsorgevermoegen,
   type Cent,
   type ErgebnisVorsorge,
   type Nettovermoegen,
   type VermoegensEingabe,
+  type Vorsorgeposten,
   type Vorsorgestand,
   type Vorsorgeziel,
   type Vorsorgezielannahme,
@@ -41,6 +43,12 @@ export interface Vorsorgesicht {
   readonly annahme: Vorsorgezielannahme;
   /** Was heute für das Ziel da ist, mit seinen Teilen (Schulden stehen hier nie). */
   readonly vermoegen: Nettovermoegen;
+  /**
+   * Was in `vermoegen` steckt, Posten für Posten: Depots (mit ihrem Verrechnungskonto),
+   * die übrigen Konten der Klassen Vorsorge und Investment, die zugeordneten
+   * Vermögenswerte. Geht auf `vermoegen.netto` auf (`vorsorgeposten`).
+   */
+  readonly posten: readonly Vorsorgeposten[];
   readonly stand: Vorsorgestand;
   /**
    * Was im Ruhestand im Monat da wäre, wenn ab heute nichts mehr dazukommt: die Rente
@@ -73,6 +81,7 @@ export async function vorsorgeLaden(deps: VorsorgeDeps, heute: string): Promise<
     ziel,
     annahme,
     vermoegen,
+    posten: vorsorgeposten(bestand, ziel.id, heute),
     stand,
     ohneSparenMonatlich:
       annahme.renteMonatlich +
@@ -137,9 +146,17 @@ function ganzzahlIn(wert: unknown, von: number, bis: number): wert is number {
   return typeof wert === "number" && Number.isInteger(wert) && wert >= von && wert <= bis;
 }
 
-/** Legt das Ziel an oder ändert es. Die Annahmen gelten ab dem Monat von `heute`. */
+/**
+ * Legt das Ziel an oder ändert es. Die Annahmen gelten ab dem Monat von `heute`.
+ *
+ * **Beim ANLEGEN zählen alle Depots zum Ziel.** Bis Migration 83 zählte jedes Depot,
+ * ohne dass jemand gefragt wurde; ein neu angelegtes Ziel soll nicht mit weniger
+ * rechnen als ein bestehendes. Abwählen lässt es sich je Depot. Ohne Ziel trägt kein
+ * Depot eine Zuordnung (das Löschen des Ziels löst sie), es wird also nichts
+ * überschrieben, was jemand entschieden hätte.
+ */
 export async function vorsorgezielFestlegen(
-  deps: Pick<VorsorgeDeps, "vorsorgeRepo">,
+  deps: Pick<VorsorgeDeps, "vorsorgeRepo" | "depotRepo">,
   e: VorsorgezielEingabe,
   heute: string,
   erfasstAm: string,
@@ -155,6 +172,11 @@ export async function vorsorgezielFestlegen(
   const bisher = (await deps.vorsorgeRepo.ziele())[0];
   const ziel: Vorsorgeziel = { id: bisher?.id ?? crypto.randomUUID(), bezeichnung };
   await deps.vorsorgeRepo.zielSpeichern(ziel, erfasstAm);
+  if (!bisher) {
+    for (const d of await deps.depotRepo.alle()) {
+      if (!d.vorsorgezielId) await deps.depotRepo.speichern({ ...d, vorsorgezielId: ziel.id });
+    }
+  }
   await deps.vorsorgeRepo.annahmeSpeichern({
     zielId: ziel.id,
     abMonat: heute.slice(0, 7),
@@ -167,7 +189,22 @@ export async function vorsorgezielFestlegen(
   return ziel;
 }
 
-/** Löscht das Ziel samt seinen Annahmen. Die Vermögenswerte bleiben, ohne Zuordnung. */
+/**
+ * Das Ziel, dem ein neu abgerufenes Depot zugeordnet wird — `undefined`, solange es keines
+ * gibt. Ein neues Depot zählt, wie bisher jedes: wer fürs Alter anlegt, tut es meist in
+ * einem Depot, und ein Depot, das still NICHT zählte, fiele erst auf, wenn die Sparrate
+ * schon zu hoch dastand. Abwählen lässt es sich im Bereich Vermögen.
+ *
+ * Ein eigener Use-Case, weil der Abruf (`abrufAusfuehren`) das Ziel nicht kennen darf:
+ * er bekommt die Antwort hereingereicht (`DepotUebernahmeDeps.vorgabeVorsorgeziel`).
+ */
+export async function vorsorgezielFuerNeueDepots(
+  deps: Pick<VorsorgeDeps, "vorsorgeRepo">,
+): Promise<string | undefined> {
+  return (await deps.vorsorgeRepo.ziele())[0]?.id;
+}
+
+/** Löscht das Ziel samt seinen Annahmen. Vermögenswerte und Depots bleiben, ohne Zuordnung. */
 export async function vorsorgezielLoeschen(deps: Pick<VorsorgeDeps, "vorsorgeRepo">): Promise<void> {
   const ziel = (await deps.vorsorgeRepo.ziele())[0];
   if (ziel) await deps.vorsorgeRepo.zielLoeschen(ziel.id);

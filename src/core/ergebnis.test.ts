@@ -503,7 +503,7 @@ describe("Vorsorge mit Ziel — die Rate statt der Überweisung", () => {
       zielId: "z1",
       bezeichnung: "Lindqvist",
       annahmen,
-      bestand: { konten: KONTEN, buchungen: ist, depotwerte: [], gegenstaende: [], werte: [] },
+      bestand: { konten: KONTEN, buchungen: ist, depots: [], depotwerte: [], gegenstaende: [], werte: [] },
     };
     return eingabe({ ist, vorsorge, ...over });
   };

@@ -2149,3 +2149,68 @@ describe("Migration 82 — Kauf und Nutzungsdauer an der Rücklage, nur das Sche
     db.close();
   });
 });
+
+describe("Migration 83 — ein Depot wählt, ob es zum Vorsorgeziel zählt, und kennt sein Verrechnungskonto", () => {
+  /** Ein Bestand vor 83: zwei Depots, dazu keines, eines oder zwei Vorsorgeziele. */
+  function vor83(ziele: readonly (readonly [string, string])[], fremdschluessel = false): Database {
+    const db = new SQL.Database();
+    if (fremdschluessel) db.run("PRAGMA foreign_keys = ON");
+    // Bis 81: die 82 gehört einem anderen Bereich und berührt das Depot nicht.
+    apply(db, 0, 81);
+    db.run("INSERT INTO bankzugang (id, bezeichnung, url, blz, benutzer, angelegt_am) VALUES ('z','Ormelbank','https://example.invalid','99999990','u','2025-01-01')");
+    db.run("INSERT INTO depot (id, zugang_id, schluessel, bezeichnung) VALUES ('d-1','z','1|','Erstdepot'), ('d-2','z','2|','Zweitdepot')");
+    for (const [id, erfasstAm] of ziele) {
+      db.run("INSERT INTO vorsorgeziel (id, bezeichnung, erfasst_am) VALUES (?, ?, ?)", [id, id, erfasstAm]);
+    }
+    return db;
+  }
+  const zeilen = (db: Database, sql: string) => db.exec(sql)[0]?.values ?? [];
+
+  it("ordnet jedes bestehende Depot dem vorhandenen Ziel zu — bis hierher zählten alle", () => {
+    const db = vor83([["ziel-a", "2025-01-01"]]);
+    apply(db, 81, 83);
+    expect(zeilen(db, "SELECT id, vorsorgeziel_id, verrechnungskonto_id FROM depot ORDER BY id")).toEqual([
+      ["d-1", "ziel-a", null],
+      ["d-2", "ziel-a", null],
+    ]);
+    db.close();
+  });
+
+  it("lässt die Zuordnung ohne Ziel leer und belegt kein Verrechnungskonto vor", () => {
+    const db = vor83([]);
+    apply(db, 81, 83);
+    expect(zeilen(db, "SELECT vorsorgeziel_id, verrechnungskonto_id FROM depot")).toEqual([[null, null], [null, null]]);
+    db.close();
+  });
+
+  it("nimmt bei mehreren Zielen das zuerst angelegte, wie die Use-Cases", () => {
+    const db = vor83([["ziel-spaet", "2025-06-01"], ["ziel-frueh", "2025-02-01"]]);
+    apply(db, 81, 83);
+    expect(zeilen(db, "SELECT DISTINCT vorsorgeziel_id FROM depot")).toEqual([["ziel-frueh"]]);
+    db.close();
+  });
+
+  it("läuft ein zweites Mal folgenlos durch", () => {
+    const db = vor83([["ziel-a", "2025-01-01"]]);
+    apply(db, 81, 83);
+    const vorher = zeilen(db, "SELECT * FROM depot ORDER BY id");
+    apply(db, 81, 83);
+    expect(zeilen(db, "SELECT * FROM depot ORDER BY id")).toEqual(vorher);
+    db.close();
+  });
+
+  it("hinterlässt mit eingeschalteten Fremdschlüsseln keinen Widerspruch; Ziel und Konto lösen beim Löschen nur den Verweis", () => {
+    const db = vor83([["ziel-a", "2025-01-01"]], true);
+    apply(db, 81, 83);
+    expect(db.exec("PRAGMA foreign_key_check")).toEqual([]);
+    db.run("INSERT INTO zahlungskonto (id, bezeichnung, typ, inhaber_ids) VALUES ('k-v','Verrechnung','Giro','[]')");
+    db.run("UPDATE depot SET verrechnungskonto_id = 'k-v' WHERE id = 'd-1'");
+    db.run("DELETE FROM zahlungskonto WHERE id = 'k-v'");
+    db.run("DELETE FROM vorsorgeziel WHERE id = 'ziel-a'");
+    expect(zeilen(db, "SELECT id, vorsorgeziel_id, verrechnungskonto_id FROM depot ORDER BY id")).toEqual([
+      ["d-1", null, null],
+      ["d-2", null, null],
+    ]);
+    db.close();
+  });
+});

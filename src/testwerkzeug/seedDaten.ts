@@ -1145,6 +1145,54 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   });
 
   ruecklagenFaelle(setzen, tagIn, monat, JETZT);
+  depotFaelle(setzen, tagIn, JETZT);
+}
+
+/**
+ * Die Depots im Bereich Vermögen (Migration 83): eines mit Verrechnungskonto, das zum
+ * Vorsorgeziel zählt, und eines, das nicht zählt.
+ *
+ * Aus demselben Grund wie `ruecklagenFaelle` ein eigener Abschnitt mit `fall` in den Ids
+ * und ohne Würfel: die Umstellungsprobe nimmt `konto-fall-…` wieder heraus, und das
+ * Verrechnungskonto ist ein Konto. Das Depot selbst rechnet sie nicht.
+ *
+ * Das Verrechnungskonto trägt die Klasse Investment — so zählt es zur Vorsorge, über seine
+ * Klasse und nicht, weil es am Depot hängt. Den Fall „Klasse zählt nicht" zeigt der
+ * Spielstand nicht: man stellt ihn her, indem man die Klasse dieses Kontos ändert.
+ */
+function depotFaelle(
+  setzen: (sql: string, werte?: (string | number | null)[]) => unknown,
+  tagIn: (versatz: number, tag: number) => string,
+  jetzt: string,
+): void {
+  setzen(
+    "INSERT INTO zahlungskonto (id, bezeichnung, typ, iban, inhaber_ids, kontostand, klasse, aktiv) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    ["konto-fall-verrechnung", "Konto Depotbank", "Giro", iban("99999907", 3104405), '["person-1"]', 185000, "investment", 1],
+  );
+  setzen(
+    "INSERT INTO kontostand_anker (konto_id, datum, herkunft, betrag, erfasst_am) VALUES (?, ?, ?, ?, ?)",
+    ["konto-fall-verrechnung", tagIn(-MONATE, 1), "hand", 185000, jetzt],
+  );
+  // Das Depot von oben zählt zum Ziel und hängt an diesem Konto.
+  setzen("UPDATE depot SET verrechnungskonto_id = ?, vorsorgeziel_id = ? WHERE id = ?", [
+    "konto-fall-verrechnung",
+    "vorsorge-1",
+    "depot-1",
+  ]);
+  // Ein zweites Depot, das NICHT zur Vorsorge zählt — ohne Verrechnungskonto, mit drei
+  // Ständen, damit es auch in Übersicht und Analyse etwas zeigt.
+  setzen(
+    "INSERT INTO depot (id, zugang_id, schluessel, bezeichnung, waehrung, verrechnungskonto_id, vorsorgeziel_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    ["depot-fall-2", "zugang-1", "D-2", "Zweitdepot", "EUR", null, null],
+  );
+  for (const [vorMonaten, wert] of [[4, 310000], [2, 324000], [0, 318500]] as const) {
+    setzen("INSERT INTO depotwert (depot_id, stichtag, gesamtwert, erfasst_am) VALUES (?, ?, ?, ?)", [
+      "depot-fall-2",
+      tagIn(-vorMonaten, 1),
+      wert,
+      jetzt,
+    ]);
+  }
 }
 
 /**

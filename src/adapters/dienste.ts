@@ -110,6 +110,7 @@ import {
   schuldAnlegen as schuldAnlegenUseCase,
   schuldFuehren as schuldFuehrenUseCase,
   schuldLoeschen as schuldLoeschenUseCase,
+  depotAendern as depotAendernUseCase,
   vermoegenswertAendern as vermoegenswertAendernUseCase,
   vermoegenswertAnlegen as vermoegenswertAnlegenUseCase,
   vermoegenswertFuehren as vermoegenswertFuehrenUseCase,
@@ -118,6 +119,7 @@ import {
   wertEntfernen as wertEntfernenUseCase,
   type BeobachtungEingabe,
   type SchuldEingabe,
+  type DepotEingabe,
   type VermoegenswertEingabe,
 } from "../application/vermoegen/vermoegenPflege";
 import { sqliteVermoegenRepository } from "./persistence/sqliteVermoegenRepository";
@@ -125,6 +127,7 @@ import { sqliteVorsorgeRepository } from "./persistence/sqliteVorsorgeRepository
 import {
   vorsorgeLaden,
   vorsorgezielFestlegen as vorsorgezielFestlegenUseCase,
+  vorsorgezielFuerNeueDepots,
   vorsorgezielLoeschen as vorsorgezielLoeschenUseCase,
   type Vorsorgesicht,
   type VorsorgezielEingabe,
@@ -610,7 +613,7 @@ export function vorsorge(heute: string): Promise<Vorsorgesicht | null> {
 
 export function vorsorgezielFestlegen(eingabe: VorsorgezielEingabe, heute: string) {
   return vorsorgezielFestlegenUseCase(
-    { vorsorgeRepo: sqliteVorsorgeRepository },
+    { vorsorgeRepo: sqliteVorsorgeRepository, depotRepo: sqliteDepotRepository },
     eingabe,
     heute,
     new Date().toISOString(),
@@ -619,6 +622,11 @@ export function vorsorgezielFestlegen(eingabe: VorsorgezielEingabe, heute: strin
 
 export function vorsorgezielLoeschen() {
   return vorsorgezielLoeschenUseCase({ vorsorgeRepo: sqliteVorsorgeRepository });
+}
+
+/** Verrechnungskonto und Vorsorgeziel eines Depots — die beiden Angaben, die nur der Nutzer kennt. */
+export function depotAendern(id: string, eingabe: DepotEingabe) {
+  return depotAendernUseCase({ depotRepo: sqliteDepotRepository, kontoRepo: sqliteZahlungskontoRepository }, id, eingabe);
 }
 
 export function vermoegenswertAnlegen(eingabe: VermoegenswertEingabe) {
@@ -1013,6 +1021,8 @@ export async function bankAbrufen(
     // Depots werden mitgeholt: sie hängen an keiner Kontozuordnung, weil sie keine Konten
     // sind — jedes, das die Bank freigibt, kommt als Beobachtung in die Wertreihe.
     depotRepo: sqliteDepotRepository,
+    // Ein neues Depot zählt zum Vorsorgeziel, wie bisher jedes (`vorsorgezielFuerNeueDepots`).
+    vorgabeVorsorgeziel: () => vorsorgezielFuerNeueDepots({ vorsorgeRepo: sqliteVorsorgeRepository }),
     umsatzRepo: sqliteUmsatzRepository,
     laufRepo: sqliteImportLaufRepository,
     // Der Abruf hängt die frisch gebuchten Zeilen selbst an ihre Verträge. Ohne das

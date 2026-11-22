@@ -90,6 +90,13 @@ dieselbe Summe, die der Abgleich gegen den Kontostands-Anker benutzt.
 von der Zahl darüber nicht weglaufen. Sein letzter Punkt liegt auf dem Bis-Tag selbst,
 wenn der Monat dort noch nicht zu Ende ist.
 
+**Die Depots stehen im Bereich Vermögen als eigene Liste**, je mit Depotwert, dem Stand
+ihres Verrechnungskontos und der Summe aus beidem (`Depotzeile` in
+`application/vermoegen/vermoegensichten.ts`). Die Summe ist eine Anzeige an der Zeile,
+keine dritte Zahl im Nettovermögen: dort steckt der Depotwert unter „Depots" und das
+Konto unter „Konten", wie bisher. Gepflegt werden am Depot nur Verrechnungskonto und
+Vorsorgeziel (`depotAendern`); alles andere meldet die Bank.
+
 **Welche Konten hereinkommen, entscheidet der Aufrufer.** Die Sicht
 (`application/vermoegen/vermoegensichten.ts`) lässt ein Konto weg, an dem ein abgerufenes
 Depot hängt: es zeigt im Kontenbereich den Depotwert statt seines Stands und stünde sonst
@@ -118,9 +125,26 @@ dafür jeden Monat zurücklegen". Es wohnt in der Oberfläche in diesem Bereich 
 gegen eine engere Auswahl desselben Bestands:
 
 - **`vorsorgevermoegen` IST `nettovermoegen`**, über Konten der Klassen Vorsorge und
-  Investment (`istVorsorgekonto`), alle Depots und die Vermögenswerte, die dem Ziel
-  zugeordnet sind (`vorsorgezielId`). Keine zweite Summe, die von der ersten weglaufen
-  könnte. Schulden werden nicht abgezogen.
+  Investment (`istVorsorgekonto`), die Depots und die Vermögenswerte, die dem Ziel
+  zugeordnet sind (`vorsorgezielId` an beiden). Keine zweite Summe, die von der ersten
+  weglaufen könnte. Schulden werden nicht abgezogen.
+- **Je Depot wählbar, seit Migration 83.** Bis dahin zählte jedes Depot. Die Migration
+  ordnete deshalb jedes bestehende Depot dem vorhandenen Ziel zu, damit sich keine Zahl
+  änderte, und dieselbe Vorgabe gilt weiter an zwei Stellen: ein **neu abgerufenes**
+  Depot zählt zum Ziel (`vorsorgezielFuerNeueDepots`, dem Abruf hereingereicht — er
+  kennt den Bereich Vermögen nicht), und das **Anlegen** des Ziels ordnet alle Depots zu.
+  Ein Depot, das still NICHT zählte, fiele erst auf, wenn die Sparrate schon zu hoch
+  dastand; abwählen lässt es sich in der Liste der Depots im Bereich Vermögen.
+- **Das Verrechnungskonto eines Depots zählt über seine Klasse, sonst über nichts**
+  (`depot.verrechnungskonto_id`, ohne Vorbelegung). Ist es kein Konto der Klassen
+  Vorsorge oder Investment, zählt es nicht mit, und die Oberfläche sagt das samt dem Weg
+  zur Klasse. Eine Ausnahme „zählt, weil es am Depot hängt" hiesse, dass dasselbe Konto in
+  der Ergebnisrechnung (`core/einordnung.ts`, Umbuchung auf ein Vorsorgekonto) anders
+  dastünde als hier. Ein Konto steht in der Summe einmal, auch wenn es das
+  Verrechnungskonto zweier Depots ist.
+- **Die Karte zeigt, was zählt** (`vorsorgeposten`): Depots mit ihrem Verrechnungskonto
+  darunter, die übrigen Konten der beiden Klassen, die zugeordneten Vermögenswerte — je
+  Posten ein eigener Aufruf von `nettovermoegen`, damit die Liste auf die Summe aufgeht.
 - **Die Annahmen sind eine Reihe mit „gilt ab"** (`vorsorgeziel_annahme`, `annahmeIm`).
   Wer heute die Rendite senkt, hat nichts über das letzte Jahr gesagt. Im selben Monat
   wird überschrieben — eine Annahme ist ein Vorsatz, keine Messung.

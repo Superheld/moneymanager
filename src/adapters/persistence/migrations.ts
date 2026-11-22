@@ -2486,4 +2486,26 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE ruecklage ADD COLUMN nutzungsdauer_monate INTEGER`,
     ],
   },
+  {
+    version: 83, // Ein Depot waehlt, ob es zum Vorsorgeziel zaehlt, und kennt sein Verrechnungskonto
+    sql: [
+      // Bis hierher zaehlte JEDES Depot zum Vorsorgeziel (`vorsorgevermoegen`). Ab jetzt
+      // entscheidet es der Nutzer je Depot, in derselben Form wie beim Vermoegenswert (v78):
+      // ein Verweis auf das Ziel, SET NULL, weil das Depot bleibt, wenn das Ziel geht.
+      `ALTER TABLE depot ADD COLUMN vorsorgeziel_id TEXT REFERENCES vorsorgeziel(id) ON DELETE SET NULL`,
+      // Das Verrechnungskonto: das Zahlungskonto, ueber das gekauft und verkauft wird. Ohne
+      // Vorbelegung — welches Konto es ist, weiss die Bank nicht zu sagen und die App raet
+      // nicht. SET NULL, weil ein geloeschtes Konto das Depot nicht mitnimmt.
+      `ALTER TABLE depot ADD COLUMN verrechnungskonto_id TEXT REFERENCES zahlungskonto(id) ON DELETE SET NULL`,
+      // Ueberfuehrt wird der heutige Zustand, damit sich keine Zahl aendert: jedes
+      // bestehende Depot zaehlt zum vorhandenen Ziel. Es gibt eines je Haushalt; gibt es
+      // mehrere (nur aus einem fremden Bestand), dasselbe, das die Use-Cases nehmen — das
+      // zuerst angelegte. Ohne Ziel bleibt die Spalte leer: das Anlegen des Ziels ordnet
+      // dann alle Depots zu (`vorsorgezielFestlegen`). `IS NULL` haelt es wiederholbar.
+      `UPDATE depot
+          SET vorsorgeziel_id = (SELECT id FROM vorsorgeziel ORDER BY erfasst_am, id LIMIT 1)
+        WHERE vorsorgeziel_id IS NULL
+          AND EXISTS (SELECT 1 FROM vorsorgeziel)`,
+    ],
+  },
 ];
