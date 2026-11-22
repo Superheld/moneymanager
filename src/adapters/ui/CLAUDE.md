@@ -636,7 +636,9 @@ das bedeutet, ist enger als es klingt, und die Grenze gehört benannt:
 - **Die Shell ist umgestellt.** In `app.css` steht die schmale Form ohne Medienabfrage da,
   die breiten kommen per `min-width` dazu. Dasselbe gilt für `.main`, `.field` und
   `.form-grid`. Schmal führt eine Leiste unten in die vier häufigsten Bereiche (unten,
-  „Die Navigation in drei Stufen").- **Die BEREICHE sind es nicht.** Ihre Raster stehen weiter als `max-width`-Abfragen
+  „Die Navigation in drei Stufen").
+- **Die Übersicht ist schmal eigens geordnet**: der laufende Monat oben, „Damit die
+  Zahlen stimmen" darunter als eine Zeile, die aufklappt (`uebersicht/CLAUDE.md`).- **Die BEREICHE sind es nicht.** Ihre Raster stehen weiter als `max-width`-Abfragen
   (`ausblick-karten`) oder tragen sich über `auto-fit` selbst (`karten-paar`, `kpis`). Sie
   funktionieren schmal, aber sie sind nicht dafür entworfen — eine Tabelle scrollt dort
   waagerecht, ein Registerband ebenso. Das ist der Stand, und die Neuaufteilung kommt

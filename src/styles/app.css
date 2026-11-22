@@ -1191,6 +1191,37 @@ select.field.tabellenfilter {
   color: var(--accent);
 }
 
+/* --- Übersicht schmal: „Damit die Zahlen stimmen" als eine Zeile ---
+   (uebersicht/EinrichtungKarte.tsx, `alsZeile`). Nur schmal gerendert, deshalb ohne
+   Medienabfrage. Die ganze Zeile ist der Knopf, mindestens 44 px hoch; Titel links, der
+   Stand rechts. Reicht die Breite nicht, bricht der Stand unter den Titel, statt ihn
+   abzuschneiden. */
+.einrichtung-zeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0 var(--sp-3);
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.einrichtung-zeile-titel {
+  font-size: var(--fs-title);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-h);
+}
+.einrichtung-zeile-stand {
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
 /* --- Monatsausblick: drei Karten im goldenen Schnitt ---
    Der laufende Monat trägt eine Zahlenspalte mehr und bekommt die breite Seite
    (38,2 %); die beiden Vorschauen teilen sich den Rest. Eine hälftige Aufteilung

@@ -13,7 +13,7 @@
 // Bis 2026-11-15 stand hier `MonatsAusblick`, eine Aufrechnung nach Auszahlung, in der
 // Rücklagen mit der Rate und aufbauende Budgets mit der Ausgabe zählten.
 
-import { useState } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { ErgebnisPosten, ErgebnisZeile, ErgebnisZeileId, MonatsErgebnis, Stufe } from "../../../application";
 import { Card, CoverageTrack, Pill } from "../bausteine";
@@ -51,6 +51,7 @@ export function ErgebnisKarten({
   kategorieNamen,
   empfaenger,
   onBuchung,
+  unterDemLaufenden,
 }: {
   ergebnisse: readonly MonatsErgebnis[];
   /** Gibt es überhaupt Verträge, Budgets oder Rücklagen? */
@@ -59,6 +60,13 @@ export function ErgebnisKarten({
   empfaenger: ReadonlyMap<string, string>;
   /** Klick auf einen Posten, hinter dem genau EINE Buchung steht — er öffnet sie. */
   onBuchung?: (istId: string) => void;
+  /**
+   * Was direkt unter dem laufenden Monat steht, vor den kommenden. Schmal ist das die
+   * Einrichtungskarte (siehe `UebersichtScreen`): dort stehen die Karten untereinander,
+   * und der laufende Monat soll oben stehen, ohne dass sie hinter zwei Vorschaumonate
+   * rutscht. Breit bleibt es leer — nebeneinander gäbe es kein „darunter".
+   */
+  unterDemLaufenden?: ReactNode;
 }) {
   const { t } = useTranslation();
   const ohneEinnahmeplan = ergebnisse.every((e) => (e.zeilen.find((z) => z.id === "einnahmen")?.plan ?? 0) === 0);
@@ -73,8 +81,11 @@ export function ErgebnisKarten({
   return (
     <div>
       <div className="ausblick-karten">
-        {ergebnisse.map((e) => (
-          <ErgebnisKarte key={e.label} ergebnis={e} namen={namen} onBuchung={onBuchung} />
+        {ergebnisse.map((e, i) => (
+          <Fragment key={e.label}>
+            <ErgebnisKarte ergebnis={e} namen={namen} onBuchung={onBuchung} />
+            {i === 0 && unterDemLaufenden}
+          </Fragment>
         ))}
       </div>
       {ohneEinnahmeplan && (

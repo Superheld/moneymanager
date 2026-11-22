@@ -19,6 +19,25 @@ und beim ersten Öffnen nicht zu deuten. Drei Dinge daran:
 Sie kommt deshalb wieder, wenn nach einem Import Zahlungen ohne Kategorie dastehen. Das
 ist gewollt: genau diese Zahlungen machen die Karten darunter ungenau.
 
+**Schmal (unter 700 px) steht der laufende Monat ganz oben** (seit 2026-11-22), und die
+Karte darunter als EINE Zeile („3 von 6 erledigt ▸"), die aufklappt — vor den beiden
+kommenden Monaten. Am Handy nahm die ganze Liste zwei Bildschirmhöhen, bevor die erste
+Zahl kam, und wer die App öfter als einmal öffnet, will zuerst wissen, wie der Monat
+steht. Drei Dinge daran:
+
+- **Was eingeklappt wird, folgt den „Drei Rängen"** (`../CLAUDE.md`). Die Fragen und ihr
+  Warum sind Erklärung. Der Satz zu Zahlungen ohne Kategorie ist eine Einschränkung — er
+  sagt, dass „Ungeplant" darüber Zahlungen enthält, die woanders hingehören — und steht
+  deshalb offen unter der Zeile, solange sie zu ist.
+- **`useSchmal` statt CSS**, weil sich das Markup ändert: die Karte wird zur Zeile und
+  rückt zwischen die Monatskarten (`unterDemLaufenden` an `ErgebnisKarten`). CSS könnte
+  sie umsortieren, aber nicht einklappen.
+- **Ohne Monatskarte bleibt sie oben und offen** — ganz am Anfang trägt sie den leeren
+  Zustand darunter, und eine eingeklappte Zeile über einer Karte ohne Knopf wäre ein
+  Weg, den man erst suchen muss.
+
+Breit ändert sich nichts: oben, vollständig, wie bisher. Geprüft in `schmal.test.tsx`.
+
 **Ihr nächster offener Schritt steht auch am Ende des Imports** (seit 2026-11-15): der
 Kern nennt ihn (`naechster` am Einrichtungsstand), die Zeile je Schritt liegt deshalb in
 `bausteine/Einrichtungsschritt.tsx`. Einzelheiten in `../CLAUDE.md` unter „Leere Zustände".

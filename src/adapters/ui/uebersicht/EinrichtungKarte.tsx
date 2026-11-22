@@ -17,8 +17,18 @@
 //
 // Die Zeile je Schritt samt ihrem Ziel steht in `bausteine/Einrichtungsschritt.tsx` —
 // das Ende des Imports zeigt den nächsten Schritt mit derselben Zeile.
+//
+// **Schmal steht sie als EINE Zeile da, die aufklappt** (`alsZeile`, seit 2026-11-22): am
+// Handy unter dem laufenden Monat, und dort nähme die ganze Liste zwei Bildschirmhöhen,
+// bevor die erste Zahl kommt. Eingeklappt wird nach „Drei Ränge" (`../CLAUDE.md`): die
+// Fragen und ihr Warum sind ERKLÄRUNG und dürfen hinter die Zeile. Der Satz zu den
+// Zahlungen ohne Kategorie ist es nicht — er sagt, dass „Ungeplant" in der Karte darüber
+// Zahlungen enthält, die woanders hingehören. Er ist eine EINSCHRÄNKUNG und bleibt
+// deshalb offen unter der Zeile stehen, solange sie zu ist.
 
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Collapsible } from "@base-ui/react/collapsible";
 import type { Einrichtungsstand } from "../../../application";
 import { Card } from "../bausteine";
 import type { ScreenId } from "../bausteine/AppShell";
@@ -29,13 +39,45 @@ export interface EinrichtungKarteProps {
   readonly stand: Einrichtungsstand;
   /** Fehlt er (Tests, Vorschau ohne Shell), stehen die Schritte ohne Knopf da. */
   readonly onNavigate?: (id: ScreenId) => void;
+  /** Schmal unter dem laufenden Monat: eine Zeile mit dem Stand, die aufklappt. */
+  readonly alsZeile?: boolean;
 }
 
-export function EinrichtungKarte({ stand, onNavigate }: EinrichtungKarteProps) {
+export function EinrichtungKarte({ stand, onNavigate, alsZeile = false }: EinrichtungKarteProps) {
   const { t } = useTranslation();
+  const [offen, setOffen] = useState(false);
   if (stand.fertig) return null;
 
   const erledigt = stand.schritte.filter((s) => s.status === "erledigt").length;
+
+  if (alsZeile) {
+    const ohneKategorie = stand.schritte.find((s) => s.id === "kategorien" && s.status === "offen" && s.anzahl !== undefined);
+    return (
+      <Card>
+        <Collapsible.Root open={offen} onOpenChange={setOffen}>
+          {/* Die ganze Zeile ist der Schalter — ein Finger trifft keinen Pfeil am Rand. */}
+          <Collapsible.Trigger className="einrichtung-zeile">
+            <span className="einrichtung-zeile-titel">{t("einrichtung.titel")}</span>
+            <span className="muted einrichtung-zeile-stand">
+              {t("einrichtung.stand", { erledigt, gesamt: stand.schritte.length })} {offen ? "▾" : "▸"}
+            </span>
+          </Collapsible.Trigger>
+          {!offen && ohneKategorie?.anzahl !== undefined && (
+            <div className="hinweis" style={{ marginTop: 2 }}>
+              {t("einrichtung.schritt.kategorien.warumAnzahl", { count: ohneKategorie.anzahl })}
+            </div>
+          )}
+          <Collapsible.Panel>
+            <Stapel abstand={4} style={{ marginTop: "var(--sp-3)" }}>
+              {stand.schritte.map((s) => (
+                <EinrichtungsschrittZeile key={s.id} schritt={s} onNavigate={onNavigate} />
+              ))}
+            </Stapel>
+          </Collapsible.Panel>
+        </Collapsible.Root>
+      </Card>
+    );
+  }
 
   return (
     <Card
