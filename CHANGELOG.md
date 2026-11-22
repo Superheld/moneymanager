@@ -5,117 +5,139 @@ Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 
 ## [Unveröffentlicht]
 
+## [0.31.0-pre.1] — 2026-11-22
+
+Die Übersicht rechnet jetzt, was ein Monat kostet, statt nur, was vom Konto geht; Rücklagen
+und aufbauende Budgets sind eine Sache geworden; neu sind der Bereich Vermögen, der Bericht
+und die Frage „Reicht das Geld?". Am Handy gibt es eine Leiste unten. **Sechs Migrationen**
+(76–81): sie legen die Tabellen für Vermögen und Vorsorgeziel an und bauen die Rücklagen um —
+jedes aufbauende Budget wird eine Rücklage, die weiterläuft. Vergangene Monate rechnen wie
+vorher. Ein Zurück zu 0.30.0 gibt es nur über die Tagessicherung vor den Migrationen.
+
 ### Neu
 
-**Wartet auf Zuordnung**, als Karte im Bereich Rücklagen. Hängen mehrere Rücklagen an
-derselben Kategorie, stehen die Buchungen dort, bei denen noch offen ist, welche Rücklage
-sie trägt, gesammelt mit Datum, Empfänger, Kategorie und Betrag; gewählt wird direkt in der
-Zeile, auch „keine Rücklage". Ist nichts offen, steht die Karte nicht da.
-
 **Der Bereich Vermögen.** Vermögenswerte (etwa ein Fahrzeug oder eine Versicherung mit
-Rückkaufswert) und Schulden stehen als Wert bzw. Restschuld zum Stichtag da, wie man sie
-aus dem Auszug abliest. Daraus und aus Konten und Depots rechnet die App das
-Nettovermögen, mit seinem Verlauf über die Monatsenden.
+Rückkaufswert) und Schulden stehen mit Wert bzw. Restschuld zum Stichtag da, wie man sie aus
+dem Auszug abliest. Daraus und aus Konten und Depots rechnet die App das Nettovermögen, mit
+seinem Verlauf über die Monatsenden.
 
-**Das Vorsorgeziel**, im Bereich Vermögen. Aus Wunschbetrag, erwarteter Rente,
-Entnahmezeit und Rendite rechnet es, was am Zieltag da sein muss und welche Sparrate das
-im Monat verlangt. Die Annahmen gelten ab dem Monat, in dem sie eingetragen wurden — was
-vorher galt, bleibt für die Monate davor stehen.
+**Das Vorsorgeziel**, im Bereich Vermögen. Aus dem, was du im Monat brauchst, der erwarteten
+Rente, der Dauer und der Rendite rechnet es, was am Zieltag da sein muss und welche Sparrate
+das im Monat verlangt. Geänderte Annahmen gelten ab dem Monat, in dem du sie einträgst.
+
+**Der Bericht**, als neues Register in der Analyse. Für einen abgeschlossenen Monat oder ein
+Kalenderjahr steht auf einem Blatt: was der Zeitraum gekostet hat und was bleibt, neben dem
+Vormonat bzw. Vorjahr; der Weg zur Änderung der Kontostände; und das Nettovermögen am Anfang
+und am Ende. Wählbar ist nur, was ganz erfasst ist.
+
+**„Was hat der Monat gekostet?"** im Verlauf der Analyse, neben „Wofür ging Geld raus?". Je
+Monat dieselbe Rechnung wie in den Monatskarten, als Diagramm oder Tabelle, mit dem Anteil
+der Verträge und der Sparquote. Der laufende Monat steht da, zählt aber in keine Kennzahl.
+
+**„Reicht das Geld?"** im Register Ausblick: je liquidem Konto Tag für Tag vorgerechnet — Stand
+heute, der tiefste Stand fest und erwartet, und ab wann es ins Minus geht. Darunter **„Wie
+lange reicht es ohne Einnahmen?"**: das freie Geld der liquiden Konten gegen die Kosten eines
+Monats, einmal ohne und einmal mit dem Zurücklegen. Ein überzogenes Konto zählt mit seinem
+Minus.
+
+**„Voraussichtlich am Monatsende"** in der Karte des laufenden Monats: offene Verträge mit
+ihrem Betrag, monatliche Budgets als ausgegeben gerechnet.
+
+**Einordnung in den Buchungen.** Jede Zeile sagt in einer eigenen Spalte, wie die Buchung
+zählt — Einnahme, Vertrag, monatliches Budget, aus Rücklage, Vorsorge, Umbuchung, Ungeplant.
+Der Buchungsdialog sagt dasselbe als Satz mit dem Grund.
+
+**„Damit die Zahlen stimmen"**, als Karte in der Übersicht: was die App noch wissen muss
+(Konten, Buchungen, Kategorien, Verträge, Budgets, Rücklagen), mit dem Weg in den Bereich
+dafür. Ist alles erledigt, verschwindet sie. Jeder Bereich sagt ausserdem, wenn er noch
+leer ist, was hierher gehört und was als Nächstes dran ist; nach dem Import steht der
+nächste offene Schritt.
+
+**Wo das Geld liegt**, als Karte im Bereich Rücklagen: je Konto, welche Rücklagen dort ihr
+Geld haben, was davon gedeckt ist und was frei bleibt — und wenn der Stand nicht reicht, was
+fehlt. Am Ende die Rücklagen ohne Konto; ein Klick öffnet sie zum Eintragen. Gebunden und
+frei steht ausserdem in der Übersicht unter „Was da ist", je Kontoklasse.
+
+**Wartet auf Zuordnung**, als Karte im Bereich Rücklagen. Hängen mehrere Rücklagen an
+derselben Kategorie, stehen dort die Buchungen, bei denen noch offen ist, welche sie trägt;
+gewählt wird direkt in der Zeile, auch „keine Rücklage". Dasselbe geht im Buchungsdialog.
+
+**„Könnte dazugehören"** an einem Vertrag: Buchungen ohne Vertrag, die nach Kategorie, Betrag
+und Termin passen. Zugeordnet wird nur auf deinen Klick.
 
 **Eine Kreditrate steht als Zinsen und Tilgung da.** Verweist eine Schuld auf den Vertrag,
-über den ihre Rate läuft, zeigen die Monatskarten unter „Verträge" nur noch die Zinsen;
-die Tilgung steht in einer eigenen Zeile bei Rücklagen und Vorsorge, denn sie baut
-Vermögen auf. Sie wird nicht eingegeben, sondern aus den eingetragenen Restschulden
-abgeleitet: was die Schuld zwischen zwei Stichtagen gesunken ist, verteilt auf die Monate
-dazwischen. Was am Ende frei bleibt, ändert sich dadurch nicht.
-
-**Der Bericht**, als neues Register in der Analyse. Für einen abgeschlossenen Monat oder
-ein Kalenderjahr steht auf einem Blatt untereinander: was der Zeitraum gekostet hat und
-was bleibt, neben dem Vormonat bzw. Vorjahr; der Weg vom Ergebnis zur Änderung der
-Kontostände; und das Nettovermögen am Anfang und am Ende mit seinen vier Teilen. Gerechnet
-wird dasselbe wie in den Monatskarten und der Kostensicht — ein Jahr ist die Summe seiner
-zwölf Monate. Wählbar ist nur, was ganz erfasst ist.
-
-**Wo das Geld liegt**, als neue Karte im Bereich Rücklagen. Für jedes Konto, auf dem
-Rücklagen ihr Geld haben, steht auf einem Blatt: welche Rücklagen das sind (beide
-Formen), was sie beanspruchen, was davon gedeckt ist und was auf dem Konto frei bleibt —
-und wenn der Stand nicht reicht, wie viel fehlt. Am Ende stehen die Rücklagen ohne Konto;
-ein Klick öffnet sie, damit man das Konto eintragen kann. Bisher gab es das nur je Konto
-im Kontoauszug.
+über den ihre Rate läuft, stehen unter „Verträge" nur die Zinsen und die Tilgung in einer
+eigenen Zeile, denn sie baut Vermögen auf. Abgeleitet wird sie aus den eingetragenen
+Restschulden. Was am Ende frei bleibt, ändert sich dadurch nicht.
 
 ### Geändert
 
-**Jeder Bereich schlägt nur vor, was in ihm landet.** Unter Budgets stehen nur noch
-Budgetvorschläge — keine Spalte „Art" mehr, und „übernehmen" legt immer ein Budget an.
-Für eine Kategorie, in der nur selten etwas anfällt, dann aber viel, steht der Vorschlag
-jetzt im Bereich Rücklagen, unter der Liste: „übernehmen" öffnet dort den Dialog einer
-Rücklage, die weiterläuft, mit Kategorie, Name und Rate vorbelegt. Die Beträge sind
-dieselben wie vorher. Was du unter Budgets schon verworfen hattest, bleibt in beiden
-Bereichen verworfen; „keine Rücklage" gilt nur für die Rücklagen. Im Dialog einer
-Rücklage heisst die Reihe der Raten jetzt auch beim Korrigieren und Entfernen „Rate"
-statt „Betrag".
+**Die Monatskarten zeigen, was der Monat kostet.** Einnahmen, Verträge, monatliche Budgets
+und Ungeplantes, dann Rücklagen, Vorsorge und Anlage, in drei Stufen bis „Bleibt wirklich
+frei". Ein Vertrag kostet jeden Monat seinen Anteil, auch wenn er jährlich abgebucht wird;
+eine Rücklage kostet ihre Rate. Ein Kauf aus einer Rücklage zählt damit nicht mehr doppelt;
+nur was über das Angesparte hinausgeht, kostet seinen Monat. Aufklappbar darunter „Und auf
+dem Konto?": warum das nicht dasselbe ist wie die Änderung der Kontostände. Als Vertrag
+zählt, was einem Vertrag zugeordnet ist.
 
-**Eine Rücklage wird abgeschlossen, nicht ausgebucht.** Eine Rücklage mit Kategorie, die
-abgeschlossen wird, hat statt „ausgebucht" den Knopf „abschließen" — mit dem Kauf oder am
-Ende des Urlaubs, es ist derselbe Handgriff. Eine Buchung wählst du dabei nicht mehr: ihre
-Ausgaben hat die Rücklage über die Kategorie schon gefunden. Der Dialog zeigt, was am
-gewählten Tag angespart und getragen ist, und lässt wählen, ob sie neu beginnt oder endet.
-Was übrig ist, wird auf dem Konto frei; kein Monat ändert sich dadurch, die Raten bleiben
-Kosten ihrer Monate. Ein Minus hat seinen Monat schon gekostet. Die Geschichte heisst jetzt
-„Schon abgeschlossen" und zeigt, was frei geworden ist; der Verlauf zeigt den Monat des
-Abschlusses mit beiden Zyklen, sodass er aufgeht. Eine ältere Rücklage ohne Kategorie wird
-weiter mit ihrer Buchung ausgebucht wie bisher.
+**Aufbauende Budgets sind jetzt Rücklagen.** Der Bereich Rücklagen zeigt alle in einer
+Liste, mit Kategorie, Rate, Stand (auch im Minus), bei einem Ziel dem Fortschritt und dem
+Konto; ein Klick auf den Namen zeigt den Verlauf. Jede Rücklage **läuft weiter** oder **wird
+abgeschlossen** — das wählst du beim Anlegen. Unter Budgets stehen nur noch die monatlichen;
+liegt eine Rücklage auf einer Unterkategorie, sagt das Budget darüber, dass sie abgezogen
+ist. Die Kennzahlen oben im Bereich Rücklagen zählen die bisherigen aufbauenden Budgets mit.
 
-**Ein neues Budget nicht an der Kategorie einer Rücklage.** Wer an einer Kategorie, an der
-schon eine Rücklage hängt, ein monatliches Budget anlegen will, bekommt den Hinweis auf eine
-Unterkategorie — wie umgekehrt schon bisher. Was schon so dasteht, bleibt.
+**Eine Rücklage findet ihre Ausgaben über ihre Kategorie.** Jede Ausgabe in dieser Kategorie
+und ihren Unterkategorien trägt sie von selbst; eine Buchung von Hand wählen musst du nicht
+mehr. Bei einer schon bestehenden Rücklage gilt das ab dem Tag des Updates. Jede Rücklage
+braucht deshalb eine Kategorie — eine ältere ohne bleibt, wie sie ist, bis du sie
+bearbeitest, und wird weiter mit ihrer Buchung ausgebucht. An der Kategorie eines
+monatlichen Budgets lässt sich keine neue Rücklage anlegen und umgekehrt; nimm dafür eine
+Unterkategorie. Eine geänderte Rate gilt ab dem Monat, den du wählst, wie beim Budget.
 
-**Eine Rücklage, eine Liste, ein Dialog.** Was bisher „Rücklage über die Kategorie" hiess,
-ist jetzt eine Rücklage wie jede andere; der Bereich Rücklagen zeigt alle in einer Liste,
-mit Kategorie, Rate, Stand (auch im Minus), bei einem Ziel dem Fortschritt und dem Konto,
-auf dem das Geld liegt. Jede Rücklage **läuft weiter** oder **wird abgeschlossen**; das
-wählst du beim Anlegen. Ein Klick auf den Namen zeigt den Verlauf der letzten zwölf
-Monate. Ausgebucht wird nur eine, die abgeschlossen wird. Jede Rücklage braucht eine
-Kategorie — eine ältere ohne bleibt, wie sie ist, bis du sie bearbeitest. Eine
-geänderte Rate gilt ab dem Monat, den du wählst, wie beim Budget. Unter Budgets stehen nur
-noch Budgets für den Monat; ein Vorschlag „Rücklage" legt dort eine Rücklage an, die
-weiterläuft. Hängen mehrere Rücklagen an derselben Kategorie, warten Buchungen dort ab dem
-Tag, an dem die zweite zu finden beginnt, auf eine Zuordnung. Vergangene Monate rechnen
-wie vorher.
+**Eine Rücklage wird abgeschlossen statt ausgebucht** — mit dem Kauf oder am Ende des
+Urlaubs. Der Dialog zeigt, was am gewählten Tag angespart und getragen ist, und lässt wählen,
+ob sie neu beginnt oder endet. Was übrig ist, wird auf dem Konto frei; kein Monat ändert
+sich dadurch. Ein Minus hat seinen Monat schon gekostet. „Schon abgeschlossen" zeigt jeden
+Abschluss, auch frühere Ausbuchungen und beendete Rücklagen.
 
-**Eine Rücklage findet ihre Ausgaben über ihre Kategorie.** Ab dem Tag des Updates trägt
-eine Rücklage mit Kategorie jede Ausgabe in dieser Kategorie und ihren Unterkategorien von
-selbst, und was auf ihrem Konto für sie liegen soll, sinkt um das, was sie schon getragen
-hat. Vergangene Monate rechnen wie vorher. Hängen mehrere Rücklagen an derselben
-Kategorie, steht an der Buchung „wartet auf Zuordnung": sie zählt als ungeplant, bis du im
-Buchungsdialog wählst, welche Rücklage sie trägt (oder keine). Der Dialog einer Rücklage
-sagt dir, wenn an der gewählten Kategorie schon eine hängt, und an der Kategorie eines
-monatlichen Budgets lässt sich keine neue anlegen — nimm dafür eine Unterkategorie. Eine
-geänderte freie Rate gilt ab dem laufenden Monat; die Monate davor behalten ihre.
+**Jeder Bereich schlägt nur vor, was in ihm landet.** Unter Budgets stehen nur
+Budgetvorschläge. Für eine Kategorie, in der selten etwas anfällt, dann aber viel, steht der
+Vorschlag im Bereich Rücklagen; „übernehmen" öffnet dort eine Rücklage, die weiterläuft. Was
+du schon verworfen hattest, bleibt verworfen.
 
-**Die Kennzahlen im Bereich Rücklagen zählen beide Formen.** „Soll heute", „Tatsächlich
-da" und der Deckungsgrad rechnen die Rücklagen über die Kategorie mit — ihr Soll ist, was
-von ihnen übrig ist —, der Bedarf unter „Diesen Monat" ihre Monatsrate. „Ziele gesamt"
-bleibt bei den Rücklagen mit Ziel; die über die Kategorie haben keins. Liegt eine
-Rücklage über die Kategorie auf einem Konto, das nicht liquide ist, zählt es zu den
-Rücklagenkonten: was dort eingeht, steht unter „eingegangen", und die Faustformel misst
-es mit. Die Monatskarten und die Kostensicht ändern sich dadurch nicht.
+**Verträge zeigen, was sie den Monat kosten**, neben dem Betrag je Fälligkeit. Über der
+Liste stehen geplante Ausgaben und Einnahmen je Monat statt „Pro Monat" und „Pro Jahr".
 
-**Aufbauende Budgets heissen jetzt Rücklagen** und stehen im Bereich Rücklagen, als
-„Rücklage über die Kategorie": was in ihrer Kategorie ausgegeben wird, zählt von selbst
-gegen sie. Daneben stehen die bisherigen Rücklagen, deren Ausgabe man beim Ausbuchen
-wählt. Anlegen, Bearbeiten, Verlauf und Löschen gehen von dort. Der Bereich Budgets
-zeigt nur noch die monatlichen; liegt eine Rücklage auf einer Unterkategorie, sagt die
-Zeile darüber, dass sie abgezogen ist. In den Monatskarten, der Kostensicht, dem Bericht
-und der Reichweite stehen beide in einer Zeile „Rücklagen". Gerechnet wird wie vorher —
-jede Summe bleibt dieselbe.
+**Vorsorge mit Ziel kostet die Sparrate des Ziels.** Gibt es ein Vorsorgeziel, zählt die
+Zeile „Vorsorge und Anlage" dessen nötige Sparrate; was du wirklich überwiesen hast, steht
+unter „Und auf dem Konto?".
+
+**Am Handy** steht unten eine Leiste mit Übersicht, Buchungen, Rücklagen, Budgets und
+„Mehr" für alle anderen Bereiche. Die Übersicht zeigt den laufenden Monat ganz oben, „Damit
+die Zahlen stimmen" als eine Zeile zum Aufklappen. In Tabellen trägt die zweite Zeile die
+Namen ihrer Werte und lässt sich bedienen; Knöpfe und Felder sind gross genug für den
+Finger, und beim Antippen eines Formularfeldes zoomt das iPhone nicht mehr. Die
+Import-Inbox bricht schmal ebenso um. Noch nicht fertig: Vermögen, Analyse und die
+Kategorien in den Einstellungen sind schmal breiter als der Bildschirm, und das Suchfeld
+der Inbox zoomt beim Antippen noch.
 
 **Kein „Alpha" mehr neben der Version.** Dass die App noch nicht stabil ist, sagt die 0
-vorne. Das Datenschema ändert sich weiter, aber eine Migration überführt den Bestand,
-statt etwas wegzunehmen.
+vorne. Das Datenschema ändert sich weiter, aber eine Migration überführt den Bestand, statt
+etwas wegzunehmen.
 
 **Vorabversionen heissen „Vorab"** statt „Beta" — im Abzeichen neben der Version und am
 Schalter „Vorabversionen erhalten". Wer den Schalter eingeschaltet hat, behält ihn.
+
+### Behoben
+
+**Die Liquiditätsvorschau** hörte am ersten Monatswechsel auf zu rechnen; Termine im
+Folgemonat fehlten.
+
+**Die wöchentlichen Sicherungen** waren um einen Monatswechsel kürzer als sieben Tage und
+reichten deshalb weniger weit zurück.
+
+**Am Handy** wurden Beträge mit Tausenderstelle und Spaltenköpfe abgeschnitten.
 
 ## [0.30.0] — 2026-11-13
 
