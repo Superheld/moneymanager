@@ -1282,6 +1282,38 @@ select.field.tabellenfilter {
      fuer einen senkrechten Rollbalken an einer Leiste, die nur eine Zeile hoch ist. */
   overflow-x: auto;
   overflow-y: hidden;
+  /* Der Rand, den `Registerleiste.tsx` freihält, wenn es den aktiven Reiter ins Bild
+     rückt: so breit wie der Verlauf unten, sonst läge der Reiter darunter. */
+  scroll-padding-inline-end: var(--sp-7);
+}
+/* Schmal: ein Verlauf an der rechten Kante sagt, dass dort noch Reiter kommen. Am
+   Telefon passen die Reiter der Analyse und der Einstellungen nicht in eine Zeile, und
+   eine Rollleiste ohne Balken sieht aus, als ende sie an der Kante — der letzte
+   sichtbare Reiter schliesst oft glatt ab. Umbrechen statt rollen wäre die andere Wahl
+   gewesen; zwei Reiterzeilen über einer Trennlinie lesen sich aber als zwei Ebenen.
+
+   Ohne Messung: der Verlauf ist das letzte Kind der Leiste und klebt per `sticky` an
+   ihrer rechten Kante. Ist man am Ende angekommen, steht er an seinem eigenen Platz
+   HINTER dem letzten Reiter, über leerer Fläche — und ist damit unsichtbar, ebenso in
+   jeder Leiste, deren Reiter ohnehin passen. Der negative Rand nimmt den Abstand der
+   Leiste vor ihm zurück, damit er eine knapp passende Leiste nicht erst zum Rollen
+   bringt. */
+.registerleiste::after {
+  content: "";
+  position: sticky;
+  right: 0;
+  flex: 0 0 var(--sp-7);
+  margin-left: calc(-1 * var(--sp-4));
+  background: linear-gradient(to right, transparent, var(--cream) 75%);
+  pointer-events: none;
+}
+@media (min-width: 700px) {
+  .registerleiste {
+    scroll-padding-inline-end: 0;
+  }
+  .registerleiste::after {
+    content: none;
+  }
 }
 .registerleiste-reiter {
   background: none;

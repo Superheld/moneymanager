@@ -644,11 +644,12 @@ das bedeutet, ist enger als es klingt, und die Grenze gehört benannt:
   `.form-grid`. Schmal führt eine Leiste unten in die vier häufigsten Bereiche (unten,
   „Die Navigation in drei Stufen").
 - **Die Übersicht ist schmal eigens geordnet**: der laufende Monat oben, „Damit die
-  Zahlen stimmen" darunter als eine Zeile, die aufklappt (`uebersicht/CLAUDE.md`).- **Die BEREICHE sind es nicht.** Ihre Raster stehen weiter als `max-width`-Abfragen
+  Zahlen stimmen" darunter als eine Zeile, die aufklappt (`uebersicht/CLAUDE.md`).
+- **Die BEREICHE sind es nicht.** Ihre Raster stehen weiter als `max-width`-Abfragen
   (`ausblick-karten`) oder tragen sich über `auto-fit` selbst (`karten-paar`, `kpis`). Sie
-  funktionieren schmal, aber sie sind nicht dafür entworfen — eine Tabelle scrollt dort
-  waagerecht, ein Registerband ebenso. Das ist der Stand, und die Neuaufteilung kommt
-  danach.
+  funktionieren schmal, aber sie sind nicht dafür entworfen. Ein Registerband rollt
+  waagerecht, mit einem Verlauf an der Kante (unten). Das ist der Stand, und die
+  Neuaufteilung kommt danach.
 
 **Eine Tabelle von Hand fällt schmal nicht zusammen.** Die zwei Spalten der schmalen Form
 gibt es nur in der `DataTable`; eine eigene `<table>` behält alle Spalten und läuft
@@ -672,6 +673,24 @@ es bis dahin, und jede steht für eine Art:
 - **Eine Zeile aus Text und Knöpfen** (Kategorien in den Einstellungen): der Text bricht
   um (`flex-wrap` und `min-width: 0` am Namen), die Knöpfe schrumpfen nicht
   (`.katrow-aktionen`). Ohne beides schob der Name die Knöpfe über den Kartenrand.
+
+**Eine Reiterleiste rollt schmal, und man sieht es ihr an** (`Registerleiste`, seit
+2026-11-22). Die Reiter der Analyse und der Einstellungen passen bei 390 px nicht in
+eine Zeile, auch nicht mit kleinerem Abstand. Umbrechen wäre die andere Wahl gewesen;
+zwei Reiterzeilen über einer Trennlinie lesen sich aber als zwei Ebenen. Zwei Dinge
+machen das Rollen sichtbar:
+
+- **Ein Verlauf an der rechten Kante**, ohne Messung: `::after` der Leiste klebt per
+  `sticky` rechts. Am Ende der Leiste steht er an seinem eigenen Platz hinter dem
+  letzten Reiter, über leerer Fläche, und ist damit weg — ebenso in jeder Leiste, die
+  ohnehin passt. Er nimmt die Farbe des Seitengrunds (`--cream`); eine Leiste auf einer
+  Karte bräuchte eine andere.
+- **Der aktive Reiter rückt ins Bild**, beim Öffnen und bei jedem Wechsel
+  (`aktivenReiterZeigen`), und zwar links vom Verlauf (`scroll-padding-inline-end`).
+  Nur die Leiste rollt, nie die Seite: `scrollIntoView` hätte auch senkrecht
+  gerollt, sobald die Leiste nicht ganz im Bild ist.
+
+Breit gibt es beides nicht; dort passen die Reiter.
 
 Vier Dinge, die bei jedem neuen Stück ab jetzt gelten und die man schmal nicht nachholen
 kann:
