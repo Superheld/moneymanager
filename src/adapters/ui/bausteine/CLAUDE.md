@@ -67,6 +67,11 @@ Zeile. In einer Tabellenzelle sprengt es die Zeilenhöhe und erzwingt eine Spalt
 die der Inhalt nicht braucht. `Zeilenauswahl` ist so gross wie eine `Pill` daneben und
 gehört dorthin, wo eine Zeile eine kleine Entscheidung trägt.
 
+**Schmal ist sie grösser** (seit 2026-11-22): 16 px Schrift und 44 px Höhe, wie jedes
+Feld dort — ein natives `select` unter 16 px lässt iOS beim Antippen zoomen, und eine Pille
+trifft kein Finger. Deshalb steht ihr Aussehen in `app.css` (`.zeilenauswahl`) und nicht
+mehr inline: ein Inline-Stil kennt keine Breite.
+
 Das Gegenstück im Formular ist heute `Auswahl` (siehe unten) und war früher
 `<select className="field">`; an der Aufgabenteilung ändert das nichts.
 

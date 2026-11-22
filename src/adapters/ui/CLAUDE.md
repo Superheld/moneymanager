@@ -658,10 +658,20 @@ kann:
 - **Kein Raster ohne `min-width: 0`.** Ein Rasterkind wächst per Vorgabe mit seinem Inhalt;
   eine breite Tabelle zieht dann die ganze Seite auf, und der Scrollrahmen der `DataTable`
   kommt nie zum Zug.
-- **44 px Trefferfläche** für alles, was ein Finger treffen muss.
+- **44 px Trefferfläche** für alles, was ein Finger treffen muss (`--trefferflaeche`).
+  Die Bausteine tragen sie seit 2026-11-22 selbst, als `min-height` (wo der Inhalt
+  schmaler sein kann, auch `min-width`) im Abschnitt „Trefferflächen" am Ende von
+  `app.css`, breit auf `auto` zurückgenommen. Wer einen Baustein mit Bedienteil baut,
+  hängt seine Klasse dort an; `trefferflaechen.test.ts` prüft die Liste. **Keine
+  Mindestbreite an Knöpfen mit Text:** in einer Flex-Zeile ersetzt sie das `auto`, das
+  einen Knopf nie schmaler werden lässt als seine Beschriftung — so lief der Seitenkopf
+  aus dem Bild.
 - **Ein Eingabefeld unter 16 px lässt iOS Safari die Seite ZOOMEN**, sobald es den Fokus
   bekommt — und zurück zoomt sie nicht. `.field` ist deshalb schmal 16 px und erst ab
-  700 px wieder 13,5.
+  700 px wieder 13,5. Das gilt für das Feld, das den Fokus bekommt, nicht für seine
+  Hülle (im `Datumsfeld` trug bis 2026-11-22 nur die Hülle die 16 px), für ein natives
+  `select` (`Zeilenauswahl`) und für jeden kleineren Sonderfall (`tabellenfilter`): der
+  kleinere Grad steht dort erst ab 700 px. Geprüft in `trefferflaechen.test.ts`.
 - **Ränder über `env(safe-area-inset-*)`**, nicht als feste Zahl. Voraussetzung dafür ist
   `viewport-fit=cover` in `index.html`; ohne die Angabe meldet `env()` überall Null.
 

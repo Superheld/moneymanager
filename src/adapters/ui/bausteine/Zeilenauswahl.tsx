@@ -58,17 +58,8 @@ export function Zeilenauswahl<T extends string>({
       value={wert}
       disabled={disabled}
       onChange={(e) => void onChange(e.target.value as T)}
-      style={{
-        font: "inherit",
-        fontSize: "var(--fs-xs)",
-        padding: "2px 6px",
-        borderRadius: "var(--r-pill, 999px)",
-        border: "1px solid var(--line)",
-        background: "var(--surface)",
-        color: "var(--ink-2)",
-        cursor: disabled ? "default" : "pointer",
-        maxWidth: "100%",
-      }}
+      // Aussehen in `app.css`: schmal braucht sie eine andere Grösse als breit.
+      className="zeilenauswahl"
     >
       {moeglichkeiten.map((m) => (
         <option key={m.wert} value={m.wert} title={m.hinweis} disabled={m.gesperrt}>

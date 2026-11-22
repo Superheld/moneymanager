@@ -18,4 +18,8 @@
   --pad-screen:  var(--sp-8);  /* screen gutters         */
   --stack-tight: var(--sp-2);
   --stack:       var(--sp-4);
+
+  /* Was ein Finger mindestens treffen muss, schmal (ui/CLAUDE.md, „Mobile first"). Keine
+     Stufe der Reihe oben, sondern die Grösse einer Fingerkuppe. */
+  --trefferflaeche: 44px;
 }
