@@ -265,7 +265,7 @@ describe("Rücklagen — diesen Monat und die Faustformel", () => {
     await sqliteZahlungskontoRepository.speichern({ id: "giro", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0 });
     await sqliteZahlungskontoRepository.speichern({ id: "tg", bezeichnung: "Tagesgeld", typ: "Tagesgeld", klasse: "ruecklage", inhaberIds: [], saldo: 100000 });
     // Die Faustformel braucht Vertragseinnahmen: 1.000,00 im Monat → 3.000,00.
-    await sqliteVertragRepository.speichern({ id: "v1", anbieter: "Arbeitgeber", beginn: "2024-01-01", verlaengerung: "keine", status: "aktiv" });
+    await sqliteVertragRepository.speichern({ id: "v1", anbieter: "Arbeitgeber", beginn: "2024-01-01", verlaengerung: "keine" });
     await planzahlungSpeichern({
       id: "r1", bezeichnung: "Gehalt", betrag: 100000, rhythmus: "monatlich", startdatum: "2024-01-01",
       charakter: "Ertrag", kontoId: "giro", vertragId: "v1",
@@ -301,7 +301,7 @@ describe("Rücklagen — diesen Monat und die Faustformel", () => {
     const { sqliteVertragRepository } = await import("../../persistence/sqliteVertragRepository");
     await sqliteZahlungskontoRepository.speichern({ id: "giro", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0 });
     await sqliteZahlungskontoRepository.speichern({ id: "spar", bezeichnung: "Sparkonto", typ: "Tagesgeld", klasse: "sparen", inhaberIds: [], saldo: 150000 });
-    await sqliteVertragRepository.speichern({ id: "v1", anbieter: "Arbeitgeber", beginn: "2024-01-01", verlaengerung: "keine", status: "aktiv" });
+    await sqliteVertragRepository.speichern({ id: "v1", anbieter: "Arbeitgeber", beginn: "2024-01-01", verlaengerung: "keine" });
     await planzahlungSpeichern({
       id: "r1", bezeichnung: "Gehalt", betrag: 100000, rhythmus: "monatlich", startdatum: "2024-01-01",
       charakter: "Ertrag", kontoId: "giro", vertragId: "v1",

@@ -977,8 +977,8 @@ describe("Migration 50 — der Rest der Verweise", () => {
     db.run("INSERT INTO kategorie (id, name, default_charakter) VALUES ('kat','Wohnen','Aufwand')");
     db.run("INSERT INTO budget (id, kategorie_id, art) VALUES ('b1','kat','monatlich')");
     db.run("INSERT INTO budget_betrag (budget_id, ab_monat, betrag) VALUES ('b1','2026-01',50000)");
-    db.run(`INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, status, betrag, rhythmus, erste_zahlung, charakter, kategorie_id)
-            VALUES ('r1','Ebbinghaus','2026-01-01','keine','aktiv',-50000,'monatlich','2026-01-01','Aufwand','kat')`);
+    db.run(`INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, betrag, rhythmus, erste_zahlung, charakter, kategorie_id)
+            VALUES ('r1','Ebbinghaus','2026-01-01','keine',-50000,'monatlich','2026-01-01','Aufwand','kat')`);
 
     db.run("PRAGMA foreign_keys = ON");
     db.run("DELETE FROM kategorie WHERE id='kat'");
@@ -2394,6 +2394,55 @@ describe("Migration 84 — die Zahlungsregel geht im Vertrag auf", () => {
     expect(db.exec("PRAGMA foreign_key_check")).toEqual([]);
     db.run("DELETE FROM zahlungskonto WHERE id = 'k-ziel'");
     expect(zeilen(db, "SELECT id, konto_id, gegenkonto_id, betrag FROM vertrag")).toEqual([["v-1", "k-giro", null, -1000]]);
+    db.close();
+  });
+});
+
+describe("Vertragsende statt Vertragsstatus (v85/v86)", () => {
+  /** Zwei Verträge auf dem Stand VOR dem Ende. */
+  function bestand(db: Database) {
+    apply(db, 0, 84);
+    db.run(
+      `INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, status)
+       VALUES ('v-laeuft', 'Kesselmann', '2024-01-01', 'automatisch', 'aktiv'),
+              ('v-anders', 'Ohlert', '2024-01-01', 'automatisch', 'gekuendigt')`,
+    );
+  }
+
+  const zeile = (db: Database, sql: string) => db.exec(sql)[0]?.values[0];
+
+  it("ein laufender Vertrag bleibt ohne Ende, die Spalte status ist danach weg", () => {
+    const db = new SQL.Database();
+    bestand(db);
+    apply(db, 84, 86);
+    expect(zeile(db, "SELECT ende FROM vertrag WHERE id = 'v-laeuft'")).toEqual([null]);
+    expect(spalten(db, "vertrag")).not.toContain("status");
+    expect(spalten(db, "vertrag")).toContain("ende");
+    db.close();
+  });
+
+  it("ein Status, den es nicht geben dürfte, geht nicht verloren, sondern wird ein Ende", () => {
+    // Kein Code hat je etwas anderes als 'aktiv' geschrieben. Steht trotzdem etwas
+    // anderes da, wird es in die einzige Form übersetzt, die es jetzt gibt — und der
+    // Vertrag plant ab dann nicht mehr.
+    const db = new SQL.Database();
+    bestand(db);
+    apply(db, 84, 86);
+    const [ende] = zeile(db, "SELECT ende FROM vertrag WHERE id = 'v-anders'")!;
+    expect(ende).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    db.close();
+  });
+
+  it("v85 lässt sich in dem Zustand wiederholen, den sie selbst hinterlässt", () => {
+    const db = new SQL.Database();
+    bestand(db);
+    apply(db, 84, 85);
+    db.run("UPDATE vertrag SET ende = '2030-01-31' WHERE id = 'v-anders'");
+    apply(db, 84, 85);
+    // Ein von Hand nachgetragenes Ende überschreibt der zweite Lauf nicht.
+    expect(zeile(db, "SELECT ende FROM vertrag WHERE id = 'v-anders'")).toEqual(["2030-01-31"]);
+    apply(db, 85, 86);
+    expect(spalten(db, "vertrag")).not.toContain("status");
     db.close();
   });
 });

@@ -158,7 +158,7 @@ describe("VertraegeScreen", () => {
   it("zeigt einen Vertrag mit Anbieter", async () => {
     await sqliteVertragRepository.speichern({
       id: "v1", anbieter: "Petrossen", beginn: "2026-01-01",
-      status: "aktiv", verlaengerung: "automatisch", verlaengerungMonate: 12,
+ verlaengerung: "automatisch", verlaengerungMonate: 12,
       mindestlaufzeitMonate: 12, kuendigungsfristMonate: 3,
     });
     rendere(<VertraegeScreen />);

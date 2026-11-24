@@ -268,7 +268,7 @@ describe("Umbuchung und Vertrag am Entwurf", () => {
     await grunddaten();
     await entwurf();
     await vertragRepo.speichern({
-      id: "v1", anbieter: "Testanbieter", beginn: "2026-01-01", status: "aktiv",
+      id: "v1", anbieter: "Testanbieter", beginn: "2026-01-01",
       verlaengerung: "automatisch", verlaengerungMonate: 1,
       mindestlaufzeitMonate: 1, kuendigungsfristMonate: 1,
     });

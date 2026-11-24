@@ -120,8 +120,8 @@ describe("Vermögenswerte", () => {
 describe("Schulden", () => {
   it("speichert die Verweise und liest sie zurück", async () => {
     db.run(
-      `INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, status)
-       VALUES ('ver1', 'Talmberger Bank', '2024-01-01', 'keine', 'aktiv')`,
+      `INSERT INTO vertrag (id, anbieter, beginn, verlaengerung)
+       VALUES ('ver1', 'Talmberger Bank', '2024-01-01', 'keine')`,
     );
     await repo.gegenstandSpeichern({ id: "g1", bezeichnung: "Wohnung Lindenhof", art: "immobilie" });
     await repo.verbindlichkeitSpeichern({
@@ -173,8 +173,8 @@ describe("Migration 77 mit eingeschalteten Fremdschlüsseln", () => {
   beforeEach(() => {
     db.run("PRAGMA foreign_keys = ON");
     db.run(
-      `INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, status)
-       VALUES ('ver1', 'Talmberger Bank', '2024-01-01', 'keine', 'aktiv')`,
+      `INSERT INTO vertrag (id, anbieter, beginn, verlaengerung)
+       VALUES ('ver1', 'Talmberger Bank', '2024-01-01', 'keine')`,
     );
     db.run("INSERT INTO vermoegensgegenstand (id, bezeichnung, art) VALUES ('g1', 'Wohnung Lindenhof', 'immobilie')");
     db.run(`INSERT INTO vermoegenswert (gegenstand_id, stichtag, wert, erfasst_am) VALUES ('g1', '2025-12-31', 25000000, '${JETZT}')`);

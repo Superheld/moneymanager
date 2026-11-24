@@ -48,7 +48,7 @@ import { Modal } from "../bausteine/Modal";
 import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
 import { Datumsfeld } from "../bausteine/Datumsfeld";
-import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
+import { useDatum, useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 import { Kaestchen } from "../bausteine/Kaestchen";
 import { Collapsible } from "@base-ui/react/collapsible";
 import { type VertragFormular } from "./vertragFormular";
@@ -118,6 +118,7 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
 }) {
   const { t } = useTranslation();
   const geld = useGeld();
+  const datum = useDatum();
   const [f, setF] = useState<VertragFormular>(start);
   const [personen, setPersonen] = useState<Person[]>([]);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
@@ -245,6 +246,10 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
    * Abschnitts. Leer, wenn nichts drinsteht; dann greift der Standard-Hinweis.
    */
   const konditionen = [
+    // Zuerst, weil es die anderen Angaben entwertet: wer gekündigt hat, fragt nicht mehr
+    // nach Frist und Verlängerung. Und es muss im ZUGEKLAPPTEN Abschnitt zu lesen sein —
+    // sonst sieht ein gekündigter Vertrag in seiner eigenen Maske aus wie ein laufender.
+    f.ende && t("vertraege.gekuendigtZum", { datum: datum.mitJahr(f.ende) }),
     f.mindestlaufzeit && t("vertraege.zusammenMindestlaufzeit", { monate: f.mindestlaufzeit }),
     f.kuendigungsfrist && t("vertraege.zusammenKuendigungsfrist", { monate: f.kuendigungsfrist }),
     f.verlaengerung === "keine" ? t("vertraege.zusammenKeineVerlaengerung") : null,
@@ -287,6 +292,7 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
       verlaengerungMonate: f.verlaengerungMonate ? Number(f.verlaengerungMonate) : undefined,
       art: f.art,
       kuendigungsfristMonate: f.kuendigungsfrist ? Number(f.kuendigungsfrist) : undefined,
+      ende: f.ende || undefined,
       betrag: geld.parse(f.betragText) ?? 0,
       rhythmus: f.rhythmus,
       charakter: f.charakter,
@@ -503,6 +509,12 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
           </FormField>
           <FormField label={t("vertraege.feldBeginn")} hint={t("vertraege.feldBeginnHinweis")}>
             <Datumsfeld ariaLabel={t("vertraege.feldBeginn")} wert={f.beginn} aufAenderung={(v) => setze("beginn", v)} />
+          </FormField>
+          {/* Direkt neben dem Beginn: Anfang und Ende sind ein Paar. Ein Feld und kein
+              Knopf „Kündigen", weil die Kündigung fast immer zu einem künftigen Tag wirkt —
+              und weil ein geleertes Feld sie ebenso einfach zurücknimmt. */}
+          <FormField label={t("vertraege.feldEnde")} hint={t("vertraege.feldEndeHinweis")}>
+            <Datumsfeld ariaLabel={t("vertraege.feldEnde")} wert={f.ende} aufAenderung={(v) => setze("ende", v)} />
           </FormField>
           <FormField label={t("vertraege.feldInhaber")} hint={t("vertraege.optional")}>
             <Auswahl

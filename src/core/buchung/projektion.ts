@@ -64,6 +64,9 @@ export function projiziereRegel(
   for (let k = kStart; k < kStart + MAX_SCHRITTE; k++) {
     const faellig = addMonate(start, k * schritt);
     if (ord(faellig) >= endeOrd) break;
+    // Nach dem Ende der Regel kommt nichts mehr — ein gekündigter Vertrag plant weiter
+    // bis zu seinem letzten Tag und danach nicht mehr.
+    if (regel.vertragsende && toIso(faellig) > regel.vertragsende) break;
     if (ord(faellig) >= startOrd) {
       const datum = toIso(faellig);
       buchungen.push({
@@ -102,7 +105,10 @@ export function naechsteFaelligkeit(regel: Zahlungsregel, heute: string): string
   // Der Sprung landet höchstens einen Zyklus daneben; drei Schritte sind reichlich.
   for (let i = 0; i < 3; i++, k++) {
     const faellig = addMonate(start, k * schritt);
-    if (ord(faellig) >= heuteOrd) return toIso(faellig);
+    if (ord(faellig) >= heuteOrd) {
+      const datum = toIso(faellig);
+      return regel.vertragsende && datum > regel.vertragsende ? null : datum;
+    }
   }
   return null;
 }

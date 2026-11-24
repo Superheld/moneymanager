@@ -13,6 +13,7 @@ import {
   realerKontostand,
   ruecklagenDeckung,
   ruecklagenfluss,
+  vertragsstatus,
   zielwertGesamt,
   zyklusSoll,
   zyklusUngedeckt,
@@ -447,9 +448,10 @@ export async function ruecklagenLaden(
       deps.ruecklagenzuordnungRepo.alle(),
     ]);
   const kontostaende = new Map(konten.map((k) => [k.id, realerKontostand(k, buchungen)]));
-  // Nur laufende Verträge: ein gekündigter zahlt nicht mehr ein, und eine Mindestrücklage
-  // auf Einnahmen zu stützen, die es nicht mehr gibt, wäre die falsche Beruhigung.
-  const laufend = new Set(vertraege.filter((v) => v.status === "aktiv").map((v) => v.id));
+  // Nur ungekündigte Verträge: ein gekündigter zahlt bald nicht mehr ein, und eine
+  // Mindestrücklage auf Einnahmen zu stützen, deren Ende schon feststeht, wäre die falsche
+  // Beruhigung — auch wenn das Ende noch ein paar Monate entfernt ist.
+  const laufend = new Set(vertraege.filter((v) => vertragsstatus(v, heute) === "aktiv").map((v) => v.id));
   const einnahmen = vertragseinnahmenProMonat(
     regeln.filter((r) => r.vertragId && laufend.has(r.vertragId)),
   );

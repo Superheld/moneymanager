@@ -2608,4 +2608,43 @@ export const MIGRATIONS: Migration[] = [
        DROP TABLE zahlungsregel`,
     ],
   },
+  {
+    version: 85, // Einen Vertrag kuendigen: das Ende als Datum
+    sql: [
+      // Ein gekuendigter Vertrag liess sich bis hierher nur LOESCHEN. Damit gingen die
+      // Zuordnungen seiner Zahlungen mit, und sein Vorschlag kam wieder, weil nur ein
+      // bestehender Vertrag ihn verdeckt. Jetzt bleibt er stehen und traegt ein Ende.
+      //
+      // Ein Datum und kein Status: eine Kuendigung wirkt fast immer in der Zukunft
+      // („zum 31. Maerz"), und bis dahin wird weiter gezahlt und geplant. Ob ein Vertrag
+      // gekuendigt oder schon beendet ist, haengt dann nur noch am Tag, an dem man fragt —
+      // `vertragsstatus` leitet es ab. Ein gespeicherter Status daneben waere ein zweites
+      // Feld auf dieselbe Frage.
+      //
+      // Das Ende steht an EINER Stelle. Seit v84 traegt der Vertrag seine Zahlung selbst,
+      // und die Regel, die die Planung liest, wird aus ihm gebaut und nimmt das Ende mit
+      // (`regelAusVertrag`, `vertragsende`).
+      `ALTER TABLE vertrag ADD COLUMN ende TEXT`,
+      // Die alte Spalte `status` hat keine Stelle im Programm je auf etwas anderes als
+      // 'aktiv' gesetzt. Ob der Bestand trotzdem einen anderen Wert traegt, laesst sich
+      // vorher nicht nachsehen (keine Echtdaten in der Entwicklung) — deshalb wird ein
+      // solcher Wert nicht weggeworfen, sondern in die einzige Form uebersetzt, die es
+      // jetzt gibt: „nicht mehr aktiv, spaetestens seit heute". Das Datum ist eine
+      // Untergrenze und keine Auskunft; wer es genauer weiss, traegt es im Dialog nach.
+      // Wiederholbar ueber `ende IS NULL`, und `@wennSpalte`, weil v86 die Spalte fallen
+      // laesst.
+      `-- @wennSpalte vertrag.status
+       UPDATE vertrag SET ende = date('now')
+       WHERE status <> 'aktiv' AND ende IS NULL`,
+    ],
+  },
+  {
+    version: 86, // Der Vertragsstatus ist abgeleitet und nicht mehr gespeichert
+    sql: [
+      // Getrennt von v85, weil die die Spalte ein letztes Mal liest: bricht ein Lauf
+      // zwischen beiden ab, faende eine wiederholte v85 sonst ein Statement gegen eine
+      // Spalte, die es nicht mehr gibt (siehe `adapters/persistence/CLAUDE.md`).
+      `ALTER TABLE vertrag DROP COLUMN status`,
+    ],
+  },
 ];

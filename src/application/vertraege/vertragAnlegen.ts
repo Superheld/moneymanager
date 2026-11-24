@@ -10,7 +10,6 @@ import type {
   Vertrag,
   Verlaengerungsart,
   Vertragsart,
-  Vertragsstatus,
   Vertragszahlung,
   Zahlungsregel,
   Regelvorlage,
@@ -45,6 +44,11 @@ export interface VertragEingabe {
   /** Abo (kündbar, wird überwacht) oder Dauervertrag (Arbeit, Miete). Fehlend = Abo. */
   art?: Vertragsart;
   kuendigungsfristMonate?: number;
+  /**
+   * „Gekündigt zum" — der letzte Tag, an dem der Vertrag gilt. Leer heisst: läuft.
+   * Landet nur am Vertrag; die Regel bekommt es beim Lesen (siehe `Vertrag.ende`).
+   */
+  ende?: string;
   notizen?: string;
   // --- Zahlungsseite (→ `Vertrag.zahlung`) ---
   betrag: Cent;
@@ -100,6 +104,21 @@ function zahlungAus(eingabe: VertragEingabe): Vertragszahlung {
   };
 }
 
+/**
+ * Das Vertragsende aus der Eingabe — geprüft, oder `undefined` für „läuft".
+ *
+ * Ein Ende vor dem Beginn wird abgewiesen statt hingenommen: der Vertrag hätte dann nie
+ * gegolten, und die Planung sähe keine einzige Fälligkeit. Das sähe aus wie ein
+ * gelöschter Vertrag, der noch in der Liste steht.
+ */
+function endeAus(eingabe: VertragEingabe): string | undefined {
+  const ende = eingabe.ende?.trim();
+  if (!ende) return undefined;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ende)) throw new FachlicherFehler("ende.ungueltig");
+  if (ende < eingabe.beginn) throw new FachlicherFehler("ende.vorBeginn");
+  return ende;
+}
+
 export async function vertragAnlegen(
   vertragRepo: VertragRepository,
   eingabe: VertragEingabe,
@@ -109,8 +128,8 @@ export async function vertragAnlegen(
   if (!anbieter) throw new FachlicherFehler("anbieter.fehlt");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(eingabe.beginn)) throw new FachlicherFehler("beginn.ungueltig");
   if (!(eingabe.betrag > 0)) throw new FachlicherFehler("betrag.groesserNull");
+  const ende = endeAus(eingabe);
 
-  const status: Vertragsstatus = "aktiv";
   const vertrag: Vertrag = {
     id: crypto.randomUUID(),
     anbieter,
@@ -122,7 +141,7 @@ export async function vertragAnlegen(
     verlaengerungMonate: eingabe.verlaengerung === "automatisch" ? eingabe.verlaengerungMonate : undefined,
     art: eingabe.art ?? "abo",
     kuendigungsfristMonate: eingabe.kuendigungsfristMonate,
-    status,
+    ende,
     // Die Kategorisierungs-Kette fragt den Vertrag danach, weil die Vertragszuordnung
     // auf ihn zeigt; die Planung liest dieselbe Kategorie über die gebaute Regel.
     kategorieId: eingabe.kategorieId || undefined,
@@ -157,8 +176,8 @@ export async function vertragAktualisieren(
   if (!anbieter) throw new FachlicherFehler("anbieter.fehlt");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(eingabe.beginn)) throw new FachlicherFehler("beginn.ungueltig");
   if (!(eingabe.betrag > 0)) throw new FachlicherFehler("betrag.groesserNull");
+  const ende = endeAus(eingabe);
 
-  const bestehend = (await vertragRepo.alle()).find((v) => v.id === vertragId);
   const vertrag: Vertrag = {
     id: vertragId,
     anbieter,
@@ -170,7 +189,7 @@ export async function vertragAktualisieren(
     verlaengerungMonate: eingabe.verlaengerung === "automatisch" ? eingabe.verlaengerungMonate : undefined,
     art: eingabe.art ?? "abo",
     kuendigungsfristMonate: eingabe.kuendigungsfristMonate,
-    status: bestehend?.status ?? "aktiv",
+    ende,
     kategorieId: eingabe.kategorieId || undefined,
     notizen: eingabe.notizen?.trim() || undefined,
     zahlung: zahlungAus(eingabe),

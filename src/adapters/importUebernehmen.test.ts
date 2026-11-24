@@ -59,7 +59,7 @@ describe("Kategorie-Vorschlag beim Übernehmen, je Stufe der Kette", () => {
     // Ein Vertrag mit Kategorie und einer Erkennungsregel auf seinen Anbieter.
     await vertragRepo.speichern({
       id: "v-1", anbieter: "Kesselmann", beginn: "2025-01-01", verlaengerung: "keine",
-      status: "aktiv", kategorieId: "k-vertrag",
+      kategorieId: "k-vertrag",
     });
     await erkennungRepo.speichern(standardErkennung("v-1", "Kesselmann", 2990));
     // Ein Modell, das „Ohlert" kennt — und zum Vergleich etwas anderes, damit es wählen muss.

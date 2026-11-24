@@ -39,7 +39,7 @@ const VERTRAG: Vertrag = {
   anbieter: "Kesselmann",
   beginn: "2025-01-01",
   verlaengerung: "automatisch",
-  status: "aktiv",
+
   kategorieId: "kat-1",
 };
 

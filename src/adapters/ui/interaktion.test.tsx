@@ -170,7 +170,7 @@ describe("Vertrag anlegen", () => {
 
   it("zeigt den Kündigungstermin eines laufenden Vertrags", async () => {
     await sqliteVertragRepository.speichern({
-      id: "v1", anbieter: "Fitnessstudio", beginn: "2026-01-31", status: "aktiv",
+      id: "v1", anbieter: "Fitnessstudio", beginn: "2026-01-31",
       verlaengerung: "automatisch", verlaengerungMonate: 1,
       mindestlaufzeitMonate: 1, kuendigungsfristMonate: 1,
     });
@@ -980,7 +980,7 @@ describe("Vertrag aus einer Buchung", () => {
     await zahlungAnlegen();
     await sqliteVertragRepository.speichern({
       id: "v1", anbieter: "Telefonica Germany", beginn: "2025-01-01",
-      verlaengerung: "automatisch", status: "aktiv",
+      verlaengerung: "automatisch",
     });
     await erkennungSicherstellen(sqliteVertragserkennungRepository, "v1", "Telefonica Germany", 2999);
     await zuordnungenAbgleichen(vertragsAbgleichDeps);
@@ -1006,7 +1006,7 @@ describe("Vertrag aus einer Buchung", () => {
     await zahlungAnlegen();
     await sqliteVertragRepository.speichern({
       id: "v1", anbieter: "Telefonica Germany", beginn: "2025-01-01",
-      verlaengerung: "automatisch", status: "aktiv",
+      verlaengerung: "automatisch",
     });
     await erkennungSicherstellen(sqliteVertragserkennungRepository, "v1", "Telefonica Germany", 2999);
     await zuordnungenAbgleichen(vertragsAbgleichDeps);

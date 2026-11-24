@@ -529,8 +529,10 @@ beforeAll(async () => {
  *   • 84 — die Zahlung am Vertrag. Der Spielstand schreibt sie dorthin; die Tabelle
  *     `zahlungsregel` ist hier noch leer und fällt. Überführt wird in der Probe nichts,
  *     das prüft `migrations.test.ts`.
+ *   • 85/86 — das Vertragsende statt des gespeicherten Status. Der Spielstand schreibt
+ *     keinen Status mehr; die Probe rechnet über keinen gekündigten Vertrag.
  */
-const NUR_SCHEMA_DANACH = new Set([82, 83, 84]);
+const NUR_SCHEMA_DANACH = new Set([82, 83, 84, 85, 86]);
 
 function migrationen(db: Database, filter: (version: number) => boolean): void {
   for (const m of MIGRATIONS.filter((x) => filter(x.version))) for (const sql of m.sql) db.run(sql);

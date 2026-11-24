@@ -76,3 +76,32 @@ describe("vertragAktualisieren / vertragLoeschen", () => {
     expect(vr.daten).toHaveLength(0);
   });
 });
+
+describe("Kündigen — das Vertragsende", () => {
+  it("schreibt das Ende an den Vertrag, und die Regel der Planung nimmt es von dort", async () => {
+    const vr = memVertrag();
+    const { vertrag } = await vertragAnlegen(vr, eingabe());
+    const { vertrag: v2, regel } = await vertragAktualisieren(vr, vertrag.id, eingabe({ ende: "2026-03-31" }));
+    expect(v2.ende).toBe("2026-03-31");
+    expect(regel.vertragsende).toBe("2026-03-31");
+  });
+
+  it("ein geleertes Ende nimmt die Kündigung zurück", async () => {
+    const vr = memVertrag();
+    const { vertrag } = await vertragAnlegen(vr, eingabe({ ende: "2026-03-31" }));
+    const { vertrag: v2 } = await vertragAktualisieren(vr, vertrag.id, eingabe({ ende: "" }));
+    expect(v2.ende).toBeUndefined();
+  });
+
+  it("weist ein Ende in falscher Form und eines vor dem Beginn ab", async () => {
+    const vr = memVertrag();
+    await expect(vertragAnlegen(vr, eingabe({ ende: "31.03.2026" }))).rejects.toThrow("ende.ungueltig");
+    await expect(vertragAnlegen(vr, eingabe({ ende: "2025-12-31" }))).rejects.toThrow("ende.vorBeginn");
+  });
+
+  it("ein Ende am Tag des Beginns ist erlaubt", async () => {
+    const vr = memVertrag();
+    const { vertrag } = await vertragAnlegen(vr, eingabe({ ende: "2026-01-01" }));
+    expect(vertrag.ende).toBe("2026-01-01");
+  });
+});

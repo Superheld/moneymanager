@@ -10,7 +10,31 @@ import type { Cent } from "../basis/geld";
 import { RHYTHMUS_MONATE, type Charakter, type Rhythmus, type Zahlungsregel } from "../basis/zahlungsregel";
 
 export type Verlaengerungsart = "keine" | "automatisch";
+
+/**
+ * Wo ein Vertrag gerade steht — ABGELEITET, nicht gespeichert.
+ *
+ * Bis 2026-11-08 war das ein eigenes Feld, und keine Stelle im Programm hat es je auf
+ * etwas anderes als `aktiv` gesetzt. Wer einen gekündigten Vertrag loswerden wollte,
+ * konnte ihn nur löschen, und damit verlor er zweimal: die Zuordnungen seiner alten
+ * Zahlungen gingen mit, und der Vorschlag kam wieder, weil nur ein bestehender Vertrag
+ * ihn verdeckt (`vertragsvorschlaege`).
+ *
+ * Abgeleitet wird aus `ende` und dem Tag, an dem man fragt. Ein gespeicherter Status neben
+ * einem gespeicherten Datum wären zwei Felder auf dieselbe Frage — „gekündigt zum März"
+ * und „aktiv" zugleich wäre speicherbar, und niemand wüsste, welches gilt.
+ */
 export type Vertragsstatus = "aktiv" | "gekuendigt" | "beendet";
+
+/**
+ *   • kein `ende` → `aktiv`
+ *   • `ende` heute oder später → `gekuendigt` (läuft noch, zahlt noch, ist aber erledigt)
+ *   • `ende` vorbei → `beendet`
+ */
+export function vertragsstatus(v: Vertrag, heute: string): Vertragsstatus {
+  if (!v.ende) return "aktiv";
+  return v.ende >= heute ? "gekuendigt" : "beendet";
+}
 
 /**
  * Was für ein Vertrag das ist — und ob es Sinn ergibt, ihn kündigen zu wollen.
@@ -76,7 +100,22 @@ export interface Vertrag {
   /** Verlängerungsschritt in Monaten, wenn verlaengerung = „automatisch". */
   readonly verlaengerungMonate?: number;
   readonly kuendigungsfristMonate?: number;
-  readonly status: Vertragsstatus;
+  /**
+   * Der LETZTE Tag, an dem der Vertrag gilt — „gekündigt zum". Fehlend heisst: läuft.
+   *
+   * Ein Datum und kein Schalter, weil eine Kündigung fast immer in der Zukunft wirkt:
+   * gekündigt im Januar zum 31. März heisst, Februar und März wird noch gezahlt. Ein
+   * Schalter „gekündigt" hätte den Monatsausblick sofort leer gemacht oder nie.
+   *
+   * Der Vertrag BLEIBT danach stehen, und mit ihm die Zuordnungen seiner Zahlungen. Er
+   * verdeckt weiter den Vorschlag desselben Anbieters, und die Erkennung ordnet ihm auch
+   * nach dem Ende noch zu: eine Schlusserstattung gehört dazu, und eine Abbuchung nach
+   * der Kündigung soll gerade auffallen, statt als neuer Vorschlag aufzutauchen.
+   *
+   * Gespeichert wird es NUR hier. Die Planung folgt über `Zahlungsregel.vertragsende`, das
+   * `regelAusVertrag` aus diesem Feld nimmt.
+   */
+  readonly ende?: string;
   /**
    * Kategorie der Zahlungen dieses Vertrags.
    *
@@ -109,6 +148,7 @@ export function regelAusVertrag(v: Vertrag): Zahlungsregel | undefined {
     betrag: z.betrag,
     rhythmus: z.rhythmus,
     startdatum: z.ersteZahlung,
+    vertragsende: v.ende,
     charakter: z.charakter,
     kontoId: z.kontoId,
     gegenkontoId: z.gegenkontoId,
@@ -138,10 +178,13 @@ export interface Kuendigungstermin {
  * Nächster zulässiger Kündigungstermin ab `heute`. Aus Beginn, Mindestlaufzeit,
  * Verlängerungsregel und Frist. Liefert den frühesten Endtermin, für den die
  * Kündigung noch rechtzeitig (kuendigenBis ≥ heute) raus kann. null, wenn der
- * Vertrag nicht aktiv ist oder kein künftiger Termin mehr erreichbar ist.
+ * Vertrag schon gekündigt ist oder kein künftiger Termin mehr erreichbar ist.
+ *
+ * Gefragt wird nach `ende`, nicht nach dem Status zu `heute`: ein gekündigter Vertrag,
+ * dessen Ende noch aussteht, hat keinen Kündigungstermin mehr — das ist erledigt.
  */
 export function naechsterKuendigungstermin(v: Vertrag, heute: string): Kuendigungstermin | null {
-  if (v.status !== "aktiv") return null;
+  if (v.ende) return null;
   const beginn = parseIso(v.beginn);
   const heuteDatum = parseIso(heute);
   const heuteO = ord(heuteDatum);
@@ -241,8 +284,8 @@ export function kostenJeMonat(regel: Zahlungsregel): number {
  * weiter und kostet bis dahin; ihn schon mit der Kündigung aus den Fixkosten zu nehmen,
  * zeigte Geld als frei, das noch monatelang abgeht.
  */
-export function vertragLaeuft(v: Vertrag): boolean {
-  return v.status !== "beendet";
+export function vertragLaeuft(v: Vertrag, heute: string): boolean {
+  return vertragsstatus(v, heute) !== "beendet";
 }
 
 /** Was die Verträge zusammen den Monat bedeuten — die erste Stufe der Ergebnisrechnung. */
@@ -270,11 +313,12 @@ export interface Pflichten {
  */
 export function pflichtenJeMonat(
   posten: readonly { readonly vertrag: Vertrag; readonly regel?: Zahlungsregel }[],
+  heute: string,
 ): Pflichten {
   let fixkosten = 0;
   let einnahmen = 0;
   for (const { vertrag, regel } of posten) {
-    if (!regel || !vertragLaeuft(vertrag)) continue;
+    if (!regel || !vertragLaeuft(vertrag, heute)) continue;
     if (regel.charakter === "Aufwand") fixkosten += kostenJeMonat(regel);
     else if (regel.charakter === "Ertrag") einnahmen += kostenJeMonat(regel);
   }
@@ -285,8 +329,9 @@ export function pflichtenJeMonat(
 export function kuendigungsterminNaht(v: Vertrag, heute: string, warnTage = 45): boolean {
   // Ein Dauervertrag wird nicht „bald kündbar" — die Warnung gehört den Abos. Der Termin
   // selbst bleibt abrufbar (naechsterKuendigungstermin), er ist nur keine Aufforderung.
-  // Eine Umbuchung erst recht nicht: sie ist eine Abmachung mit sich selbst, und die
-  // kündigt man, indem man sie löscht.
+  // Eine Umbuchung erst recht nicht: sie ist eine Abmachung mit sich selbst, und niemand
+  // muss an eine Frist erinnert werden, die er sich selbst gesetzt hat. Beenden lässt sie
+  // sich trotzdem — über `ende`, wie jeden anderen Vertrag.
   if (v.art === "dauervertrag" || v.art === "umbuchung") return false;
   const t = naechsterKuendigungstermin(v, heute);
   if (!t) return false;

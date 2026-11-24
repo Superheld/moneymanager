@@ -657,8 +657,8 @@ describe("4 · Bestand abgleichen", () => {
       buchung({ id: `r${i}`, betrag: -1234, kategorieId: "kat-lm", gegenpartei: "Talmer", zweck: "Einkauf" });
     }
     db.run(
-      `INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, status, art, kategorie_id)
-       VALUES ('v-talmer', 'Talmer', '2026-01-01', 'automatisch', 'aktiv', 'laufend', 'kat-dro')`,
+      `INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, art, kategorie_id)
+       VALUES ('v-talmer', 'Talmer', '2026-01-01', 'automatisch', 'laufend', 'kat-dro')`,
     );
     // `schluessel` traegt JSON mit typisierten Merkmalen — der Spaltenname ist aelter als
     // ihr Inhalt (siehe sqliteVertragZuordnungRepositories). Klartext ergaebe eine leere
