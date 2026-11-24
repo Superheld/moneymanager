@@ -64,7 +64,7 @@ describe("Quellen laden", () => {
   it("nimmt Verträge mit Kategorie samt ihrer Regeln auf", async () => {
     const q = await kategorisierungsquellen(
       repos({
-        vertraege: [{ id: "v1", anbieter: "Kesselmann", beginn: "2026-01-01", verlaengerung: "keine", status: "aktiv", kategorieId: "k-abo" }],
+        vertraege: [{ id: "v1", anbieter: "Kesselmann", beginn: "2026-01-01", verlaengerung: "keine", kategorieId: "k-abo" }],
         erkennungen: [standardErkennung("v1", "Kesselmann International", 999)],
       }),
     );
@@ -76,7 +76,7 @@ describe("Quellen laden", () => {
     // Sonst liefe der Abgleich über den ganzen Regelsatz für ein Ergebnis, das feststeht.
     const q = await kategorisierungsquellen(
       repos({
-        vertraege: [{ id: "v1", anbieter: "Kesselmann", beginn: "2026-01-01", verlaengerung: "keine", status: "aktiv" }],
+        vertraege: [{ id: "v1", anbieter: "Kesselmann", beginn: "2026-01-01", verlaengerung: "keine" }],
         erkennungen: [standardErkennung("v1", "Kesselmann International", 999)],
       }),
     );

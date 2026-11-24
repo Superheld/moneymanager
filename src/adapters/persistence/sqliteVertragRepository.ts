@@ -1,6 +1,6 @@
 // SQLite-Implementierung des VertragRepository-Ports.
 
-import type { Charakter, Rhythmus, Verlaengerungsart, Vertrag, Vertragsart, Vertragsstatus } from "../../core";
+import type { Charakter, Rhythmus, Verlaengerungsart, Vertrag, Vertragsart } from "../../core";
 import type { VertragRepository } from "../../application/ports";
 import { getDb } from "./db";
 
@@ -14,7 +14,7 @@ interface Zeile {
   verlaengerung: string;
   verlaengerung_monate: number | null;
   kuendigungsfrist_monate: number | null;
-  status: string;
+  ende: string | null;
   art: string | null;
   kategorie_id: string | null;
   notizen: string | null;
@@ -37,7 +37,7 @@ function zuVertrag(z: Zeile): Vertrag {
     verlaengerung: z.verlaengerung as Verlaengerungsart,
     verlaengerungMonate: z.verlaengerung_monate ?? undefined,
     kuendigungsfristMonate: z.kuendigungsfrist_monate ?? undefined,
-    status: z.status as Vertragsstatus,
+    ende: z.ende ?? undefined,
     // Fehlend heisst „abo" — so bleiben Bestandsverträge ohne Spalte gültig.
     art: (z.art as Vertragsart) ?? "abo",
     kategorieId: z.kategorie_id ?? undefined,
@@ -63,7 +63,7 @@ export const sqliteVertragRepository: VertragRepository = {
     const db = await getDb();
     const zeilen = await db.select<Zeile[]>(
       `SELECT id, anbieter, vertragsnummer, inhaber_id, beginn, mindestlaufzeit_monate,
-              verlaengerung, verlaengerung_monate, kuendigungsfrist_monate, status, art,
+              verlaengerung, verlaengerung_monate, kuendigungsfrist_monate, ende, art,
               kategorie_id, notizen, betrag, rhythmus, erste_zahlung, charakter, konto_id, gegenkonto_id
        FROM vertrag ORDER BY anbieter`,
     );
@@ -74,7 +74,7 @@ export const sqliteVertragRepository: VertragRepository = {
     const db = await getDb();
     await db.execute(
       `INSERT INTO vertrag (id, anbieter, vertragsnummer, inhaber_id, beginn, mindestlaufzeit_monate,
-         verlaengerung, verlaengerung_monate, kuendigungsfrist_monate, status, art, kategorie_id, notizen,
+         verlaengerung, verlaengerung_monate, kuendigungsfrist_monate, ende, art, kategorie_id, notizen,
          betrag, rhythmus, erste_zahlung, charakter, konto_id, gegenkonto_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
        ON CONFLICT(id) DO UPDATE SET
@@ -83,7 +83,7 @@ export const sqliteVertragRepository: VertragRepository = {
          mindestlaufzeit_monate = excluded.mindestlaufzeit_monate,
          verlaengerung = excluded.verlaengerung, verlaengerung_monate = excluded.verlaengerung_monate,
          kuendigungsfrist_monate = excluded.kuendigungsfrist_monate,
-         status = excluded.status, art = excluded.art, kategorie_id = excluded.kategorie_id,
+         ende = excluded.ende, art = excluded.art, kategorie_id = excluded.kategorie_id,
          notizen = excluded.notizen,
          betrag = excluded.betrag, rhythmus = excluded.rhythmus,
          erste_zahlung = excluded.erste_zahlung, charakter = excluded.charakter,
@@ -98,7 +98,7 @@ export const sqliteVertragRepository: VertragRepository = {
         v.verlaengerung,
         v.verlaengerungMonate ?? null,
         v.kuendigungsfristMonate ?? null,
-        v.status,
+        v.ende ?? null,
         v.art ?? "abo",
         v.kategorieId ?? null,
         v.notizen ?? null,

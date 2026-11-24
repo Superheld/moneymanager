@@ -102,7 +102,7 @@ describe("VertraegeScreen — Ansichten", () => {
   /** Ein Vertrag samt Regel; künftiger Start ⇒ die nächste Fälligkeit IST der Start. */
   async function vertragMitRegel(id: string, anbieter: string, betrag: number, rhythmus: string, start: string, art?: "abo" | "dauervertrag") {
     await sqliteVertragRepository.speichern({
-      id, anbieter, beginn: start, verlaengerung: "keine", status: "aktiv", ...(art ? { art } : {}),
+      id, anbieter, beginn: start, verlaengerung: "keine", ...(art ? { art } : {}),
     });
     await planzahlungSpeichern({
       id: `r-${id}`, bezeichnung: anbieter, betrag, rhythmus: rhythmus as "monatlich",
@@ -141,7 +141,7 @@ describe("VertraegeScreen — Ansichten", () => {
   it("nennt Fixkosten, Einnahmen und was nach den Pflichten bleibt — je Monat", async () => {
     await bestand();
     await sqliteVertragRepository.speichern({
-      id: "e", anbieter: "Epsilon", beginn: tagNach(5), verlaengerung: "keine", status: "aktiv", art: "dauervertrag",
+      id: "e", anbieter: "Epsilon", beginn: tagNach(5), verlaengerung: "keine", art: "dauervertrag",
     });
     await planzahlungSpeichern({
       id: "r-e", bezeichnung: "Epsilon", betrag: 200000, rhythmus: "monatlich",
@@ -151,7 +151,7 @@ describe("VertraegeScreen — Ansichten", () => {
       id: "k2", bezeichnung: "Tagesgeld", typ: "Tagesgeld", klasse: "sparen", inhaberIds: [], saldo: 0,
     });
     await sqliteVertragRepository.speichern({
-      id: "u", anbieter: "Zeta", beginn: tagNach(5), verlaengerung: "keine", status: "aktiv", art: "umbuchung",
+      id: "u", anbieter: "Zeta", beginn: tagNach(5), verlaengerung: "keine", art: "umbuchung",
     });
     await planzahlungSpeichern({
       id: "r-u", bezeichnung: "Zeta", betrag: -30000, rhythmus: "monatlich",
@@ -282,7 +282,7 @@ describe("VertraegeScreen — Beginn und Fälligkeit", () => {
     ];
     for (const [id, anbieter, betrag, kategorieId] of vertraege) {
       await sqliteVertragRepository.speichern({
-        id, anbieter, beginn: "2025-01-01", verlaengerung: "automatisch", status: "aktiv",
+        id, anbieter, beginn: "2025-01-01", verlaengerung: "automatisch",
       });
       await planzahlungSpeichern({
         id: `r-${id}`, bezeichnung: anbieter, betrag, rhythmus: "monatlich",
@@ -320,7 +320,7 @@ describe("VertraegeScreen — Beginn und Fälligkeit", () => {
     ];
     for (const [id, anbieter, betrag, kategorieId] of vertraege) {
       await sqliteVertragRepository.speichern({
-        id, anbieter, beginn: "2025-01-01", verlaengerung: "automatisch", status: "aktiv",
+        id, anbieter, beginn: "2025-01-01", verlaengerung: "automatisch",
       });
       await planzahlungSpeichern({
         id: `r-${id}`, bezeichnung: anbieter, betrag, rhythmus: "monatlich",
@@ -344,7 +344,7 @@ describe("VertraegeScreen — Beginn und Fälligkeit", () => {
     await konto();
     await sqliteVertragRepository.speichern({
       id: "v1", anbieter: "Sportverein", beginn: "2015-03-01", mindestlaufzeitMonate: 24,
-      kuendigungsfristMonate: 3, verlaengerung: "automatisch", verlaengerungMonate: 12, status: "aktiv",
+      kuendigungsfristMonate: 3, verlaengerung: "automatisch", verlaengerungMonate: 12,
     });
     const nutzer = userEvent.setup();
     rendere(<VertraegeScreen />);
@@ -368,7 +368,7 @@ describe("VertraegeScreen — Beginn und Fälligkeit", () => {
     await konto();
     await sqliteVertragRepository.speichern({
       id: "v1", anbieter: "Sportverein", beginn: "2015-03-01",
-      verlaengerung: "automatisch", verlaengerungMonate: 12, status: "aktiv",
+      verlaengerung: "automatisch", verlaengerungMonate: 12,
     });
     await planzahlungSpeichern({
       id: "r1", bezeichnung: "Sportverein", betrag: -18000, rhythmus: "jaehrlich",
@@ -533,7 +533,7 @@ describe("VertraegeScreen — Vorschläge", () => {
     // Direkt ins Repository geschrieben — wie ein Vertrag aus der Zeit vor Migration 19.
     await sqliteVertragRepository.speichern({
       id: "alt", anbieter: "Vibora GmbH", beginn: "2025-01-01",
-      verlaengerung: "automatisch", status: "aktiv",
+      verlaengerung: "automatisch",
     });
     await planzahlungSpeichern({
       id: "r-alt", bezeichnung: "Vibora GmbH", betrag: -1650, rhythmus: "monatlich",
@@ -563,7 +563,7 @@ describe("VertraegeScreen — Vorschläge", () => {
     await konto();
     await sqliteVertragRepository.speichern({
       id: "um", anbieter: "Sparrate aufs Tagesgeld", beginn: "2025-01-01",
-      verlaengerung: "automatisch", status: "aktiv", art: "umbuchung",
+      verlaengerung: "automatisch", art: "umbuchung",
     });
     await planzahlungSpeichern({
       id: "r-um", bezeichnung: "Sparrate aufs Tagesgeld", betrag: -20000, rhythmus: "monatlich",
@@ -623,7 +623,7 @@ describe("VertraegeScreen — Vorschläge", () => {
     }
     await sqliteVertragRepository.speichern({
       id: "v1", anbieter: "Vibora GmbH", beginn: "2024-01-01",
-      verlaengerung: "automatisch", status: "aktiv",
+      verlaengerung: "automatisch",
     });
     // Der Vertrag braucht seine Zahlungsregel, seit die Erkennung IM Bearbeiten-Dialog
     // steht: gespeichert wird beides zusammen, und `vertragAktualisieren` verlangt einen
@@ -668,7 +668,7 @@ describe("VertraegeScreen — Vorschläge", () => {
     await monatsreihe("a", "Ohlert", 5000, 3);
     await sqliteVertragRepository.speichern({
       id: "v1", anbieter: "Ohlert", beginn: "2024-01-01",
-      verlaengerung: "automatisch", status: "aktiv",
+      verlaengerung: "automatisch",
     });
     await sqliteVertragserkennungRepository.speichern(standardErkennung("v1", "Ohlert", 5000));
 
@@ -690,7 +690,7 @@ describe("VertraegeScreen — Vorschläge", () => {
     await monatsreihe("a", "Ohlert", 5000, 3);
     await sqliteVertragRepository.speichern({
       id: "v1", anbieter: "Ohlert", beginn: "2024-01-01",
-      verlaengerung: "automatisch", status: "aktiv",
+      verlaengerung: "automatisch",
     });
     await sqliteVertragserkennungRepository.speichern({
       vertragId: "v1",
@@ -722,7 +722,7 @@ describe("VertraegeScreen — Vorschläge", () => {
     await monatsreihe("b", "Petrossen Bonn Rg 4711", 5000, 3);
     await sqliteVertragRepository.speichern({
       id: "v1", anbieter: "Petrossen Bonn", beginn: "2024-01-01",
-      verlaengerung: "automatisch", status: "aktiv",
+      verlaengerung: "automatisch",
     });
     // Bewusst OHNE Stern angelegt — nicht über `standardErkennung`, die seit 2026-08-27
     // von sich aus einen anhängt. Gebraucht wird hier die enge Ausgangslage, damit die
@@ -789,7 +789,7 @@ describe("VertraegeScreen — Vorschläge", () => {
     }
     await sqliteVertragRepository.speichern({
       id: "v1", anbieter: "Zweitfunk", beginn: "2024-01-01",
-      verlaengerung: "automatisch", status: "aktiv",
+      verlaengerung: "automatisch",
     });
     await planzahlungSpeichern({
       id: "r-v1", bezeichnung: "Zweitfunk", betrag: -4678, rhythmus: "monatlich",
@@ -866,7 +866,7 @@ describe("VertraegeScreen — Vorschläge", () => {
     }
     await sqliteVertragRepository.speichern({
       id: "v1", anbieter: "Ohlert Assekuranz", beginn: "2024-01-01",
-      verlaengerung: "automatisch", status: "aktiv",
+      verlaengerung: "automatisch",
     });
     await planzahlungSpeichern({
       id: "r-v1", bezeichnung: "Ohlert Assekuranz", betrag: -5500, rhythmus: "monatlich",
@@ -991,7 +991,7 @@ describe("VertraegeScreen — Vorschläge", () => {
     await monatsreihe("a", "Vibora GmbH", 1650);
     await sqliteVertragRepository.speichern({
       id: "v1", anbieter: "vibora", beginn: "2025-01-01",
-      verlaengerung: "automatisch", status: "aktiv",
+      verlaengerung: "automatisch",
     });
 
     rendere(<VertraegeScreen />);
@@ -1038,7 +1038,7 @@ describe("VertraegeScreen — die Zahlungen hinter einem Vertrag", () => {
     });
     await sqliteVertragRepository.speichern({
       id: "v1", anbieter: "Talmberg Energie", beginn: "2026-01-01",
-      verlaengerung: "keine", status: "aktiv",
+      verlaengerung: "keine",
     });
     await sqliteLedgerRepository.speichern({
       id: "b1", datum: "2026-08-11", betrag: -4720, kontoId: "k1",
@@ -1088,7 +1088,7 @@ describe("VertraegeScreen — die Zahlungen hinter einem Vertrag", () => {
     });
     await sqliteVertragRepository.speichern({
       id: "v1", anbieter: "Ohlert Seewinkel", beginn: "2026-01-01",
-      verlaengerung: "keine", status: "aktiv",
+      verlaengerung: "keine",
     });
     rendere(<VertraegeScreen />);
 
@@ -1114,7 +1114,7 @@ describe("VertraegeScreen — Könnte dazugehören", () => {
     await konto();
     await sqliteKategorieRepository.speichern({ id: "kat-x", name: "Kategorie X", defaultCharakter: "Aufwand" });
     await sqliteVertragRepository.speichern({
-      id: "v1", anbieter: "Brakelmann", beginn: "2026-01-01", verlaengerung: "keine", status: "aktiv", kategorieId: "kat-x",
+      id: "v1", anbieter: "Brakelmann", beginn: "2026-01-01", verlaengerung: "keine", kategorieId: "kat-x",
     });
     await planzahlungSpeichern({
       id: "r-v1", bezeichnung: "Brakelmann", betrag: -61300, rhythmus: "monatlich",
@@ -1209,7 +1209,7 @@ describe("VertraegeScreen — Löschen", () => {
     });
     await sqliteVertragRepository.speichern({
       id: "v1", anbieter: "Ohlert Seewinkel", beginn: "2026-01-01",
-      verlaengerung: "keine", status: "aktiv",
+      verlaengerung: "keine",
     });
 
     rendere(<VertraegeScreen />);
@@ -1411,7 +1411,7 @@ describe("VertraegeScreen — Kategorie auf die Zahlungen übertragen", () => {
     }
     await sqliteVertragRepository.speichern({
       id: "v-terhoven", anbieter: "Terhoven Media", beginn: "2025-01-01",
-      verlaengerung: "automatisch", status: "aktiv", kategorieId: "kat-neu",
+      verlaengerung: "automatisch", kategorieId: "kat-neu",
     });
     await planzahlungSpeichern({
       id: "r-terhoven", bezeichnung: "Terhoven Media", betrag: -2900, rhythmus: "monatlich",
@@ -1468,5 +1468,62 @@ describe("VertraegeScreen — Kategorie auf die Zahlungen übertragen", () => {
       const buchungen = await sqliteLedgerRepository.alle();
       expect(buchungen.every((b) => b.kategorieId === "kat-alt")).toBe(true);
     });
+  });
+});
+
+/**
+ * Kündigen statt löschen. Der Anlass: wer einen gekündigten Vertrag loswerden wollte,
+ * konnte ihn nur löschen — und dann kam er als Vorschlag wieder, weil nur ein
+ * bestehender Vertrag den Vorschlag verdeckt, und die Zuordnungen seiner alten Zahlungen
+ * gingen mit.
+ */
+describe("VertraegeScreen — Kündigen", () => {
+  it("ein beendeter Vertrag bleibt stehen, behält seine Zahlungen und holt den Vorschlag nicht zurück", async () => {
+    await konto();
+    await monatsreihe("a", "Vibora GmbH", 1650);
+    await sqliteVertragRepository.speichern({
+      id: "v1", anbieter: "Vibora GmbH", beginn: "2025-01-01",
+      verlaengerung: "automatisch", ende: tagVor(1),
+    });
+    await planzahlungSpeichern({
+      id: "r1", bezeichnung: "Vibora GmbH", betrag: -1650, rhythmus: "monatlich",
+      startdatum: "2025-01-01", charakter: "Aufwand", kontoId: "k1", vertragId: "v1",
+    });
+
+    rendere(<VertraegeScreen />);
+    expect(await screen.findByText(i18n.t("vertraege.beendet"))).toBeInTheDocument();
+    await waitFor(async () => {
+      expect(await sqliteVertragszuordnungRepository.alle()).toHaveLength(12);
+    });
+    expect(document.body.textContent).not.toMatch(/Aus deinen Buchungen erkannt/);
+  });
+
+  it("kündigt über das Feld im Dialog, und die Planung nimmt das Ende vom Vertrag", async () => {
+    await konto();
+    await sqliteVertragRepository.speichern({
+      id: "v1", anbieter: "Ohlert", beginn: "2025-01-01", verlaengerung: "automatisch",
+    });
+    await planzahlungSpeichern({
+      id: "r1", bezeichnung: "Ohlert", betrag: -2500, rhythmus: "monatlich",
+      startdatum: "2025-01-15", charakter: "Aufwand", kontoId: "k1", vertragId: "v1",
+    });
+
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await nutzer.click(await screen.findByRole("button", { name: /bearbeiten/i }));
+    await nutzer.click(await screen.findByRole("button", { name: /Vertragsdaten/i }));
+
+    const ende = await screen.findByRole("textbox", { name: i18n.t("vertraege.feldEnde") });
+    await nutzer.type(ende, `${tagNach(60)}{Enter}`);
+    const speichern = screen.getAllByRole("button", { name: /speichern/i });
+    await nutzer.click(speichern[speichern.length - 1]);
+
+    await waitFor(async () => {
+      expect((await sqliteVertragRepository.alle())[0].ende).toBe(tagNach(60));
+    });
+    // Gespeichert am Vertrag; die Regel der Planung wird aus ihm gebaut und trägt es mit.
+    expect((await sqliteZahlungsregelRepository.alle())[0].vertragsende).toBe(tagNach(60));
+    // In der Liste steht er danach als gekündigt — mit Datum, weil er bis dahin noch zahlt.
+    expect(await screen.findByText(/gekündigt zum/i)).toBeInTheDocument();
   });
 });

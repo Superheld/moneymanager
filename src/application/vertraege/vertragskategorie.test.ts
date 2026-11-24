@@ -59,7 +59,7 @@ const VERTRAG: Vertrag = {
   anbieter: "Terhoven",
   beginn: "2026-01-01",
   verlaengerung: "automatisch",
-  status: "aktiv",
+
   kategorieId: "kat-vertrag",
 };
 

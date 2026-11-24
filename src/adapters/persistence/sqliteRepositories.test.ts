@@ -372,7 +372,7 @@ describe("Ledger-Repository", () => {
 describe("Vertrag- und Zahlungsregel-Repository", () => {
   it("speichert einen Vertrag mit Laufzeitfeldern", async () => {
     await vertragRepository.speichern({
-      id: "v1", anbieter: "Petrossen", beginn: "2026-01-01", status: "aktiv",
+      id: "v1", anbieter: "Petrossen", beginn: "2026-01-01",
       verlaengerung: "automatisch", verlaengerungMonate: 12,
       mindestlaufzeitMonate: 12, kuendigungsfristMonate: 3,
     });
@@ -385,7 +385,7 @@ describe("Vertrag- und Zahlungsregel-Repository", () => {
 
   it("speichert die Zahlung am Vertrag und liest sie als Regel der Planung zurück", async () => {
     await vertragRepository.speichern({
-      id: "v1", anbieter: "Tollgreve", beginn: "2026-01-01", status: "aktiv", verlaengerung: "keine",
+      id: "v1", anbieter: "Tollgreve", beginn: "2026-01-01", verlaengerung: "keine",
       kategorieId: undefined,
       zahlung: { betrag: -90000, rhythmus: "monatlich", ersteZahlung: "2026-01-03", charakter: "Aufwand" },
     });
@@ -404,7 +404,7 @@ describe("Vertrag- und Zahlungsregel-Repository", () => {
 
   it("baut aus einem Vertrag ohne Zahlung keine Regel", async () => {
     await vertragRepository.speichern({
-      id: "v1", anbieter: "Ummelt", beginn: "2026-01-01", status: "aktiv", verlaengerung: "keine",
+      id: "v1", anbieter: "Ummelt", beginn: "2026-01-01", verlaengerung: "keine",
     });
     expect((await vertragRepository.alle())[0].zahlung).toBeUndefined();
     expect(await zahlungsregelRepository.alle()).toHaveLength(0);
@@ -412,12 +412,27 @@ describe("Vertrag- und Zahlungsregel-Repository", () => {
 
   it("löscht mit dem Vertrag seine Zahlung", async () => {
     await vertragRepository.speichern({
-      id: "v1", anbieter: "Wiebold", beginn: "2026-01-01", status: "aktiv", verlaengerung: "keine",
+      id: "v1", anbieter: "Wiebold", beginn: "2026-01-01", verlaengerung: "keine",
       zahlung: { betrag: -100, rhythmus: "monatlich", ersteZahlung: "2026-01-01", charakter: "Aufwand" },
     });
     await vertragRepository.loeschen("v1");
     expect(await vertragRepository.alle()).toHaveLength(0);
     expect(await zahlungsregelRepository.alle()).toHaveLength(0);
+  });
+
+  it("gibt der Regel das Ende ihres Vertrags mit — ein gekündigter Vertrag plant nicht weiter", async () => {
+    await vertragRepository.speichern({
+      id: "v1", anbieter: "Ohlert", beginn: "2025-01-01", verlaengerung: "keine", ende: "2026-03-31",
+      zahlung: { betrag: -2500, rhythmus: "monatlich", ersteZahlung: "2025-01-15", charakter: "Aufwand" },
+    });
+    await vertragRepository.speichern({
+      id: "v2", anbieter: "Pagel", beginn: "2025-01-01", verlaengerung: "keine",
+      zahlung: { betrag: -1000, rhythmus: "monatlich", ersteZahlung: "2025-01-01", charakter: "Aufwand" },
+    });
+    expect((await vertragRepository.alle()).find((v) => v.id === "v1")?.ende).toBe("2026-03-31");
+    const regeln = new Map((await zahlungsregelRepository.alle()).map((r) => [r.id, r]));
+    expect(regeln.get("v1")?.vertragsende).toBe("2026-03-31");
+    expect(regeln.get("v2")?.vertragsende).toBeUndefined();
   });
 });
 
@@ -1204,7 +1219,7 @@ describe("Vertrag — Kategorie am Aggregat", () => {
   it("trägt die Kategorie durch das Schema", async () => {
     await vertragRepository.speichern({
       id: "v1", anbieter: "Kesselmann", beginn: "2026-01-01",
-      verlaengerung: "automatisch", status: "aktiv", kategorieId: "kat-abo",
+      verlaengerung: "automatisch", kategorieId: "kat-abo",
     });
     expect((await vertragRepository.alle())[0].kategorieId).toBe("kat-abo");
   });
@@ -1212,7 +1227,7 @@ describe("Vertrag — Kategorie am Aggregat", () => {
   it("ein Vertrag ohne Kategorie bleibt ohne", async () => {
     await vertragRepository.speichern({
       id: "v1", anbieter: "Kesselmann", beginn: "2026-01-01",
-      verlaengerung: "keine", status: "aktiv",
+      verlaengerung: "keine",
     });
     expect((await vertragRepository.alle())[0].kategorieId).toBeUndefined();
   });

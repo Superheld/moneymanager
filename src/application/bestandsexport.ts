@@ -56,7 +56,7 @@ import type {
  * Zwei Dateien, die sich unabhängig entwickeln, teilen keine Versionsnummer: sonst steigt
  * die eine, weil sich an der anderen etwas geändert hat, und `fassung` sagt nichts mehr.
  */
-export const BESTANDSEXPORT_FASSUNG = 5;
+export const BESTANDSEXPORT_FASSUNG = 6;
 
 /** Ein Konto, wie es in der Datei steht. Mit IBAN und Saldo — daher die Warnung oben. */
 export interface ExportKonto {
@@ -89,7 +89,13 @@ export interface ExportVertrag {
   readonly id: string;
   readonly anbieter: string;
   readonly kategorieId: string | null;
-  readonly status: string;
+  /**
+   * „Gekündigt zum", oder null für einen laufenden Vertrag. Seit Fassung 6 an der Stelle
+   * von `status`, der nie etwas anderes als „aktiv" trug — der Status ist abgeleitet
+   * (`vertragsstatus`), und eine Datei, die ihn festschriebe, wäre am Tag nach dem
+   * Export womöglich schon falsch.
+   */
+  readonly ende: string | null;
 }
 
 /** Der Beleg zu einer Buchung, soweit es einen gibt. Rein aus `umsatz_roh`. */
@@ -352,7 +358,7 @@ export function vertraegeInExportform(vertraege: readonly Vertrag[]): ExportVert
       id: v.id,
       anbieter: v.anbieter,
       kategorieId: leer(v.kategorieId),
-      status: v.status,
+      ende: leer(v.ende),
     }));
 }
 

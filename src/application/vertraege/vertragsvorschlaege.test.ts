@@ -62,7 +62,7 @@ function fakes(buchungen: IstBuchung[], umsaetze: Umsatz[], vertraege: Vertrag[]
 }
 
 function vertrag(anbieter: string): Vertrag {
-  return { id: `v-${anbieter}`, anbieter, beginn: "2025-01-01", verlaengerung: "automatisch", status: "aktiv" };
+  return { id: `v-${anbieter}`, anbieter, beginn: "2025-01-01", verlaengerung: "automatisch" };
 }
 
 describe("vertragsvorschlaege", () => {

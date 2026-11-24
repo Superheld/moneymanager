@@ -7,6 +7,7 @@ import {
   naechsterKuendigungstermin,
   ruecklagenbedarf,
   ruecklageProMonat,
+  vertragsstatus,
   type Vertrag,
 } from "./vertrag";
 import type { Zahlungsregel } from "../basis/zahlungsregel";
@@ -20,7 +21,7 @@ function vertrag(over: Partial<Vertrag> = {}): Vertrag {
     verlaengerung: "automatisch",
     verlaengerungMonate: 12,
     kuendigungsfristMonate: 3,
-    status: "aktiv",
+
     ...over,
   };
 }
@@ -42,8 +43,27 @@ describe("naechsterKuendigungstermin", () => {
     expect(naechsterKuendigungstermin(v, "2026-06-01")).toBeNull();
   });
 
-  it("nicht-aktive Verträge liefern keinen Termin", () => {
-    expect(naechsterKuendigungstermin(vertrag({ status: "gekuendigt" }), "2026-06-01")).toBeNull();
+  it("ein gekündigter Vertrag hat keinen Termin mehr, auch wenn sein Ende noch aussteht", () => {
+    // Die Kündigung ist raus — einen nächsten Termin dafür zu nennen, hiesse sie noch
+    // einmal zu verlangen.
+    expect(naechsterKuendigungstermin(vertrag({ ende: "2026-12-31" }), "2026-06-01")).toBeNull();
+    expect(kuendigungsterminNaht(vertrag({ ende: "2026-12-31" }), "2026-09-15", 45)).toBe(false);
+  });
+});
+
+describe("vertragsstatus", () => {
+  it("ohne Ende aktiv", () => {
+    expect(vertragsstatus(vertrag(), "2026-06-01")).toBe("aktiv");
+  });
+
+  it("mit Ende in der Zukunft gekündigt, am letzten Tag noch immer", () => {
+    const v = vertrag({ ende: "2026-03-31" });
+    expect(vertragsstatus(v, "2026-01-15")).toBe("gekuendigt");
+    expect(vertragsstatus(v, "2026-03-31")).toBe("gekuendigt");
+  });
+
+  it("am Tag nach dem Ende beendet", () => {
+    expect(vertragsstatus(vertrag({ ende: "2026-03-31" }), "2026-04-01")).toBe("beendet");
   });
 });
 
@@ -177,7 +197,7 @@ describe("pflichtenJeMonat", () => {
       posten("a", -60000, "jaehrlich", "Aufwand"),
       posten("b", -4700, "monatlich", "Aufwand"),
       posten("c", 250000, "monatlich", "Ertrag"),
-    ]);
+    ], "2026-06-15");
     expect(p).toEqual({ fixkosten: -9700, einnahmen: 250000, nachPflichten: 240300 });
   });
 
@@ -185,21 +205,23 @@ describe("pflichtenJeMonat", () => {
     const p = pflichtenJeMonat([
       posten("a", -4700, "monatlich", "Aufwand"),
       posten("u", -30000, "monatlich", "Umschichtung", { art: "umbuchung" }),
-    ]);
+    ], "2026-06-15");
     expect(p).toEqual({ fixkosten: -4700, einnahmen: 0, nachPflichten: -4700 });
   });
 
   it("lässt einen beendeten Vertrag aus, einen gekündigten nicht", () => {
     const p = pflichtenJeMonat([
-      posten("a", -1000, "monatlich", "Aufwand", { status: "beendet" }),
-      posten("b", -2000, "monatlich", "Aufwand", { status: "gekuendigt" }),
-    ]);
+      posten("a", -1000, "monatlich", "Aufwand", { ende: "2026-05-31" }),
+      posten("b", -2000, "monatlich", "Aufwand", { ende: "2026-09-30" }),
+    ], "2026-06-15");
     expect(p.fixkosten).toBe(-2000);
-    expect(vertragLaeuft(vertrag({ status: "gekuendigt" }))).toBe(true);
-    expect(vertragLaeuft(vertrag({ status: "beendet" }))).toBe(false);
+    expect(vertragLaeuft(vertrag({ ende: "2026-09-30" }), "2026-06-15")).toBe(true);
+    // Der letzte Tag zählt noch.
+    expect(vertragLaeuft(vertrag({ ende: "2026-06-15" }), "2026-06-15")).toBe(true);
+    expect(vertragLaeuft(vertrag({ ende: "2026-05-31" }), "2026-06-15")).toBe(false);
   });
 
   it("übergeht einen Vertrag ohne Zahlungsregel", () => {
-    expect(pflichtenJeMonat([{ vertrag: vertrag() }])).toEqual({ fixkosten: 0, einnahmen: 0, nachPflichten: 0 });
+    expect(pflichtenJeMonat([{ vertrag: vertrag() }], "2026-06-15")).toEqual({ fixkosten: 0, einnahmen: 0, nachPflichten: 0 });
   });
 });

@@ -23,7 +23,7 @@ function regel(over: Partial<Zahlungsregel> = {}): Zahlungsregel {
 }
 
 function vertrag(over: Partial<Vertrag> = {}): Vertrag {
-  return { id: "v1", anbieter: "A", beginn: "2026-01-01", verlaengerung: "keine", status: "aktiv", ...over };
+  return { id: "v1", anbieter: "A", beginn: "2026-01-01", verlaengerung: "keine", ...over };
 }
 
 // ────────────────────────────────────────────────────────────────────────────

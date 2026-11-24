@@ -39,7 +39,9 @@ const ID = "bestand";
  * schreiben, die andere, was wir lesen können. Sie sind heute gleich und dürfen
  * auseinanderlaufen — eine ältere Datei bleibt lesbar, eine neuere nicht.
  */
-const HOECHSTE_FASSUNG = 5;
+// 6: der Vertrag trägt `ende` statt `status`. Gelesen wird der Vertragsabschnitt hier
+// nicht, eine Datei der Fassung 5 bleibt also ohne Abstrich lesbar.
+const HOECHSTE_FASSUNG = 6;
 
 /** Wie viel vom Kopf der Datei angesehen wird, um sie zu erkennen. */
 const KOPFLAENGE = 2048;

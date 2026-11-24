@@ -32,6 +32,8 @@ export interface VertragFormular {
   verlaengerungMonate: string;
   art: Vertragsart;
   kuendigungsfrist: string;
+  /** „Gekündigt zum" als ISO-Datum, leer für einen laufenden Vertrag. */
+  ende: string;
   betragText: string;
   rhythmus: Rhythmus;
   charakter: Charakter;
@@ -71,6 +73,7 @@ export function leeresFormular(heute: string): VertragFormular {
     verlaengerungMonate: "12",
     art: "abo",
     kuendigungsfrist: "",
+    ende: "",
     betragText: "",
     rhythmus: "monatlich",
     charakter: "Aufwand",
@@ -99,6 +102,7 @@ export function formularAusVertrag(v: Vertrag, r: Zahlungsregel | undefined, gel
     verlaengerungMonate: v.verlaengerungMonate != null ? String(v.verlaengerungMonate) : "12",
     art: v.art ?? "abo",
     kuendigungsfrist: v.kuendigungsfristMonate != null ? String(v.kuendigungsfristMonate) : "",
+    ende: v.ende ?? "",
     betragText: r ? String(minorZuMajor(Math.abs(r.betrag), geld.waehrung)) : "",
     rhythmus: r?.rhythmus ?? "monatlich",
     charakter: r?.charakter ?? "Aufwand",

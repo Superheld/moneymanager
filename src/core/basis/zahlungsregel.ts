@@ -35,6 +35,15 @@ export interface Zahlungsregel {
   readonly rhythmus: Rhythmus;
   /** Erste Fälligkeit, ISO-Datum „YYYY-MM-DD". */
   readonly startdatum: string;
+  /**
+   * Das `ende` des Vertrags, aus dem diese Regel gebaut ist. Nach diesem Tag plant sie
+   * nichts mehr (der Tag selbst zählt noch). Fehlend: läuft.
+   *
+   * Hier steht es, weil die PROJEKTION es braucht und nur die Regel kennt: Monatsausblick,
+   * Kontoregister, Liquidität und Analyse fragen alle `projiziereRegel`, und keine davon
+   * soll den Vertrag dazuladen müssen. Der Name sagt, woher der Wert kommt.
+   */
+  readonly vertragsende?: string;
   readonly charakter: Charakter;
   /** Referenz auf ein Zahlungskonto (Stammdaten), ab P1. Optional. */
   readonly kontoId?: string;

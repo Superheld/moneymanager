@@ -130,6 +130,10 @@ const de = {
     iban: { ungueltig: "Die IBAN ist ungültig." },
     anbieter: { fehlt: "Bitte einen Anbieter angeben." },
     beginn: { ungueltig: "Bitte ein gültiges Beginn-Datum angeben." },
+    ende: {
+      ungueltig: "Bitte ein gültiges Datum für das Vertragsende angeben.",
+      vorBeginn: "Das Vertragsende liegt vor dem Beginn.",
+    },
     bezahlt: { keinKonto: "Kein Konto hinterlegt — bitte der Zahlung/Regel ein Konto zuordnen." },
     buchung: { fehlt: "Diese Buchung gibt es nicht mehr." },
     import: {
@@ -2524,6 +2528,8 @@ const de = {
     feldErsteZahlung: "Erste Fälligkeit",
     feldErsteZahlungHinweis: "ab hier läuft der Rhythmus",
     feldBeginnHinweis: "Vertragsschluss — Basis der Fristen",
+    feldEnde: "Gekündigt zum",
+    feldEndeHinweis: "letzter Tag des Vertrags — leer, solange er läuft. Danach wird nichts mehr geplant, die Zahlungen bleiben zugeordnet.",
     feldAnbieter: "Anbieter",
     feldAnbieterPlatzhalter: "z. B. Petrossen, Arbeitgeber",
     feldInhaber: "Inhaber",
@@ -2552,6 +2558,8 @@ const de = {
     zusammenMindestlaufzeit: "Mindestlaufzeit {{monate}} Monate",
     zusammenKuendigungsfrist: "Frist {{monate}} Monate",
     zusammenKeineVerlaengerung: "keine Verlängerung",
+    gekuendigtZum: "gekündigt zum {{datum}}",
+    beendet: "beendet",
     regel: {
       spanneAnpassen: "Betragsspanne auf {{von}} bis {{bis}} setzen — dann fallen keine Zahlungen mehr durch",
       abschnitt: "Erkennung",
@@ -2875,6 +2883,10 @@ const en: typeof de = {
     iban: { ungueltig: "The IBAN is invalid." },
     anbieter: { fehlt: "Please enter a provider." },
     beginn: { ungueltig: "Please enter a valid start date." },
+    ende: {
+      ungueltig: "Please enter a valid end date for the contract.",
+      vorBeginn: "The contract ends before it begins.",
+    },
     bezahlt: { keinKonto: "No account assigned — please assign an account to the payment/rule." },
     buchung: { fehlt: "That entry no longer exists." },
     import: {
@@ -5177,6 +5189,8 @@ const en: typeof de = {
     feldErsteZahlung: "First due date",
     feldErsteZahlungHinweis: "the rhythm runs from here",
     feldBeginnHinweis: "date signed — basis for the deadlines",
+    feldEnde: "Cancelled as of",
+    feldEndeHinweis: "last day of the contract — empty while it runs. Nothing is planned after it; payments stay assigned.",
     feldAnbieter: "Provider",
     feldAnbieterPlatzhalter: "e.g. utility company, employer",
     feldInhaber: "Owner",
@@ -5205,6 +5219,8 @@ const en: typeof de = {
     zusammenMindestlaufzeit: "minimum term {{monate}} months",
     zusammenKuendigungsfrist: "notice {{monate}} months",
     zusammenKeineVerlaengerung: "no renewal",
+    gekuendigtZum: "cancelled as of {{datum}}",
+    beendet: "ended",
     regel: {
       spanneAnpassen: "Set the amount range to {{von}} – {{bis}} so no payments fall through",
       abschnitt: "Matching",

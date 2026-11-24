@@ -5,9 +5,19 @@ Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 
 ## [Unveröffentlicht]
 
-**Eine Migration** (84): die Zahlung eines Vertrags (Betrag, Rhythmus, erste Fälligkeit,
-Konto) zieht aus einer eigenen Tabelle in den Vertrag selbst. Jede geplante Zahlung wird
-überführt; die alte Tabelle fällt erst, wenn sie leer ist.
+**Drei Migrationen** (84–86). 84: die Zahlung eines Vertrags (Betrag, Rhythmus, erste
+Fälligkeit, Konto) zieht aus einer eigenen Tabelle in den Vertrag selbst; jede geplante
+Zahlung wird überführt, die alte Tabelle fällt erst, wenn sie leer ist. 85 und 86: der
+Vertrag bekommt ein Ende als Datum, der gespeicherte Status fällt weg.
+
+### Neu
+
+**Einen Vertrag kündigen.** Im Dialog steht unter den Vertragsdaten „Gekündigt zum". Bis
+zu diesem Tag wird weiter geplant und der Vertrag kostet weiter, danach nicht mehr — in
+der Übersicht, in der Planrechnung und bei „Reicht das Geld?". Der Vertrag bleibt in der
+Liste stehen, als gekündigt mit Datum und später als beendet; die Zuordnungen seiner
+Zahlungen bleiben, und sein Vorschlag kommt nicht wieder. Wer das Feld leert, nimmt die
+Kündigung zurück.
 
 ### Geändert
 

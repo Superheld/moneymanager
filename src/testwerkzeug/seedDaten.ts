@@ -299,9 +299,9 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   ];
   for (const v of vertraege) {
     setzen(
-      "INSERT INTO vertrag (id, anbieter, vertragsnummer, inhaber_id, beginn, verlaengerung, verlaengerung_monate, kuendigungsfrist_monate, status, kategorie_id, art) " +
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [v.id, v.anbieter, null, "person-1", tagIn(-MONATE, 1), "automatisch", 12, 3, "aktiv", v.kategorie, v.art],
+      "INSERT INTO vertrag (id, anbieter, vertragsnummer, inhaber_id, beginn, verlaengerung, verlaengerung_monate, kuendigungsfrist_monate, kategorie_id, art) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [v.id, v.anbieter, null, "person-1", tagIn(-MONATE, 1), "automatisch", 12, 3, v.kategorie, v.art],
     );
     // Zwei Dinge daran waren falsch, und beide sind still gescheitert — die Regeln des
     // Spielstands haben nie eine einzige Zahlung getroffen:
@@ -333,9 +333,9 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   // Empfaenger je nach Bank die eigene IBAN, der eigene Name oder nichts. Erkannt wird
   // er am Weg, und der steht an seiner Zahlung (`gegenkonto_id`).
   setzen(
-    "INSERT INTO vertrag (id, anbieter, vertragsnummer, inhaber_id, beginn, verlaengerung, verlaengerung_monate, kuendigungsfrist_monate, status, kategorie_id, art) " +
-      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    ["vertrag-sparrate", "Sparrate aufs Tagesgeld", null, "person-1", tagIn(-MONATE, 2), "automatisch", 12, null, "aktiv", "kat-sparen-anlegen", "umbuchung"],
+    "INSERT INTO vertrag (id, anbieter, vertragsnummer, inhaber_id, beginn, verlaengerung, verlaengerung_monate, kuendigungsfrist_monate, kategorie_id, art) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ["vertrag-sparrate", "Sparrate aufs Tagesgeld", null, "person-1", tagIn(-MONATE, 2), "automatisch", 12, null, "kat-sparen-anlegen", "umbuchung"],
   );
 
   // Beide Formen einer Ruecklage stehen im Spielstand, und das ist Absicht: die eine
@@ -809,8 +809,8 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   // er ist jetzt ein Vertrag wie die anderen, und er bleibt der nicht-monatliche, damit
   // die Projektionsarithmetik im Spielstand vorkommt.
   setzen(
-    "INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, status, kategorie_id, art) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    ["vertrag-beitrag", "Jahresbeitrag", tagIn(-MONATE, 20), "keine", "aktiv", "kat-freizeit-hobby", "abo"],
+    "INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, kategorie_id, art) VALUES (?, ?, ?, ?, ?, ?)",
+    ["vertrag-beitrag", "Jahresbeitrag", tagIn(-MONATE, 20), "keine", "kat-freizeit-hobby", "abo"],
   );
   for (const r of [
     { vertrag: "vertrag-miete", betrag: -98000, rhythmus: "monatlich", tag: 1, charakter: "Aufwand" },

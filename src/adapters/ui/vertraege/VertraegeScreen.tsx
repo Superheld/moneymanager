@@ -34,7 +34,7 @@ import {
   leeresFormular,
   type VertragFormular,
 } from "./vertragFormular";
-import { useGeld } from "../bausteine/einstellungenKontext";
+import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
 import { Umschalter } from "../bausteine/Umschalter";
 import { ErkennungsDialog } from "./ErkennungsDialog";
@@ -86,6 +86,7 @@ export function VertraegeScreen({ onNavigate }: { onNavigate?: (id: ScreenId) =>
   const loeschfrage = useLoeschfrage();
   const { t } = useTranslation();
   const geld = useGeld();
+  const datum = useDatum();
   const heute = useMemo(heuteIso, []);
   const [sicht, setSicht] = useState<Vertragssicht | null>(null);
   const [ansicht, setAnsicht] = useState<Ansicht>("liste");
@@ -207,6 +208,13 @@ export function VertraegeScreen({ onNavigate }: { onNavigate?: (id: ScreenId) =>
             <span className="zeilenname">{v.anbieter}</span>
             {v.art === "dauervertrag" && <Pill variant="neutral">{t("vertraege.artKurz.dauervertrag")}</Pill>}
             {v.art === "umbuchung" && <Pill variant="um">{t("vertraege.artKurz.umbuchung")}</Pill>}
+            {/* Ein gekündigter Vertrag bleibt in der Liste, und das muss man ihm ansehen —
+                sonst steht er da wie ein laufender, nur ohne Kündigungstermin. Neutral und
+                nicht amber: es ist erledigt, nicht zu tun. */}
+            {v.ende && zeileZu.get(v.id)?.status === "gekuendigt" && (
+              <Pill variant="neutral">{t("vertraege.gekuendigtZum", { datum: datum.mitJahr(v.ende) })}</Pill>
+            )}
+            {zeileZu.get(v.id)?.status === "beendet" && <Pill variant="neutral">{t("vertraege.beendet")}</Pill>}
           </span>
         ),
       },
@@ -362,7 +370,13 @@ export function VertraegeScreen({ onNavigate }: { onNavigate?: (id: ScreenId) =>
   }
   /** Die Regeln der Verträge einer Gruppe (Verträge ohne Regel fallen raus). */
   function regelnVon(vs: Vertrag[]): Zahlungsregel[] {
-    return vs.map((v) => regelZuVertrag.get(v.id)).filter((r): r is Zahlungsregel => !!r);
+    // Ohne die beendeten — dieselbe Grenze wie bei den Kennzahlen oben (`vertraegeLaden`):
+    // eine Gruppensumme, die einen beendeten Vertrag mitzählt, widerspräche der Zahl
+    // darüber.
+    return vs
+      .filter((v) => zeileZu.get(v.id)?.status !== "beendet")
+      .map((v) => regelZuVertrag.get(v.id))
+      .filter((r): r is Zahlungsregel => !!r);
   }
 
   /**

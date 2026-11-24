@@ -63,7 +63,30 @@ describe("projiziereRegel", () => {
   });
 });
 
+describe("projiziereRegel mit Enddatum", () => {
+  it("plant bis zum Ende einschliesslich und danach nichts mehr", () => {
+    // Gekündigt zum 31.03.: Januar bis März wird noch gezahlt.
+    const b = projiziereRegel(regel({ vertragsende: "2026-03-31" }), "2026-01-01", 12);
+    expect(b.map((p) => p.datum)).toEqual(["2026-01-15", "2026-02-15", "2026-03-15"]);
+  });
+
+  it("eine Fälligkeit genau am Enddatum zählt noch", () => {
+    const b = projiziereRegel(regel({ vertragsende: "2026-02-15" }), "2026-01-01", 12);
+    expect(b.map((p) => p.datum)).toEqual(["2026-01-15", "2026-02-15"]);
+  });
+
+  it("ein Fenster ganz nach dem Ende bleibt leer", () => {
+    expect(projiziereRegel(regel({ vertragsende: "2026-03-31" }), "2026-06-01", 3)).toEqual([]);
+  });
+});
+
 describe("naechsteFaelligkeit", () => {
+  it("liefert nach dem Enddatum keinen Termin mehr", () => {
+    const r = regel({ vertragsende: "2026-03-31" });
+    expect(naechsteFaelligkeit(r, "2026-03-01")).toBe("2026-03-15");
+    expect(naechsteFaelligkeit(r, "2026-03-16")).toBeNull();
+  });
+
   it("liefert den heutigen Termin, wenn heute Zahltag ist", () => {
     expect(naechsteFaelligkeit(regel(), "2026-01-15")).toBe("2026-01-15");
   });

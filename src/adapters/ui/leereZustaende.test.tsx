@@ -106,7 +106,7 @@ describe("Verträge — leer", () => {
 
   it("verschwindet, sobald es einen Vertrag gibt", async () => {
     await sqliteVertragRepository.speichern({
-      id: "v-kesselmann", anbieter: "Kesselmann", beginn: "2026-01-01", verlaengerung: "keine", status: "aktiv",
+      id: "v-kesselmann", anbieter: "Kesselmann", beginn: "2026-01-01", verlaengerung: "keine",
     });
     await planzahlungSpeichern({
       id: "r-kesselmann", bezeichnung: "Kesselmann", betrag: -1999, rhythmus: "monatlich",

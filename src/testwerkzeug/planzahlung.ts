@@ -20,8 +20,8 @@ export async function planzahlungSpeichern(regel: Zahlungsregel): Promise<void> 
   const db = await getDb();
   const id = regel.vertragId ?? regel.id;
   await db.execute(
-    `INSERT OR IGNORE INTO vertrag (id, anbieter, beginn, verlaengerung, status, art)
-     VALUES ($1, $2, $3, 'keine', 'aktiv', 'dauervertrag')`,
+    `INSERT OR IGNORE INTO vertrag (id, anbieter, beginn, verlaengerung, art)
+     VALUES ($1, $2, $3, 'keine', 'dauervertrag')`,
     [id, regel.bezeichnung, regel.startdatum],
   );
   await db.execute(

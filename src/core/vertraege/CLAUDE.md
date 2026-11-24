@@ -25,6 +25,27 @@ Liquidität und Ergebnisrechnung lesen weiter Regeln (`ZahlungsregelRepository.a
 In Tests schreibt `planzahlungSpeichern` (`src/testwerkzeug/planzahlung.ts`) eine geplante
 Zahlung in dieser Form.
 
+## Kündigen: ein Ende als Datum, der Status abgeleitet
+
+Ein gekündigter Vertrag wird nicht gelöscht, er bekommt ein `ende` — den letzten Tag, an
+dem er gilt („gekündigt zum"). Leer heisst: läuft. Ein Datum und kein Schalter, weil eine
+Kündigung fast immer in der Zukunft wirkt: bis dahin wird weiter gezahlt und geplant.
+
+- **Der Status ist abgeleitet** (`vertragsstatus(v, heute)`): ohne Ende `aktiv`, mit
+  einem Ende heute oder später `gekuendigt`, danach `beendet`. Die Spalte `vertrag.status`
+  ist seit Migration 86 weg — neben dem Datum wären es zwei Felder auf dieselbe Frage.
+- **Die Planung hört nach dem Ende auf**, ohne eigenen Code je Bereich: `regelAusVertrag`
+  gibt der Regel das Ende mit (`vertragsende`), und `projiziereRegel` plant danach nichts
+  mehr. Der letzte Tag zählt noch.
+- **Gekündigt kostet weiter, beendet nicht** (`vertragLaeuft`): ein gekündigter Vertrag
+  zählt bis zu seinem Ende in die Kosten je Monat, sonst zeigte die Kennzahl Geld als
+  frei, das noch monatelang abgeht.
+- **Der Vertrag bleibt stehen**, und mit ihm die Zuordnungen seiner Zahlungen. Er verdeckt
+  weiter den Vorschlag desselben Anbieters, und die Erkennung ordnet ihm auch nach dem
+  Ende zu: eine Schlusserstattung gehört dazu, und eine Abbuchung nach der Kündigung soll
+  auffallen, statt als neuer Vorschlag aufzutauchen. Löschen nahm beides mit.
+- **Ein gekündigter Vertrag hat keinen Kündigungstermin mehr** — das ist erledigt.
+
 ## Ein Vertrag hat zwei Beträge: was abgeht und was er kostet
 
 Die Zahlung des Vertrags (`Vertrag.zahlung`) trägt den Betrag **je Fälligkeit** — die Auszahlung. Daneben steht, was

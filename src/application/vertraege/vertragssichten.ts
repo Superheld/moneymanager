@@ -43,7 +43,9 @@ import {
   type Zahlungsspur,
   type Zahlungsregel,
   standardErkennung,
+  vertragsstatus,
   type Regelvorlage,
+  type Vertragsstatus,
 } from "../../core";
 import { erkennungenNachziehen, zuordnungenAbgleichen, type AbgleichDeps } from "./vertragszuordnung";
 import { ignorierteSchluessel, vertragsvorschlaege } from "./vertragsvorschlaege";
@@ -92,6 +94,8 @@ export interface Zuordnungsvorschlag extends Zuordnungskandidat {
 /** Ein Vertrag mit allem, was die Liste über ihn zeigt. */
 export interface Vertragszeile {
   readonly vertrag: Vertrag;
+  /** Aktiv, gekündigt oder beendet — zum Tag der Sicht abgeleitet (`vertragsstatus`). */
+  readonly status: Vertragsstatus;
   /** Die Zahlung des Vertrags als Regel der Planung — fehlt, wenn er keine trägt. */
   readonly regel?: Zahlungsregel;
   /** Nächste Fälligkeit aus der Regel — nicht aus dem Vertragsbeginn. */
@@ -226,6 +230,7 @@ export async function vertraegeLaden(
       : [];
     return {
       vertrag,
+      status: vertragsstatus(vertrag, heute),
       regel,
       naechsteZahlung: regel ? naechsteFaelligkeit(regel, heute) : null,
       kuendigungstermin: naechsterKuendigungstermin(vertrag, heute),
@@ -233,7 +238,7 @@ export async function vertraegeLaden(
       zahlungen: zahlungenJeVertrag.get(vertrag.id)?.length ?? 0,
       zahlungsliste: zahlungenJeVertrag.get(vertrag.id) ?? [],
       ruecklage: regel ? ruecklageProMonat(regel) : 0,
-      jeMonat: regel && vertragLaeuft(vertrag) ? kostenJeMonat(regel) : 0,
+      jeMonat: regel && vertragLaeuft(vertrag, heute) ? kostenJeMonat(regel) : 0,
       kandidaten: kandidaten.map((k) => ({
         ...k,
         gegenpartei: spurJeBuchung.get(k.buchung.id)?.gegenpartei ?? "",
@@ -244,7 +249,7 @@ export async function vertraegeLaden(
 
   return {
     zeilen,
-    kennzahlen: kennzahlenAus(zeilen),
+    kennzahlen: kennzahlenAus(zeilen, heute),
     personen,
     personNamen: new Map(personen.map((p) => [p.id, p.name])),
     kategorien,
@@ -257,14 +262,16 @@ export async function vertraegeLaden(
   };
 }
 
-function kennzahlenAus(zeilen: readonly Vertragszeile[]): Vertragskennzahlen {
+function kennzahlenAus(zeilen: readonly Vertragszeile[], heute: string): Vertragskennzahlen {
   let baldKuendbar = 0;
   const eigeneRegeln: Zahlungsregel[] = [];
   for (const z of zeilen) {
-    if (z.regel) eigeneRegeln.push(z.regel);
+    // Ein beendeter Vertrag kostet nichts mehr und braucht keine Rücklage. Ein gekündigter
+    // schon: er zahlt bis zu seinem Ende.
+    if (z.regel && z.status !== "beendet") eigeneRegeln.push(z.regel);
     if (z.kuendigungNaht) baldKuendbar++;
   }
-  const pflichten = pflichtenJeMonat(zeilen);
+  const pflichten = pflichtenJeMonat(zeilen, heute);
   return {
     fixkostenJeMonat: pflichten.fixkosten,
     einnahmenJeMonat: pflichten.einnahmen,
