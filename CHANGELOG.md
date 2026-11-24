@@ -3,15 +3,93 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
-## [Unveröffentlicht]
+## [0.31.0-pre.2] — 2026-11-24
+
+Die Übersicht zeigt Verträge jetzt im Monat, in dem sie fällig sind; die anteilige Rechnung
+steht als Planrechnung in der Analyse. Depots zählen einzeln zum Vorsorgeziel, eine Rücklage
+kann eine Ausgabe auch ausserhalb ihrer Kategorie tragen, und „Reicht das Geld?" zeigt eine
+Kurve. **Zwei Migrationen** (82, 83): 82 legt drei leere Spalten an der Rücklage an, 83 gibt
+dem Depot ein Vorsorgeziel und ein Verrechnungskonto und ordnet jedes vorhandene Depot dem
+Vorsorgeziel zu — so, wie es bisher schon gezählt wurde. Ein Zurück zu pre.1 gibt es nur
+über die Tagessicherung vor den Migrationen.
+
+### Neu
+
+**Die Planrechnung**, als neues Register in der Analyse: der Plan der Ergebnisrechnung für
+zwölf Monate ab dem laufenden, Verträge anteilig — oben die Summe mit ihren Stufen, darunter
+Monat für Monat. Ungeplantes ist nicht eingerechnet und steht offen unter der Summe. Ohne
+Plan gibt es den Reiter nicht.
+
+**Depots im Bereich Vermögen.** Eine eigene Karte zeigt je Depot Depotwert, Stichtag und
+Verrechnungskonto mit Stand, dazu die Summe. Je Depot wählst du, ob es zum Vorsorgeziel
+zählt und welches Konto sein Verrechnungskonto ist. Zählt das gewählte Konto über seine
+Klasse nicht mit, sagt der Dialog das und wie es dorthin kommt. Ein neu abgerufenes Depot
+zählt zum Ziel.
+
+**Eine Rücklage kann eine Ausgabe auch ausserhalb ihrer Kategorie tragen.** Im
+Buchungsdialog steht dafür die Gruppe „Andere Rücklagen": jede laufende Rücklage, die
+abgeschlossen wird und schon begonnen hat. So belastet der Kauf eines Fernsehers die
+Rücklage „Fernseher", auch wenn er unter einer Kategorie mit Budget gebucht ist, und
+erscheint im Budget nicht mehr. Das geht nur bei Ausgaben ohne Vertrag, nicht bei
+Umbuchungen. Ist an der Kategorie sonst nichts zu entscheiden, steht die Wahl hinter „Aus
+einer Rücklage bezahlt?".
+
+**Wertverlust neben dem Stand.** Eine Rücklage, die einen Gegenstand ersetzen soll, kann
+Kaufdatum, Kaufpreis und Nutzungsdauer tragen (im Dialog unter „Wertverlust zeigen"). Dann
+steht neben dem Stand, was der Gegenstand bis heute an Wert verloren hat und was der Stand
+davon nicht deckt, und im Verlauf eine zweite, gestrichelte Linie ab dem Kauf. An keiner
+Rechnung ändert das etwas.
+
+**„Reicht das Geld?" als Kurve.** Über der Tabelle steht der Stand aller Konten der Tabelle
+Tag für Tag, fest und erwartet. Beim Darüberfahren, Antippen oder mit den Pfeiltasten
+stehen darunter Tag, beide Stände, die Posten des Tages und der Budgetanteil. Eine
+Umbuchung zwischen zwei dieser Konten bewegt die Kurve nicht.
+
+### Geändert
+
+**Die Übersicht zeigt Verträge im Monat ihrer Fälligkeit**, mit dem ganzen Betrag: ein
+Vertrag über 90 je Quartal steht in einem Monat mit 90 und in den beiden anderen gar nicht,
+statt mit 30 in jedem. Die übrigen Zeilen rechnen wie bisher; Kostensicht, Bericht und
+Reichweite bleiben anteilig.
+
+**Die Vorsorge zählt nur die Depots, die dem Ziel zugeordnet sind** — bisher zählte jedes.
+Die Migration ordnet jedes vorhandene Depot dem Ziel zu, an der Summe ändert sich also
+zunächst nichts. Unter „Heute dafür da" stehen die Posten jetzt einzeln: Depots mit ihrem
+Verrechnungskonto darunter, weitere Konten der Klassen Vorsorge und Investment,
+Vermögenswerte mit Haken.
+
+**„Ohne Budget und ohne Vertrag" heisst in der Analyse „Ungeplant"** und zählt dieselbe
+Menge wie die Zeile „Ungeplant" der Monatskarten: Rücklagen ausgenommen, Wartendes
+mitgezählt und als Pille ausgewiesen. Je Kategorie stehen Summe und Anzahl da, ein Klick
+zeigt die Buchungen.
+
+**Am Handy steht die Arbeit oben.** Unter Buchungen kommt zuerst der Kopf des Auszugs mit
+einem Auswahlfeld für das Konto und den Knöpfen samt „Abrufen", dann das Gebuchte; die
+Kontenliste steht eingeklappt darunter. Unter Rücklagen steht „Wartet auf Zuordnung" ganz
+oben, dann je Rücklage eine kurze Zeile mit Stand und Balken, die sich aufklappen lässt;
+Stand, „Wo das Geld liegt", die Vorschläge und das Abgeschlossene stehen eingeklappt
+darunter.
 
 ### Behoben
+
+**Am Handy, was in pre.1 noch offen war:** Vermögen, Analyse und die Kategorien in den
+Einstellungen passen in den Bildschirm, und das Suchfeld der Inbox zoomt beim Antippen
+nicht mehr. Reiterleisten, die nicht in eine Zeile passen, zeigen an der Kante, dass es
+weitergeht, und rücken den gewählten Reiter ins Bild. Aufklappende Zeilen sind gross genug
+für den Finger, und in der zweiten Tabellenzeile steht kein Trenner mehr allein am
+Zeilenende.
 
 **SQLite ist auf 3.54.1 gehoben, SQLCipher auf 4.20.0** (libsqlite3-sys 0.40.0, sqlx 0.9.1).
 Damit ist RUSTSEC-2026-0459 behoben: eine untergeschobene `-wal`-Datei mit fremder
 Seitengrösse konnte Speicher des Prozesses in Abfragen zurückgeben. Das Dateiformat bleibt
 dasselbe — ein mit der bisherigen Fassung verschlüsselter Bestand geht unverändert auf,
 geprüft an einer mit ihr geschriebenen Datei samt WAL.
+
+**Abhängigkeiten gehoben:** Tauri 2.12 mit dem Updater 2.14.1 — damit zip 9 statt zip 4,
+und die Freigaben für dessen Meldungen fallen weg —, argon2 0.6 und chacha20poly1305 0.11
+für die Verschlüsselung, url 2.5.9 (RUSTSEC-2026-0592), dazu neun kleine Hebungen auf
+beiden Seiten. Dass ein mit der alten Fassung geschriebener Schlüssel weiter aufgeht,
+prüfen jetzt feste Testvektoren aus dieser Fassung.
 
 ## [0.31.0-pre.1] — 2026-11-22
 
