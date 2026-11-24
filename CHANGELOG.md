@@ -3,7 +3,20 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
-## [0.31.0-pre.2] — 2026-11-24
+## [Unveröffentlicht]
+
+**Eine Migration** (84): die Zahlung eines Vertrags (Betrag, Rhythmus, erste Fälligkeit,
+Konto) zieht aus einer eigenen Tabelle in den Vertrag selbst. Jede geplante Zahlung wird
+überführt; die alte Tabelle fällt erst, wenn sie leer ist.
+
+### Geändert
+
+**Jede geplante Zahlung ist ein Vertrag.** Eine geplante Zahlung, die an keinem Vertrag
+hing (möglich nur aus einer früheren Fassung der Planung), stand im Ausblick, liess sich
+aber nirgends bearbeiten. Sie erscheint jetzt als Dauervertrag unter Verträge und kann
+dort geändert oder gelöscht werden. Geplante Zahlungen heissen überall wie ihr Vertrag.
+
+ — 2026-11-24
 
 Die Übersicht zeigt Verträge jetzt im Monat, in dem sie fällig sind; die anteilige Rechnung
 steht als Planrechnung in der Analyse. Depots zählen einzeln zum Vorsorgeziel, eine Rücklage

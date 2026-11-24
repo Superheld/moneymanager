@@ -1,6 +1,7 @@
-// Zahlungsregel — die Quelle, aus der die Projektion Plan-Zahlungen erzeugt.
-// In P0 das einzige Aggregat der Planung; später kommen Verträge/Budgets/Töpfe
-// als weitere Quellen hinzu, die ebenfalls in Zahlungsregeln münden.
+// Zahlungsregel — die Form, aus der die Projektion Plan-Zahlungen erzeugt.
+// Seit Migration 84 keine eigene Tabelle mehr: jede Regel wird aus einem Vertrag gebaut
+// (`regelAusVertrag` in `core/vertraege/vertrag.ts`). Der Typ bleibt als die Sicht, die
+// die Planung liest.
 
 import type { Cent } from "./geld";
 
@@ -41,9 +42,7 @@ export interface Zahlungsregel {
    * Das ZIELKONTO einer geplanten Umbuchung — gesetzt macht die Regel aus einer Zahlung
    * eine Verschiebung zwischen zwei eigenen Konten.
    *
-   * Es steht an der REGEL und nicht am Vertrag, weil die Regel die Zahlung beschreibt
-   * und der Vertrag die Vereinbarung darüber. Derselbe Grund, aus dem `kontoId` hier
-   * steht und nicht dort.
+   * Gespeichert steht es an der Zahlung des Vertrags (`Vertragszahlung.gegenkontoId`).
    *
    * Sinnvoll nur mit `charakter: "Umschichtung"`: bei Aufwand oder Ertrag verlässt das
    * Geld den erfassten Bereich, und ein Gegenkonto behauptete etwas anderes.
@@ -51,6 +50,9 @@ export interface Zahlungsregel {
   readonly gegenkontoId?: string;
   /** Referenz auf eine Kategorie (Stammdaten), ab P1. Optional. */
   readonly kategorieId?: string;
-  /** Herkunft: aus diesem Vertrag abgeleitet (P2). Optional. */
+  /**
+   * Der Vertrag, aus dem die Regel gebaut ist. Aus dem Bestand kommt keine Regel ohne;
+   * optional bleibt das Feld für Regeln, die ein Test oder eine Rechnung von Hand baut.
+   */
   readonly vertragId?: string;
 }

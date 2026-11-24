@@ -1,6 +1,6 @@
 // SQLite-Implementierung des VertragRepository-Ports.
 
-import type { Verlaengerungsart, Vertrag, Vertragsart, Vertragsstatus } from "../../core";
+import type { Charakter, Rhythmus, Verlaengerungsart, Vertrag, Vertragsart, Vertragsstatus } from "../../core";
 import type { VertragRepository } from "../../application/ports";
 import { getDb } from "./db";
 
@@ -18,6 +18,12 @@ interface Zeile {
   art: string | null;
   kategorie_id: string | null;
   notizen: string | null;
+  betrag: number | null;
+  rhythmus: string | null;
+  erste_zahlung: string | null;
+  charakter: string | null;
+  konto_id: string | null;
+  gegenkonto_id: string | null;
 }
 
 function zuVertrag(z: Zeile): Vertrag {
@@ -36,6 +42,19 @@ function zuVertrag(z: Zeile): Vertrag {
     art: (z.art as Vertragsart) ?? "abo",
     kategorieId: z.kategorie_id ?? undefined,
     notizen: z.notizen ?? undefined,
+    // Die Zahlung gibt es nur ganz: fehlt eines der vier Pflichtfelder (ein Vertrag aus
+    // dem Altbestand, dessen Regel fehlte), plant der Vertrag nichts.
+    zahlung:
+      z.betrag !== null && z.rhythmus !== null && z.erste_zahlung !== null && z.charakter !== null
+        ? {
+            betrag: z.betrag,
+            rhythmus: z.rhythmus as Rhythmus,
+            ersteZahlung: z.erste_zahlung,
+            charakter: z.charakter as Charakter,
+            kontoId: z.konto_id ?? undefined,
+            gegenkontoId: z.gegenkonto_id ?? undefined,
+          }
+        : undefined,
   };
 }
 
@@ -45,7 +64,7 @@ export const sqliteVertragRepository: VertragRepository = {
     const zeilen = await db.select<Zeile[]>(
       `SELECT id, anbieter, vertragsnummer, inhaber_id, beginn, mindestlaufzeit_monate,
               verlaengerung, verlaengerung_monate, kuendigungsfrist_monate, status, art,
-              kategorie_id, notizen
+              kategorie_id, notizen, betrag, rhythmus, erste_zahlung, charakter, konto_id, gegenkonto_id
        FROM vertrag ORDER BY anbieter`,
     );
     return zeilen.map(zuVertrag);
@@ -55,8 +74,9 @@ export const sqliteVertragRepository: VertragRepository = {
     const db = await getDb();
     await db.execute(
       `INSERT INTO vertrag (id, anbieter, vertragsnummer, inhaber_id, beginn, mindestlaufzeit_monate,
-         verlaengerung, verlaengerung_monate, kuendigungsfrist_monate, status, art, kategorie_id, notizen)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+         verlaengerung, verlaengerung_monate, kuendigungsfrist_monate, status, art, kategorie_id, notizen,
+         betrag, rhythmus, erste_zahlung, charakter, konto_id, gegenkonto_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
        ON CONFLICT(id) DO UPDATE SET
          anbieter = excluded.anbieter, vertragsnummer = excluded.vertragsnummer,
          inhaber_id = excluded.inhaber_id, beginn = excluded.beginn,
@@ -64,7 +84,10 @@ export const sqliteVertragRepository: VertragRepository = {
          verlaengerung = excluded.verlaengerung, verlaengerung_monate = excluded.verlaengerung_monate,
          kuendigungsfrist_monate = excluded.kuendigungsfrist_monate,
          status = excluded.status, art = excluded.art, kategorie_id = excluded.kategorie_id,
-         notizen = excluded.notizen`,
+         notizen = excluded.notizen,
+         betrag = excluded.betrag, rhythmus = excluded.rhythmus,
+         erste_zahlung = excluded.erste_zahlung, charakter = excluded.charakter,
+         konto_id = excluded.konto_id, gegenkonto_id = excluded.gegenkonto_id`,
       [
         v.id,
         v.anbieter,
@@ -79,6 +102,12 @@ export const sqliteVertragRepository: VertragRepository = {
         v.art ?? "abo",
         v.kategorieId ?? null,
         v.notizen ?? null,
+        v.zahlung?.betrag ?? null,
+        v.zahlung?.rhythmus ?? null,
+        v.zahlung?.ersteZahlung ?? null,
+        v.zahlung?.charakter ?? null,
+        v.zahlung?.kontoId ?? null,
+        v.zahlung?.gegenkontoId ?? null,
       ],
     );
   },

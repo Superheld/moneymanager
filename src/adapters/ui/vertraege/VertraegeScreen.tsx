@@ -1,5 +1,5 @@
 // Verträge (P2.1) — Übersicht mit Kündigungsterminen; Anlegen im Modal. Eine Maske
-// erzeugt Vertrag (Stammdaten) + abgeleitete Zahlungsregel (Planung).
+// schreibt den Vertrag samt seiner Zahlung; die Planung liest sie als Zahlungsregel.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";

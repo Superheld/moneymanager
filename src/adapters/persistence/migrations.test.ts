@@ -35,6 +35,8 @@ beforeAll(async () => {
 function apply(db: Database, from = 0, to = Infinity): void {
   const bedingung = (sql: string) => sql.match(/^\s*--\s*@wennTabelle\s+(\w+)/i)?.[1];
   const spaltenbedingung = (sql: string) => sql.match(/^\s*--\s*@wennSpalte\s+(\w+)\.(\w+)/i);
+  const leerbedingung = (sql: string) => sql.match(/^\s*--\s*@wennLeer\s+(\w+)/i)?.[1];
+  const istLeer = (name: string) => Number(db.exec(`SELECT COUNT(*) FROM ${name}`)[0].values[0][0]) === 0;
   const hatTabelle = (name: string) =>
     db.exec(`SELECT name FROM sqlite_master WHERE type='table' AND name='${name}'`).length > 0;
   const zugang = (sql: string) => sql.match(/^\s*ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(\w+)/i);
@@ -49,6 +51,8 @@ function apply(db: Database, from = 0, to = Infinity): void {
       for (const sql of m.sql) {
         const noetig = bedingung(sql);
         if (noetig && !hatTabelle(noetig)) continue;
+        const leer = leerbedingung(sql);
+        if (leer && !(hatTabelle(leer) && istLeer(leer))) continue;
         const noetigeSpalte = spaltenbedingung(sql);
         if (noetigeSpalte && !hatSpalte(noetigeSpalte[1], noetigeSpalte[2])) continue;
         const dazu = zugang(sql);
@@ -108,7 +112,7 @@ const ERWARTETE_TABELLEN = [
   "vormerkung",
   // v78 — das Vorsorgeziel und die Reihe seiner Annahmen (gültig ab einem Monat)
   "vorsorgeziel", "vorsorgeziel_annahme",
-  "zahlungskonto", "zahlungsregel",
+  "zahlungskonto", // `zahlungsregel` ist seit v84 im Vertrag aufgegangen
 ];
 
 describe("Migration 40 — Kontoklasse vorbelegen", () => {
@@ -160,10 +164,9 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     apply(db);
     // v8
     expect(spalten(db, "zahlungskonto")).toContain("kontostand");
-    // v2/v3
-    expect(spalten(db, "zahlungsregel")).toEqual(
-      // gegenkonto_id: v66 — macht aus der Regel eine geplante Umbuchung
-      expect.arrayContaining(["konto_id", "gegenkonto_id", "kategorie_id", "vertrag_id"]),
+    // v84 — die Zahlung am Vertrag (vorher v2/v3/v66 an `zahlungsregel`)
+    expect(spalten(db, "vertrag")).toEqual(
+      expect.arrayContaining(["betrag", "rhythmus", "erste_zahlung", "charakter", "konto_id", "gegenkonto_id", "kategorie_id"]),
     );
     // v17, seit v65 an `ruecklage`
     expect(spalten(db, "ruecklage")).toEqual(
@@ -968,14 +971,14 @@ describe("Migration 50 — der Rest der Verweise", () => {
     db.close();
   });
 
-  it("laesst ein Budget mit seiner Kategorie fallen, eine Zahlungsregel aber nicht", () => {
+  it("laesst ein Budget mit seiner Kategorie fallen, einen Vertrag aber nicht", () => {
     const db = new SQL.Database();
     apply(db);
     db.run("INSERT INTO kategorie (id, name, default_charakter) VALUES ('kat','Wohnen','Aufwand')");
     db.run("INSERT INTO budget (id, kategorie_id, art) VALUES ('b1','kat','monatlich')");
     db.run("INSERT INTO budget_betrag (budget_id, ab_monat, betrag) VALUES ('b1','2026-01',50000)");
-    db.run(`INSERT INTO zahlungsregel (id, bezeichnung, betrag, rhythmus, startdatum, charakter, kategorie_id)
-            VALUES ('r1','Miete',-50000,'monatlich','2026-01-01','Aufwand','kat')`);
+    db.run(`INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, status, betrag, rhythmus, erste_zahlung, charakter, kategorie_id)
+            VALUES ('r1','Ebbinghaus','2026-01-01','keine','aktiv',-50000,'monatlich','2026-01-01','Aufwand','kat')`);
 
     db.run("PRAGMA foreign_keys = ON");
     db.run("DELETE FROM kategorie WHERE id='kat'");
@@ -984,9 +987,9 @@ describe("Migration 50 — der Rest der Verweise", () => {
     // Betragsreihe mit ihm: sie haengt per CASCADE am Budget.
     expect(db.exec("SELECT COUNT(*) FROM budget")[0].values).toEqual([[0]]);
     expect(db.exec("SELECT COUNT(*) FROM budget_betrag")[0].values).toEqual([[0]]);
-    // Eine Zahlungsregel dagegen bleibt und ist nur uneingeordnet: die Zahlung findet
-    // weiter statt, sie gehoert nur gerade nirgendwohin.
-    expect(db.exec("SELECT id, kategorie_id FROM zahlungsregel")[0].values).toEqual([["r1", null]]);
+    // Ein Vertrag dagegen bleibt und ist nur uneingeordnet: die Zahlung findet weiter
+    // statt, sie gehoert nur gerade nirgendwohin. (Bis v84 stand das an `zahlungsregel`.)
+    expect(db.exec("SELECT id, kategorie_id FROM vertrag")[0].values).toEqual([["r1", null]]);
     db.close();
   });
 
@@ -1476,6 +1479,27 @@ describe("migrate() gegen echtes SQLite", () => {
       expect.arrayContaining(["transfer_id", "gegenkonto_id"]),
     );
     expect(version(db)).toBe(MIGRATIONS[MIGRATIONS.length - 1].version);
+    db.close();
+  });
+  /**
+   * `-- @wennLeer` in `migrate()` selbst, nicht nur im Nachbau `apply()`: v84 lässt
+   * `zahlungsregel` nur fallen, wenn jede Zeile überführt ist. Hier bleibt eine liegen
+   * (ihre Id gibt es schon als Vertrag), und die Tabelle muss mit ihr stehen bleiben —
+   * die Version ist trotzdem verbucht, der nächste Start läuft durch.
+   */
+  it("lässt eine Tabelle hinter @wennLeer stehen, solange sie Zeilen trägt", async () => {
+    const db = new SQL.Database();
+    apply(db, 0, 83);
+    db.run("CREATE TABLE _migration (version INTEGER PRIMARY KEY)");
+    db.run("INSERT INTO _migration (version) VALUES (83)");
+    db.run("INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, status) VALUES ('gleich','Venske','2025-01-01','keine','aktiv')");
+    db.run(`INSERT INTO zahlungsregel (id, bezeichnung, betrag, rhythmus, startdatum, charakter, vertrag_id)
+            VALUES ('r-1','Venske',-100,'monatlich','2025-01-01','Aufwand','gleich'),
+                   ('gleich','Wessolek',-999,'monatlich','2025-01-01','Aufwand',NULL)`);
+    await migrate(adapter(db));
+    expect(version(db)).toBe(MIGRATIONS[MIGRATIONS.length - 1].version);
+    expect(db.exec("SELECT id, betrag FROM zahlungsregel")[0].values).toEqual([["gleich", -999]]);
+    expect(db.exec("SELECT id, betrag FROM vertrag")[0].values).toEqual([["gleich", -100]]);
     db.close();
   });
 });
@@ -2211,6 +2235,165 @@ describe("Migration 83 — ein Depot wählt, ob es zum Vorsorgeziel zählt, und 
       ["d-1", null, null],
       ["d-2", null, null],
     ]);
+    db.close();
+  });
+});
+
+describe("Migration 84 — die Zahlungsregel geht im Vertrag auf", () => {
+  /** Ein Bestand vor 84: ein Konto, ein Zielkonto, eine Kategorie; Verträge und Regeln je Fall. */
+  function vor84(fremdschluessel = false): Database {
+    const db = new SQL.Database();
+    if (fremdschluessel) db.run("PRAGMA foreign_keys = ON");
+    apply(db, 0, 83);
+    db.run("INSERT INTO zahlungskonto (id, bezeichnung, typ, inhaber_ids) VALUES ('k-giro','Giro','Giro','[]'), ('k-ziel','Tagesgeld','Tagesgeld','[]')");
+    db.run("INSERT INTO kategorie (id, name, default_charakter) VALUES ('kat-a','Erste','Aufwand'), ('kat-b','Zweite','Aufwand')");
+    return db;
+  }
+  const vertrag = (db: Database, id: string, anbieter: string, kategorie: string | null = null) =>
+    db.run(
+      `INSERT INTO vertrag (id, anbieter, vertragsnummer, beginn, mindestlaufzeit_monate, verlaengerung, verlaengerung_monate,
+                            kuendigungsfrist_monate, status, kategorie_id, art)
+       VALUES (?, ?, 'N-1', '2025-01-01', 12, 'automatisch', 12, 3, 'aktiv', ?, 'abo')`,
+      [id, anbieter, kategorie],
+    );
+  const regel = (db: Database, id: string, o: Record<string, string | number | null> = {}) => {
+    const z = {
+      bezeichnung: id, betrag: -1000, rhythmus: "monatlich", startdatum: "2025-02-01", charakter: "Aufwand",
+      konto_id: "k-giro", gegenkonto_id: null, kategorie_id: null, vertrag_id: null, ...o,
+    };
+    db.run(
+      `INSERT INTO zahlungsregel (id, bezeichnung, betrag, rhythmus, startdatum, charakter, konto_id, gegenkonto_id, kategorie_id, vertrag_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, z.bezeichnung, z.betrag, z.rhythmus, z.startdatum, z.charakter, z.konto_id, z.gegenkonto_id, z.kategorie_id, z.vertrag_id],
+    );
+  };
+  const zeilen = (db: Database, sql: string) => db.exec(sql)[0]?.values ?? [];
+  const ZAHLUNG = "id, anbieter, betrag, rhythmus, erste_zahlung, charakter, konto_id, gegenkonto_id, kategorie_id";
+
+  it("trägt die Zahlung in ihren Vertrag und lässt seine Konditionen stehen", () => {
+    const db = vor84();
+    vertrag(db, "v-1", "Kesselmann", "kat-a");
+    regel(db, "r-1", { vertrag_id: "v-1", betrag: -4500, rhythmus: "quartalsweise", startdatum: "2025-03-15", kategorie_id: "kat-a" });
+    apply(db, 83, 84);
+    expect(zeilen(db, `SELECT ${ZAHLUNG} FROM vertrag`)).toEqual([
+      ["v-1", "Kesselmann", -4500, "quartalsweise", "2025-03-15", "Aufwand", "k-giro", null, "kat-a"],
+    ]);
+    expect(zeilen(db, "SELECT vertragsnummer, beginn, mindestlaufzeit_monate, verlaengerung, kuendigungsfrist_monate, status, art FROM vertrag")).toEqual([
+      ["N-1", "2025-01-01", 12, "automatisch", 3, "aktiv", "abo"],
+    ]);
+    expect(tabellen(db)).not.toContain("zahlungsregel");
+    db.close();
+  });
+
+  it("lässt die Kategorie des Vertrags gelten und nimmt die der Regel nur, wo er keine hat", () => {
+    const db = vor84();
+    vertrag(db, "v-mit", "Vibora", "kat-a");
+    vertrag(db, "v-ohne", "Ohlert", null);
+    regel(db, "r-1", { vertrag_id: "v-mit", kategorie_id: "kat-b" });
+    regel(db, "r-2", { vertrag_id: "v-ohne", kategorie_id: "kat-b" });
+    apply(db, 83, 84);
+    expect(zeilen(db, "SELECT id, kategorie_id FROM vertrag ORDER BY id")).toEqual([["v-mit", "kat-a"], ["v-ohne", "kat-b"]]);
+    db.close();
+  });
+
+  it("macht aus einer Regel ohne Vertrag einen Dauervertrag mit ihrer Id — auch wenn ihr Verweis ins Leere zeigt", () => {
+    const db = vor84();
+    regel(db, "r-frei", { bezeichnung: "Tessmar", betrag: -24000, rhythmus: "jaehrlich", startdatum: "2025-05-20", kategorie_id: "kat-b" });
+    regel(db, "r-waise", { bezeichnung: "Lüdemann", vertrag_id: "gibt-es-nicht" });
+    apply(db, 83, 84);
+    expect(zeilen(db, `SELECT ${ZAHLUNG}, beginn, verlaengerung, status, art FROM vertrag ORDER BY id`)).toEqual([
+      ["r-frei", "Tessmar", -24000, "jaehrlich", "2025-05-20", "Aufwand", "k-giro", null, "kat-b", "2025-05-20", "keine", "aktiv", "dauervertrag"],
+      ["r-waise", "Lüdemann", -1000, "monatlich", "2025-02-01", "Aufwand", "k-giro", null, null, "2025-02-01", "keine", "aktiv", "dauervertrag"],
+    ]);
+    // Erfunden wird nichts: keine Erkennungsregel für einen Vertrag, den es nie gab.
+    expect(zeilen(db, "SELECT COUNT(*) FROM vertrag_erkennung")).toEqual([[0]]);
+    expect(tabellen(db)).not.toContain("zahlungsregel");
+    db.close();
+  });
+
+  it("macht aus einer geplanten Umbuchung ohne Vertrag einen Umbuchungsvertrag", () => {
+    const db = vor84();
+    regel(db, "r-spar", { charakter: "Umschichtung", gegenkonto_id: "k-ziel" });
+    apply(db, 83, 84);
+    expect(zeilen(db, "SELECT id, art, charakter, konto_id, gegenkonto_id FROM vertrag")).toEqual([
+      ["r-spar", "umbuchung", "Umschichtung", "k-giro", "k-ziel"],
+    ]);
+    db.close();
+  });
+
+  it("gibt jeder weiteren Regel eines Vertrags einen eigenen Vertrag, statt sie zusammenzulegen", () => {
+    const db = vor84();
+    vertrag(db, "v-1", "Pagenkopf", "kat-a");
+    regel(db, "r-spaet", { vertrag_id: "v-1", bezeichnung: "Pagenkopf Zusatz", betrag: -700, startdatum: "2025-06-01" });
+    regel(db, "r-frueh", { vertrag_id: "v-1", betrag: -300, startdatum: "2025-02-01" });
+    apply(db, 83, 84);
+    expect(zeilen(db, `SELECT ${ZAHLUNG} FROM vertrag ORDER BY id`)).toEqual([
+      // Die spätere wird ein eigener Vertrag — mit ihrem Namen, den Konditionen und der Kategorie des ersten.
+      ["r-spaet", "Pagenkopf Zusatz", -700, "monatlich", "2025-06-01", "Aufwand", "k-giro", null, "kat-a"],
+      // Die früheste bleibt beim Vertrag, wie `vertragAktualisieren` sie nahm.
+      ["v-1", "Pagenkopf", -300, "monatlich", "2025-02-01", "Aufwand", "k-giro", null, "kat-a"],
+    ]);
+    expect(zeilen(db, "SELECT vertragsnummer, kuendigungsfrist_monate, art FROM vertrag WHERE id = 'r-spaet'")).toEqual([["N-1", 3, "abo"]]);
+    expect(tabellen(db)).not.toContain("zahlungsregel");
+    db.close();
+  });
+
+  it("lässt einen Vertrag ohne Regel ohne Zahlung stehen", () => {
+    const db = vor84();
+    vertrag(db, "v-leer", "Quistorp");
+    apply(db, 83, 84);
+    expect(zeilen(db, "SELECT id, betrag, rhythmus, erste_zahlung, charakter FROM vertrag")).toEqual([["v-leer", null, null, null, null]]);
+    db.close();
+  });
+
+  it("übernimmt ein Konto oder eine Kategorie nicht, die es nicht mehr gibt", () => {
+    const db = vor84();
+    vertrag(db, "v-1", "Rehbein");
+    regel(db, "r-1", { vertrag_id: "v-1", konto_id: "weg", kategorie_id: "weg" });
+    regel(db, "r-frei", { konto_id: "weg", gegenkonto_id: "weg", charakter: "Umschichtung" });
+    apply(db, 83, 84);
+    expect(zeilen(db, "SELECT id, konto_id, gegenkonto_id, kategorie_id, art FROM vertrag ORDER BY id")).toEqual([
+      ["r-frei", null, null, null, "dauervertrag"],
+      ["v-1", null, null, null, "abo"],
+    ]);
+    db.close();
+  });
+
+  it("lässt die Tabelle stehen, solange eine Regel nicht überführt ist", () => {
+    // Der einzige Weg dorthin: die Id der Regel gibt es schon als Vertrag (mit anderer
+    // Zahlung). Nichts wird überschrieben, die Regel bleibt liegen, und mit ihr die Tabelle.
+    const db = vor84();
+    vertrag(db, "gleich", "Sievers");
+    regel(db, "r-eigen", { vertrag_id: "gleich", betrag: -100 });
+    regel(db, "gleich", { betrag: -999 });
+    apply(db, 83, 84);
+    expect(zeilen(db, "SELECT id, betrag FROM vertrag")).toEqual([["gleich", -100]]);
+    expect(zeilen(db, "SELECT id, betrag FROM zahlungsregel")).toEqual([["gleich", -999]]);
+    db.close();
+  });
+
+  it("läuft ein zweites Mal folgenlos durch", () => {
+    const db = vor84();
+    vertrag(db, "v-1", "Tornquist", "kat-a");
+    regel(db, "r-1", { vertrag_id: "v-1" });
+    regel(db, "r-frei");
+    apply(db, 83, 84);
+    const vorher = zeilen(db, "SELECT * FROM vertrag ORDER BY id");
+    apply(db, 83, 84);
+    expect(zeilen(db, "SELECT * FROM vertrag ORDER BY id")).toEqual(vorher);
+    db.close();
+  });
+
+  it("hinterlässt mit eingeschalteten Fremdschlüsseln keinen Widerspruch; ein gelöschtes Konto löst nur den Verweis", () => {
+    const db = vor84(true);
+    vertrag(db, "v-1", "Uhlenbrock", "kat-a");
+    regel(db, "r-1", { vertrag_id: "v-1", charakter: "Umschichtung", gegenkonto_id: "k-ziel" });
+    db.run("PRAGMA foreign_keys = OFF"); // wie die Schemasitzung
+    apply(db, 83, 84);
+    db.run("PRAGMA foreign_keys = ON");
+    expect(db.exec("PRAGMA foreign_key_check")).toEqual([]);
+    db.run("DELETE FROM zahlungskonto WHERE id = 'k-ziel'");
+    expect(zeilen(db, "SELECT id, konto_id, gegenkonto_id, betrag FROM vertrag")).toEqual([["v-1", "k-giro", null, -1000]]);
     db.close();
   });
 });

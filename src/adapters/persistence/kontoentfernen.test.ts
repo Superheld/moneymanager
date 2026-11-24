@@ -112,8 +112,8 @@ describe("zaehlen", () => {
             VALUES ('bu1','kat','alt','monatlich','2026-01-01')`);
     db.run(`INSERT INTO ruecklage (id, bezeichnung, beginn, konto_id, rate)
             VALUES ('r1','Urlaub','2026-01-01','alt',10000)`);
-    db.run(`INSERT INTO zahlungsregel (id, bezeichnung, betrag, rhythmus, startdatum, charakter, konto_id)
-            VALUES ('zr1','Sparen',-10000,'monatlich','2026-01-01','Umschichtung','alt')`);
+    db.run(`INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, status, betrag, rhythmus, erste_zahlung, charakter, konto_id)
+            VALUES ('zr1','Sparen','2026-01-01','keine','aktiv',-10000,'monatlich','2026-01-01','Umschichtung','alt')`);
 
     const l = await sqliteKontoentfernen.zaehlen("alt");
     expect(l.budgets).toBe(1);

@@ -2508,4 +2508,104 @@ export const MIGRATIONS: Migration[] = [
           AND EXISTS (SELECT 1 FROM vorsorgeziel)`,
     ],
   },
+  {
+    version: 84, // Die Zahlungsregel geht im Vertrag auf
+    sql: [
+      // Bis hierher stand ein Vertrag in ZWEI Tabellen: Konditionen in `vertrag`, die
+      // Zahlung (Betrag, Rhythmus, erste Faelligkeit, Konto) in `zahlungsregel`, verknuepft
+      // ueber `vertrag_id`. Geschrieben hat die Regel nur noch `vertragAnlegen`; eine Regel
+      // ohne Vertrag liess sich in der App weder anlegen noch bearbeiten. Was beide betraf
+      // (das Ende einer Kuendigung), haette an zwei Stellen stehen muessen. Jetzt traegt
+      // der Vertrag die Zahlung selbst, und die Planung baut ihre Regel aus ihm.
+      //
+      // Alle sechs Spalten nullable: `ALTER TABLE` kann kein NOT NULL ohne Vorgabe, und
+      // einen Betrag erfindet niemand. Ein Vertrag ohne Betrag plant nichts.
+      `ALTER TABLE vertrag ADD COLUMN betrag INTEGER`,
+      `ALTER TABLE vertrag ADD COLUMN rhythmus TEXT`,
+      `ALTER TABLE vertrag ADD COLUMN erste_zahlung TEXT`,
+      `ALTER TABLE vertrag ADD COLUMN charakter TEXT`,
+      `ALTER TABLE vertrag ADD COLUMN konto_id TEXT REFERENCES zahlungskonto(id) ON DELETE SET NULL`,
+      `ALTER TABLE vertrag ADD COLUMN gegenkonto_id TEXT REFERENCES zahlungskonto(id) ON DELETE SET NULL`,
+
+      // 1. Eine Regel OHNE Vertrag (oder mit einem Verweis ins Leere) wird ein eigener
+      //    Vertrag, mit der Id der Regel. So etwas kann aus der frueheren Planung stammen:
+      //    der Ausblick plant es bis heute, bearbeiten laesst es sich nirgends — als
+      //    Vertrag schon. Ein Dauervertrag, weil niemand weiss, ob es kuendbar ist, und
+      //    eine Kuendigungswarnung aus dem Nichts falsch waere; mit Zielkonto eine
+      //    Umbuchung. Erfunden wird sonst nichts: Beginn ist die erste Faelligkeit, eine
+      //    Erkennungsregel entsteht nicht. Konto und Kategorie nur, wenn es sie noch gibt.
+      `-- @wennTabelle zahlungsregel
+       INSERT OR IGNORE INTO vertrag
+         (id, anbieter, beginn, verlaengerung, status, art, kategorie_id,
+          betrag, rhythmus, erste_zahlung, charakter, konto_id, gegenkonto_id)
+         SELECT r.id, r.bezeichnung, r.startdatum, 'keine', 'aktiv',
+                CASE WHEN r.charakter = 'Umschichtung'
+                      AND EXISTS (SELECT 1 FROM zahlungskonto z WHERE z.id = r.gegenkonto_id)
+                     THEN 'umbuchung' ELSE 'dauervertrag' END,
+                (SELECT k.id FROM kategorie k WHERE k.id = r.kategorie_id),
+                r.betrag, r.rhythmus, r.startdatum, r.charakter,
+                (SELECT z.id FROM zahlungskonto z WHERE z.id = r.konto_id),
+                (SELECT z.id FROM zahlungskonto z WHERE z.id = r.gegenkonto_id)
+           FROM zahlungsregel r
+          WHERE r.vertrag_id IS NULL
+             OR NOT EXISTS (SELECT 1 FROM vertrag v WHERE v.id = r.vertrag_id)`,
+
+      // 2. Traegt ein Vertrag MEHRERE Regeln (das Schema erlaubte es, die App erzeugte es
+      //    nie), bleibt die erste bei ihm — dieselbe, die `vertragAktualisieren` nahm: die
+      //    mit der fruehesten Faelligkeit. Jede weitere wird ein eigener Vertrag mit den
+      //    Konditionen des ersten und dem Namen der Regel; still zusammengelegt wird
+      //    nichts. Die Erkennungsregel bleibt beim urspruenglichen Vertrag.
+      `-- @wennTabelle zahlungsregel
+       INSERT OR IGNORE INTO vertrag
+         (id, anbieter, vertragsnummer, inhaber_id, beginn, mindestlaufzeit_monate,
+          verlaengerung, verlaengerung_monate, kuendigungsfrist_monate, status, notizen,
+          kategorie_id, art, betrag, rhythmus, erste_zahlung, charakter, konto_id, gegenkonto_id)
+         SELECT r.id, r.bezeichnung, v.vertragsnummer, v.inhaber_id, v.beginn, v.mindestlaufzeit_monate,
+                v.verlaengerung, v.verlaengerung_monate, v.kuendigungsfrist_monate, v.status, v.notizen,
+                COALESCE((SELECT k.id FROM kategorie k WHERE k.id = r.kategorie_id), v.kategorie_id),
+                v.art, r.betrag, r.rhythmus, r.startdatum, r.charakter,
+                (SELECT z.id FROM zahlungskonto z WHERE z.id = r.konto_id),
+                (SELECT z.id FROM zahlungskonto z WHERE z.id = r.gegenkonto_id)
+           FROM zahlungsregel r
+           JOIN vertrag v ON v.id = r.vertrag_id
+          WHERE EXISTS (SELECT 1 FROM zahlungsregel e
+                         WHERE e.vertrag_id = r.vertrag_id
+                           AND (e.startdatum < r.startdatum
+                                OR (e.startdatum = r.startdatum AND e.id < r.id)))`,
+
+      // 3. Die erste Regel zieht in ihren Vertrag. `betrag IS NULL` haelt es wiederholbar
+      //    und laesst die Vertraege aus 1. und 2. in Ruhe. Die Kategorie des Vertrags
+      //    gilt; nur wo er keine hat, die der Regel — beide schrieb die App immer gleich.
+      `-- @wennTabelle zahlungsregel
+       UPDATE vertrag
+          SET (betrag, rhythmus, erste_zahlung, charakter, konto_id, gegenkonto_id, kategorie_id) =
+              (SELECT r.betrag, r.rhythmus, r.startdatum, r.charakter,
+                      (SELECT z.id FROM zahlungskonto z WHERE z.id = r.konto_id),
+                      (SELECT z.id FROM zahlungskonto z WHERE z.id = r.gegenkonto_id),
+                      COALESCE(vertrag.kategorie_id,
+                               (SELECT k.id FROM kategorie k WHERE k.id = r.kategorie_id))
+                 FROM zahlungsregel r
+                WHERE r.vertrag_id = vertrag.id
+                ORDER BY r.startdatum, r.id LIMIT 1)
+        WHERE betrag IS NULL
+          AND EXISTS (SELECT 1 FROM zahlungsregel r WHERE r.vertrag_id = vertrag.id)`,
+
+      // 4. Abgeraeumt wird je Zeile nur, was geprueft ueberfuehrt ist: die Zahlung steht
+      //    an einem Vertrag mit der Id der Regel (1. und 2.) oder an ihrem Vertrag (3.).
+      `-- @wennTabelle zahlungsregel
+       DELETE FROM zahlungsregel
+        WHERE EXISTS (SELECT 1 FROM vertrag v
+                       WHERE (v.id = zahlungsregel.id OR v.id = zahlungsregel.vertrag_id)
+                         AND v.betrag = zahlungsregel.betrag
+                         AND v.rhythmus = zahlungsregel.rhythmus
+                         AND v.erste_zahlung = zahlungsregel.startdatum
+                         AND v.charakter = zahlungsregel.charakter)`,
+
+      // 5. Die Tabelle faellt nur LEER. Bleibt eine Zeile stehen (eine Id, die es als
+      //    Vertrag schon gab), bleibt die Tabelle mit ihr — gelesen wird sie nicht mehr,
+      //    verloren ist nichts.
+      `-- @wennLeer zahlungsregel
+       DROP TABLE zahlungsregel`,
+    ],
+  },
 ];

@@ -526,8 +526,11 @@ beforeAll(async () => {
  *   • 82 — Kauf und Nutzungsdauer an der Rücklage, nur für die Anzeige des Wertverlusts.
  *   • 83 — Vorsorgeziel und Verrechnungskonto am Depot. Ihr UPDATE trifft hier nichts: sie
  *     läuft vor dem Einspielen, es gibt noch kein Depot. Die Probe rechnet über kein Depot.
+ *   • 84 — die Zahlung am Vertrag. Der Spielstand schreibt sie dorthin; die Tabelle
+ *     `zahlungsregel` ist hier noch leer und fällt. Überführt wird in der Probe nichts,
+ *     das prüft `migrations.test.ts`.
  */
-const NUR_SCHEMA_DANACH = new Set([82, 83]);
+const NUR_SCHEMA_DANACH = new Set([82, 83, 84]);
 
 function migrationen(db: Database, filter: (version: number) => boolean): void {
   for (const m of MIGRATIONS.filter((x) => filter(x.version))) for (const sql of m.sql) db.run(sql);
@@ -565,6 +568,28 @@ function alterSpielstand(bis: number): Database {
   return db;
 }
 
+/**
+ * Die Regeln des Spielstands, wie sie VOR Migration 84 hiessen. Damals war eine Regel eine
+ * eigene Zeile mit eigener Id und eigenem Namen, und der Jahresbeitrag hing an keinem
+ * Vertrag; heute wird sie aus dem Vertrag gebaut und trägt dessen Id und Anbieter. Die
+ * Erwartung hält die alte Form fest (Schlüssel `regel-…@datum`, Bezeichnung), deshalb
+ * übersetzt der LESEWEG zurück — an Betrag, Rhythmus, Datum und Konto ändert er nichts.
+ */
+const REGEL_VOR_84: Record<string, { id: string; bezeichnung: string; ohneVertrag?: true }> = {
+  "vertrag-miete": { id: "regel-miete", bezeichnung: "Miete" },
+  "vertrag-gehalt": { id: "regel-gehalt", bezeichnung: "Bezuege" },
+  "vertrag-internet": { id: "regel-internet", bezeichnung: "Internet" },
+  "vertrag-versicherung": { id: "regel-versicherung", bezeichnung: "Versicherung" },
+  "vertrag-beitrag": { id: "regel-beitrag", bezeichnung: "Jahresbeitrag", ohneVertrag: true },
+  "vertrag-sparrate": { id: "regel-sparrate", bezeichnung: "Sparrate" },
+};
+
+function regelInAlterForm(r: Zahlungsregel): Zahlungsregel {
+  const alt = REGEL_VOR_84[r.id];
+  if (!alt) return r;
+  return { ...r, id: alt.id, bezeichnung: alt.bezeichnung, vertragId: alt.ohneVertrag ? undefined : r.vertragId };
+}
+
 async function bestandAus(db: Database): Promise<Bestand> {
   // Auch hier und nicht nur in `alterSpielstand`: der Spielstand, „wie er heute
   // geschrieben wird", kommt ohne den Umweg dorthin.
@@ -585,7 +610,7 @@ async function bestandAus(db: Database): Promise<Bestand> {
   for (const z of zuordnungen) if (z.vertragId) vertragJeBuchung.set(z.istbuchungId, z.vertragId);
   const neu = new Set(NEU_IM_SPIELSTAND);
   return {
-    regeln,
+    regeln: regeln.map(regelInAlterForm),
     budgets,
     ruecklagen: ruecklagen.filter((r) => !neu.has(r.id)),
     beendete,

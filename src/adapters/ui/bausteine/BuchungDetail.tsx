@@ -58,7 +58,7 @@ import { useBetragUndRichtung } from "./useBetragUndRichtung";
 import { useGegenbeinwahl } from "./useGegenbeinwahl";
 import { GegenbeinBlock } from "./GegenbeinBlock";
 import { ZurUmbuchungModal } from "./ZurUmbuchungModal";
-import { vorzeichenbehaftet } from "../../../application/buchung/zahlungsregelAnlegen";
+import { vorzeichenbehaftet } from "../../../application/buchung/vorzeichen";
 import {
   buchungBearbeiten,
   buchungErfassen,

@@ -26,7 +26,6 @@ import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
 import { sqliteBudgetRepository } from "../persistence/sqliteBudgetRepository";
 import { sqliteRuecklagenRepository } from "../persistence/sqliteRuecklagenRepository";
 import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
-import { sqliteZahlungsregelRepository } from "../persistence/sqliteZahlungsregelRepository";
 import {
   sqliteImportLaufRepository,
   sqliteUmsatzRepository,
@@ -43,6 +42,7 @@ import { KontenVerwaltungScreen } from "./kontenverwaltung/KontenVerwaltungScree
 import { AnalyseScreen } from "./analyse/AnalyseScreen";
 import { UebersichtScreen } from "./uebersicht/UebersichtScreen";
 import { ReviewScreen } from "./review/ReviewScreen";
+import { planzahlungSpeichern } from "../../testwerkzeug/planzahlung";
 
 let db: Database;
 beforeAll(sqlLaden);
@@ -108,7 +108,7 @@ describe("Verträge — leer", () => {
     await sqliteVertragRepository.speichern({
       id: "v-kesselmann", anbieter: "Kesselmann", beginn: "2026-01-01", verlaengerung: "keine", status: "aktiv",
     });
-    await sqliteZahlungsregelRepository.speichern({
+    await planzahlungSpeichern({
       id: "r-kesselmann", bezeichnung: "Kesselmann", betrag: -1999, rhythmus: "monatlich",
       startdatum: "2026-01-01", charakter: "Aufwand", vertragId: "v-kesselmann",
     });
@@ -285,7 +285,7 @@ describe("Import — am Ende", () => {
 
   it("zeigt nichts Zusätzliches, wenn die Einrichtung fertig ist", async () => {
     await eineZeile();
-    await sqliteZahlungsregelRepository.speichern({
+    await planzahlungSpeichern({
       id: "r-vibora", bezeichnung: "Vibora", betrag: -1500, rhythmus: "monatlich",
       startdatum: "2026-01-01", charakter: "Aufwand",
     });

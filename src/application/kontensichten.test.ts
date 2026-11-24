@@ -47,7 +47,7 @@ function deps(
       async alle() { return buchungen; },
       async speichern() {}, async loeschen() {},
     } as unknown as KontenDeps["ledger"],
-    regelRepo: { async alle() { return []; }, async speichern() {}, async loeschen() {} },
+    regelRepo: { async alle() { return []; } },
     kategorieRepo: { async alle() { return []; }, async speichern() {}, async loeschen() {} },
     umsatzRepo: {
       async alle() { return umsaetze; },

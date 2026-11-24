@@ -580,12 +580,12 @@ describe("Spielstand", () => {
     // sie als Hinweis auf eine fehlende Zuordnung meint, als Normalzustand.
     const db = mitSeed();
     for (const [regelId, kategorieId] of [
-      ["regel-miete", "kat-miete-nebenkosten"],
-      ["regel-gehalt", "kat-gehalt"],
+      ["vertrag-miete", "kat-miete-nebenkosten"],
+      ["vertrag-gehalt", "kat-gehalt"],
     ]) {
-      const [regel] = db.exec("SELECT vertrag_id FROM zahlungsregel WHERE id = ?", [regelId]);
+      const [regel] = db.exec("SELECT id FROM vertrag WHERE id = ? AND betrag IS NOT NULL", [regelId]);
       const vertragId = regel?.values[0]?.[0];
-      expect(vertragId, `${regelId} haengt an keinem Vertrag`).toBeTruthy();
+      expect(vertragId, `${regelId} traegt keine Zahlung`).toBeTruthy();
       expect(
         zahl(db, `SELECT COUNT(*) FROM ist_buchung WHERE kategorie_id = '${kategorieId}' AND vertrag_id = '${vertragId}'`),
         `${regelId}: keine Zahlung ist dem Vertrag zugeordnet`,
@@ -599,9 +599,9 @@ describe("Spielstand", () => {
 
   it("traegt Plangroessen, damit der Monatsausblick etwas zu rechnen hat", () => {
     const db = mitSeed();
-    expect(zahl(db, "SELECT COUNT(*) FROM zahlungsregel")).toBeGreaterThanOrEqual(4);
+    expect(zahl(db, "SELECT COUNT(*) FROM vertrag WHERE betrag IS NOT NULL")).toBeGreaterThanOrEqual(4);
     // Nicht nur monatliche — sonst bliebe die Projektionsarithmetik ungeprueft.
-    expect(zahl(db, "SELECT COUNT(DISTINCT rhythmus) FROM zahlungsregel")).toBeGreaterThanOrEqual(2);
+    expect(zahl(db, "SELECT COUNT(DISTINCT rhythmus) FROM vertrag")).toBeGreaterThanOrEqual(2);
   });
 
   it("traegt keine IBAN mit existierender Bankleitzahl", () => {
@@ -627,7 +627,7 @@ describe("Spielstand — Umbuchungsvertrag", () => {
   it("verbindet Regel und gebuchte Beine ueber dasselbe Kontopaar", () => {
     const db = mitSeed();
     const [regel] = db.exec(
-      "SELECT konto_id, gegenkonto_id, charakter, vertrag_id FROM zahlungsregel WHERE gegenkonto_id IS NOT NULL",
+      "SELECT konto_id, gegenkonto_id, charakter, id FROM vertrag WHERE gegenkonto_id IS NOT NULL",
     );
     expect(regel?.values).toHaveLength(1);
     const [kontoId, gegenkontoId, charakter, vertragId] = regel!.values[0];

@@ -36,7 +36,6 @@ import { VertraegeScreen } from "./vertraege/VertraegeScreen";
 import { sqliteBudgetRepository } from "../persistence/sqliteBudgetRepository";
 import { sqliteDepotRepository } from "../persistence/sqliteDepotRepository";
 import { sqliteRuecklagenRepository } from "../persistence/sqliteRuecklagenRepository";
-import { sqliteZahlungsregelRepository } from "../persistence/sqliteZahlungsregelRepository";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
 import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
 import {
@@ -45,6 +44,7 @@ import {
   sqliteZahlungskontoRepository,
 } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteUmsatzRepository } from "../persistence/sqliteImportRepositories";
+import { planzahlungSpeichern } from "../../testwerkzeug/planzahlung";
 
 let db: Database;
 
@@ -248,7 +248,7 @@ describe("UebersichtScreen", () => {
       inhaberIds: [], saldo: 0,
     });
     for (const [id, ziel, betrag] of [["r-intern", "k2", -4321], ["r-spar", "k-spar", -20000]] as const) {
-      await sqliteZahlungsregelRepository.speichern({
+      await planzahlungSpeichern({
         id, bezeichnung: id, betrag, rhythmus: "monatlich", startdatum: `${monat(1)}-03`,
         charakter: "Umschichtung", kontoId: "k1", gegenkontoId: ziel,
       });

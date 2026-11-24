@@ -24,9 +24,9 @@ import i18n from "../../../i18n/i18n";
 import { frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import { sqliteBudgetRepository } from "../../persistence/sqliteBudgetRepository";
 import { sqliteLedgerRepository } from "../../persistence/sqliteLedgerRepository";
-import { sqliteZahlungsregelRepository } from "../../persistence/sqliteZahlungsregelRepository";
 import { sqliteKategorieRepository, sqliteZahlungskontoRepository } from "../../persistence/sqliteStammdatenRepositories";
 import { AnalyseScreen } from "./AnalyseScreen";
+import { planzahlungSpeichern } from "../../../testwerkzeug/planzahlung";
 
 let db: Database;
 beforeAll(sqlLaden);
@@ -66,8 +66,8 @@ async function bestand({ mitPlan }: { mitPlan: boolean }) {
   await sqliteLedgerRepository.speichern({ id: "b1", datum: ab, betrag: -4321, kontoId: "k1", kategorieId: "kat-a", charakter: "Aufwand", quelle: "manuell" });
   if (!mitPlan) return;
   // 90,00 je Quartal, 2000,00 Einnahmen und 500,00 Budget je Monat.
-  await sqliteZahlungsregelRepository.speichern({ id: "r-q", bezeichnung: "Kesselmann", betrag: -9000, rhythmus: "quartalsweise", startdatum: ab, charakter: "Aufwand", kategorieId: "kat-a" });
-  await sqliteZahlungsregelRepository.speichern({ id: "r-e", bezeichnung: "Ohlert", betrag: 200000, rhythmus: "monatlich", startdatum: ab, charakter: "Ertrag", kategorieId: "kat-e" });
+  await planzahlungSpeichern({ id: "r-q", bezeichnung: "Kesselmann", betrag: -9000, rhythmus: "quartalsweise", startdatum: ab, charakter: "Aufwand", kategorieId: "kat-a" });
+  await planzahlungSpeichern({ id: "r-e", bezeichnung: "Ohlert", betrag: 200000, rhythmus: "monatlich", startdatum: ab, charakter: "Ertrag", kategorieId: "kat-e" });
   await sqliteBudgetRepository.speichern({ id: "bu1", kategorieId: "kat-a", kontoId: "k1", art: "monatlich", start: ab, betraege: [{ abMonat: ab.slice(0, 7), betrag: 50000 }] });
 }
 

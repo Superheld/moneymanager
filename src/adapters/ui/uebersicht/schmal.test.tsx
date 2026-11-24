@@ -19,9 +19,9 @@ vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 import i18n from "../../../i18n/i18n";
 import { frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import { sqliteLedgerRepository } from "../../persistence/sqliteLedgerRepository";
-import { sqliteZahlungsregelRepository } from "../../persistence/sqliteZahlungsregelRepository";
 import { sqliteZahlungskontoRepository } from "../../persistence/sqliteStammdatenRepositories";
 import { UebersichtScreen } from "./UebersichtScreen";
+import { planzahlungSpeichern } from "../../../testwerkzeug/planzahlung";
 
 let db: Database;
 beforeAll(sqlLaden);
@@ -61,7 +61,7 @@ async function bestand() {
   await sqliteZahlungskontoRepository.speichern({
     id: "k-marwede", bezeichnung: "Marwede Giro", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0,
   });
-  await sqliteZahlungsregelRepository.speichern({
+  await planzahlungSpeichern({
     id: "r-tessin", bezeichnung: "Tessin", betrag: -2300, rhythmus: "monatlich",
     startdatum: "2026-01-01", charakter: "Aufwand",
   });

@@ -81,7 +81,9 @@ nicht mehr (er ist dann verschlüsselt). Der Weg ist ein Seed aus einem älteren
 **Seit 0.30.0 überführt eine Migration, statt wegzunehmen** (`CLAUDE.md` des Projekts
 → „Stadium"): wer eine Tabelle oder Spalte ablöst, trägt ihren Inhalt vorher in die neue
 Struktur. Abgeräumt wird danach nur, was nachweislich leer ist, und das prüft die Migration
-selbst. Die älteren Migrationen, die mit „ALPHA" begründet wegnehmen, bleiben, wie sie sind
+selbst: Zeilen löscht sie nur mit einem `EXISTS` auf ihr Gegenstück, und eine ganze Tabelle
+fällt hinter `-- @wennLeer x` — das Statement läuft nur, wenn `x` keine Zeile mehr trägt
+(Beispiel: v84). Die älteren Migrationen, die mit „ALPHA" begründet wegnehmen, bleiben, wie sie sind
 — die Kette ist append-only.
 
 **Eine Spalte ABLÖSEN: `-- @wennSpalte x.y` vor das Statement, das sie ein letztes Mal

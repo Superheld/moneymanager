@@ -810,15 +810,15 @@ const VERTRAG_ZUORDNUNG = {
 };
 
 export function vertragAnlegen(eingabe: VertragEingabe) {
-  return vertragAnlegenUseCase(sqliteVertragRepository, sqliteZahlungsregelRepository, eingabe, VERTRAG_ZUORDNUNG);
+  return vertragAnlegenUseCase(sqliteVertragRepository, eingabe, VERTRAG_ZUORDNUNG);
 }
 
 export function vertragAktualisieren(id: string, eingabe: VertragEingabe) {
-  return vertragAktualisierenUseCase(sqliteVertragRepository, sqliteZahlungsregelRepository, id, eingabe, VERTRAG_ZUORDNUNG);
+  return vertragAktualisierenUseCase(sqliteVertragRepository, id, eingabe, VERTRAG_ZUORDNUNG);
 }
 
 export function vertragLoeschen(id: string) {
-  return vertragLoeschenUseCase(sqliteVertragRepository, sqliteZahlungsregelRepository, id, VERTRAG_ZUORDNUNG);
+  return vertragLoeschenUseCase(sqliteVertragRepository, id, VERTRAG_ZUORDNUNG);
 }
 
 export function vertragsvorschlagIgnorieren(schluessel: string) {

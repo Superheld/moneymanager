@@ -383,27 +383,39 @@ describe("Vertrag- und Zahlungsregel-Repository", () => {
     expect(v.verlaengerung).toBe("automatisch");
   });
 
-  it("speichert eine Zahlungsregel und liest Rhythmus und Betrag zurück", async () => {
-    await zahlungsregelRepository.speichern({
-      id: "z1", bezeichnung: "Miete", betrag: -90000, rhythmus: "monatlich",
-      startdatum: "2026-01-01", charakter: "Aufwand",
+  it("speichert die Zahlung am Vertrag und liest sie als Regel der Planung zurück", async () => {
+    await vertragRepository.speichern({
+      id: "v1", anbieter: "Tollgreve", beginn: "2026-01-01", status: "aktiv", verlaengerung: "keine",
+      kategorieId: undefined,
+      zahlung: { betrag: -90000, rhythmus: "monatlich", ersteZahlung: "2026-01-03", charakter: "Aufwand" },
+    });
+    const [v] = await vertragRepository.alle();
+    expect(v.zahlung).toEqual({
+      betrag: -90000, rhythmus: "monatlich", ersteZahlung: "2026-01-03", charakter: "Aufwand",
+      kontoId: undefined, gegenkontoId: undefined,
     });
     const [z] = await zahlungsregelRepository.alle();
-    expect(z.betrag).toBe(-90000);
-    expect(z.rhythmus).toBe("monatlich");
-    expect(z.startdatum).toBe("2026-01-01");
+    // Eine Regel je Vertrag: sie trägt seine Id und seinen Namen.
+    expect(z).toMatchObject({
+      id: "v1", vertragId: "v1", bezeichnung: "Tollgreve",
+      betrag: -90000, rhythmus: "monatlich", startdatum: "2026-01-03", charakter: "Aufwand",
+    });
   });
 
-  it("löscht Vertrag und Regel", async () => {
+  it("baut aus einem Vertrag ohne Zahlung keine Regel", async () => {
     await vertragRepository.speichern({
-      id: "v1", anbieter: "X", beginn: "2026-01-01", status: "aktiv", verlaengerung: "keine",
+      id: "v1", anbieter: "Ummelt", beginn: "2026-01-01", status: "aktiv", verlaengerung: "keine",
     });
-    await zahlungsregelRepository.speichern({
-      id: "z1", bezeichnung: "X", betrag: -100, rhythmus: "monatlich",
-      startdatum: "2026-01-01", charakter: "Aufwand",
+    expect((await vertragRepository.alle())[0].zahlung).toBeUndefined();
+    expect(await zahlungsregelRepository.alle()).toHaveLength(0);
+  });
+
+  it("löscht mit dem Vertrag seine Zahlung", async () => {
+    await vertragRepository.speichern({
+      id: "v1", anbieter: "Wiebold", beginn: "2026-01-01", status: "aktiv", verlaengerung: "keine",
+      zahlung: { betrag: -100, rhythmus: "monatlich", ersteZahlung: "2026-01-01", charakter: "Aufwand" },
     });
     await vertragRepository.loeschen("v1");
-    await zahlungsregelRepository.loeschen("z1");
     expect(await vertragRepository.alle()).toHaveLength(0);
     expect(await zahlungsregelRepository.alle()).toHaveLength(0);
   });

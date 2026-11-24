@@ -152,6 +152,6 @@ console.log(
     `duplikat ${status("duplikat")} · verworfen ${status("verworfen")}`,
 );
 console.log(
-  `  Planung    ${zaehle("zahlungsregel")} Zahlungsregeln · ` +
+  `  Planung    ${zaehle("vertrag")} Vertraege · ` +
     `${zaehle("dubletten_freigabe")} Dubletten-Freigabe(n)`,
 );
