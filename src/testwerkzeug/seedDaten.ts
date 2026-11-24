@@ -331,7 +331,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   // Der Umbuchungsvertrag — eine Abmachung mit sich selbst. Er bekommt bewusst KEINE
   // Erkennungsregel: bei einer Zahlung zwischen zwei eigenen Konten steht beim
   // Empfaenger je nach Bank die eigene IBAN, der eigene Name oder nichts. Erkannt wird
-  // er am Weg, und der steht an seiner Zahlungsregel (`gegenkonto_id`).
+  // er am Weg, und der steht an seiner Zahlung (`gegenkonto_id`).
   setzen(
     "INSERT INTO vertrag (id, anbieter, vertragsnummer, inhaber_id, beginn, verlaengerung, verlaengerung_monate, kuendigungsfrist_monate, status, kategorie_id, art) " +
       "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -800,23 +800,31 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
 
   // ------------------------------------------------------------ Planung
 
-  // Zahlungsregeln tragen den Monatsausblick. Ohne sie zeigt die Uebersicht zwar Ist-Zahlen,
-  // aber keine Vorschau — und der halbe Zweck des Bereichs bliebe unsichtbar.
+  // Die Zahlung jedes Vertrags traegt den Monatsausblick. Ohne sie zeigt die Uebersicht
+  // zwar Ist-Zahlen, aber keine Vorschau — und der halbe Zweck des Bereichs bliebe
+  // unsichtbar. Seit Migration 84 steht sie am Vertrag selbst; die Vertraege sind oben
+  // angelegt, hier bekommen sie Betrag, Rhythmus und erste Faelligkeit.
+  //
+  // Der Jahresbeitrag war bis dahin eine Regel OHNE Vertrag. So etwas gibt es nicht mehr;
+  // er ist jetzt ein Vertrag wie die anderen, und er bleibt der nicht-monatliche, damit
+  // die Projektionsarithmetik im Spielstand vorkommt.
+  setzen(
+    "INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, status, kategorie_id, art) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    ["vertrag-beitrag", "Jahresbeitrag", tagIn(-MONATE, 20), "keine", "aktiv", "kat-freizeit-hobby", "abo"],
+  );
   for (const r of [
-    { id: "regel-miete", bez: "Miete", betrag: -98000, rhythmus: "monatlich", tag: 1, kat: "kat-miete-nebenkosten", charakter: "Aufwand", vertrag: "vertrag-miete" },
-    { id: "regel-gehalt", bez: "Bezuege", betrag: 315000, rhythmus: "monatlich", tag: 28, kat: "kat-gehalt", charakter: "Ertrag", vertrag: "vertrag-gehalt" },
-    { id: "regel-internet", bez: "Internet", betrag: -4500, rhythmus: "monatlich", tag: 5, kat: "kat-internet-telefon", charakter: "Aufwand", vertrag: "vertrag-internet" },
-    { id: "regel-versicherung", bez: "Versicherung", betrag: -8900, rhythmus: "monatlich", tag: 15, kat: "kat-versicherungen", charakter: "Aufwand", vertrag: "vertrag-versicherung" },
-    // Eine nicht-monatliche, damit die Projektionsarithmetik im Spielstand vorkommt.
-    { id: "regel-beitrag", bez: "Jahresbeitrag", betrag: -24000, rhythmus: "jaehrlich", tag: 20, kat: "kat-freizeit-hobby", charakter: "Aufwand", vertrag: null },
+    { vertrag: "vertrag-miete", betrag: -98000, rhythmus: "monatlich", tag: 1, charakter: "Aufwand" },
+    { vertrag: "vertrag-gehalt", betrag: 315000, rhythmus: "monatlich", tag: 28, charakter: "Ertrag" },
+    { vertrag: "vertrag-internet", betrag: -4500, rhythmus: "monatlich", tag: 5, charakter: "Aufwand" },
+    { vertrag: "vertrag-versicherung", betrag: -8900, rhythmus: "monatlich", tag: 15, charakter: "Aufwand" },
+    { vertrag: "vertrag-beitrag", betrag: -24000, rhythmus: "jaehrlich", tag: 20, charakter: "Aufwand" },
     // Der Umbuchungsvertrag: die monatliche Sparrate aufs Tagesgeldkonto. Er ist die
     // Plan-Seite dessen, was die beiden Umschichtungsbeine oben als Ist zeigen.
-    { id: "regel-sparrate", bez: "Sparrate", betrag: -30000, rhythmus: "monatlich", tag: 2, kat: "kat-sparen-anlegen", charakter: "Umschichtung", vertrag: "vertrag-sparrate", ziel: "konto-tagesgeld" },
+    { vertrag: "vertrag-sparrate", betrag: -30000, rhythmus: "monatlich", tag: 2, charakter: "Umschichtung", ziel: "konto-tagesgeld" },
   ]) {
     setzen(
-      "INSERT INTO zahlungsregel (id, bezeichnung, betrag, rhythmus, startdatum, charakter, konto_id, gegenkonto_id, kategorie_id, vertrag_id) " +
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [r.id, r.bez, r.betrag, r.rhythmus, tagIn(-MONATE, r.tag), r.charakter, "konto-giro", ("ziel" in r ? r.ziel : null) ?? null, r.kat, r.vertrag],
+      "UPDATE vertrag SET betrag = ?, rhythmus = ?, erste_zahlung = ?, charakter = ?, konto_id = ?, gegenkonto_id = ? WHERE id = ?",
+      [r.betrag, r.rhythmus, tagIn(-MONATE, r.tag), r.charakter, "konto-giro", ("ziel" in r ? r.ziel : null) ?? null, r.vertrag],
     );
   }
 

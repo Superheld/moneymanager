@@ -1,8 +1,8 @@
-// Use-Case „Vertrag anlegen" — schreibt in ZWEI Kontexte (SPEC US-B2): den Vertrag
-// (Stammdaten) und eine daraus abgeleitete Zahlungsregel (Planung), verknüpft über
-// vertragId. Bewusst kein gemeinsames Aggregat; die Anwendungsschicht orchestriert.
+// Use-Case „Vertrag anlegen" — schreibt den Vertrag samt seiner Zahlung. Bis Migration 84
+// waren das zwei Zeilen in zwei Tabellen (Vertrag und abgeleitete Zahlungsregel); die
+// Regel, die die Planung liest, wird seither aus dem Vertrag gebaut (`regelAusVertrag`).
 
-import { FachlicherFehler } from "../../core";
+import { FachlicherFehler, regelAusVertrag } from "../../core";
 import type {
   Cent,
   Charakter,
@@ -11,6 +11,7 @@ import type {
   Verlaengerungsart,
   Vertragsart,
   Vertragsstatus,
+  Vertragszahlung,
   Zahlungsregel,
   Regelvorlage,
 } from "../../core";
@@ -18,9 +19,8 @@ import type {
   VertragRepository,
   VertragserkennungRepository,
   VertragszuordnungRepository,
-  ZahlungsregelRepository,
 } from "../ports";
-import { vorzeichenbehaftet } from "../buchung/zahlungsregelAnlegen";
+import { vorzeichenbehaftet } from "../buchung/vorzeichen";
 import { erkennungSicherstellen, vertragszuordnungenAbraeumen } from "./vertragszuordnung";
 
 /**
@@ -46,7 +46,7 @@ export interface VertragEingabe {
   art?: Vertragsart;
   kuendigungsfristMonate?: number;
   notizen?: string;
-  // --- Zahlungsseite (→ abgeleitete Zahlungsregel) ---
+  // --- Zahlungsseite (→ `Vertrag.zahlung`) ---
   betrag: Cent;
   rhythmus: Rhythmus;
   charakter: Charakter;
@@ -82,12 +82,26 @@ export interface VertragEingabe {
 
 export interface VertragErgebnis {
   vertrag: Vertrag;
+  /** Die Regel, als die die Planung den Vertrag liest — gebaut, nicht gespeichert. */
   regel: Zahlungsregel;
+}
+
+function zahlungAus(eingabe: VertragEingabe): Vertragszahlung {
+  return {
+    betrag: vorzeichenbehaftet(eingabe.betrag, eingabe.charakter),
+    rhythmus: eingabe.rhythmus,
+    ersteZahlung: eingabe.ersteZahlung || eingabe.beginn,
+    charakter: eingabe.charakter,
+    kontoId: eingabe.kontoId || undefined,
+    // Nur bei einer Umschichtung. Bei Aufwand oder Ertrag verlässt das Geld den
+    // erfassten Bereich, und ein Gegenkonto behauptete etwas anderes — die Erkennung
+    // suchte dann nach einem zweiten Bein, das es nie geben wird.
+    gegenkontoId: eingabe.charakter === "Umschichtung" ? eingabe.gegenkontoId || undefined : undefined,
+  };
 }
 
 export async function vertragAnlegen(
   vertragRepo: VertragRepository,
-  regelRepo: ZahlungsregelRepository,
   eingabe: VertragEingabe,
   zuordnung?: VertragZuordnungsDeps,
 ): Promise<VertragErgebnis> {
@@ -109,31 +123,14 @@ export async function vertragAnlegen(
     art: eingabe.art ?? "abo",
     kuendigungsfristMonate: eingabe.kuendigungsfristMonate,
     status,
-    // Auch am VERTRAG, nicht nur an der abgeleiteten Zahlungsregel: die
-    // Kategorisierungs-Kette fragt den Vertrag, weil die Vertragszuordnung auf ihn zeigt.
-    kategorieId: eingabe.kategorieId,
-    notizen: eingabe.notizen?.trim() || undefined,
-  };
-
-  const regel: Zahlungsregel = {
-    id: crypto.randomUUID(),
-    bezeichnung: anbieter,
-    betrag: vorzeichenbehaftet(eingabe.betrag, eingabe.charakter),
-    rhythmus: eingabe.rhythmus,
-    startdatum: eingabe.ersteZahlung || eingabe.beginn,
-    charakter: eingabe.charakter,
-    kontoId: eingabe.kontoId || undefined,
-    // Nur bei einer Umschichtung. Bei Aufwand oder Ertrag verlässt das Geld den
-    // erfassten Bereich, und ein Gegenkonto behauptete etwas anderes — die Erkennung
-    // suchte dann nach einem zweiten Bein, das es nie geben wird.
-    gegenkontoId: eingabe.charakter === "Umschichtung" ? eingabe.gegenkontoId || undefined : undefined,
+    // Die Kategorisierungs-Kette fragt den Vertrag danach, weil die Vertragszuordnung
+    // auf ihn zeigt; die Planung liest dieselbe Kategorie über die gebaute Regel.
     kategorieId: eingabe.kategorieId || undefined,
-    vertragId: vertrag.id,
+    notizen: eingabe.notizen?.trim() || undefined,
+    zahlung: zahlungAus(eingabe),
   };
 
-  // Eventual consistent: erst Stammdaten, dann die abgeleitete Planungsregel.
   await vertragRepo.speichern(vertrag);
-  await regelRepo.speichern(regel);
   if (zuordnung) {
     await erkennungSicherstellen(
       zuordnung.erkennungRepo,
@@ -144,16 +141,14 @@ export async function vertragAnlegen(
       eingabe.vorlage,
     );
   }
-  return { vertrag, regel };
+  return { vertrag, regel: regelAusVertrag(vertrag)! };
 }
 
 /**
- * Aktualisiert einen bestehenden Vertrag und seine abgeleitete Zahlungsregel
- * (IDs bleiben erhalten). Findet die verknüpfte Regel über vertragId.
+ * Aktualisiert einen bestehenden Vertrag samt seiner Zahlung (die Id bleibt).
  */
 export async function vertragAktualisieren(
   vertragRepo: VertragRepository,
-  regelRepo: ZahlungsregelRepository,
   vertragId: string,
   eingabe: VertragEingabe,
   zuordnung?: VertragZuordnungsDeps,
@@ -176,26 +171,12 @@ export async function vertragAktualisieren(
     art: eingabe.art ?? "abo",
     kuendigungsfristMonate: eingabe.kuendigungsfristMonate,
     status: bestehend?.status ?? "aktiv",
-    kategorieId: eingabe.kategorieId,
-    notizen: eingabe.notizen?.trim() || undefined,
-  };
-
-  const regelId = (await regelRepo.alle()).find((r) => r.vertragId === vertragId)?.id ?? crypto.randomUUID();
-  const regel: Zahlungsregel = {
-    id: regelId,
-    bezeichnung: anbieter,
-    betrag: vorzeichenbehaftet(eingabe.betrag, eingabe.charakter),
-    rhythmus: eingabe.rhythmus,
-    startdatum: eingabe.ersteZahlung || eingabe.beginn,
-    charakter: eingabe.charakter,
-    kontoId: eingabe.kontoId || undefined,
-    gegenkontoId: eingabe.charakter === "Umschichtung" ? eingabe.gegenkontoId || undefined : undefined,
     kategorieId: eingabe.kategorieId || undefined,
-    vertragId,
+    notizen: eingabe.notizen?.trim() || undefined,
+    zahlung: zahlungAus(eingabe),
   };
 
   await vertragRepo.speichern(vertrag);
-  await regelRepo.speichern(regel);
   // Nur anlegen, wenn noch keine Regel da ist — eine nachgesteuerte darf ein
   // Namenswechsel im Vertrag nicht wegwischen (siehe `erkennungSicherstellen`).
   if (zuordnung) {
@@ -208,20 +189,15 @@ export async function vertragAktualisieren(
       eingabe.vorlage,
     );
   }
-  return { vertrag, regel };
+  return { vertrag, regel: regelAusVertrag(vertrag)! };
 }
 
-/** Löscht einen Vertrag samt seiner abgeleiteten Zahlungsregel(n) und seiner Zuordnungen. */
+/** Löscht einen Vertrag samt seiner Zahlung und seiner Zuordnungen. */
 export async function vertragLoeschen(
   vertragRepo: VertragRepository,
-  regelRepo: ZahlungsregelRepository,
   vertragId: string,
   zuordnung?: VertragZuordnungsDeps,
 ): Promise<void> {
-  const regeln = await regelRepo.alle();
-  for (const r of regeln) {
-    if (r.vertragId === vertragId) await regelRepo.loeschen(r.id);
-  }
   if (zuordnung) {
     await vertragszuordnungenAbraeumen(zuordnung.erkennungRepo, zuordnung.zuordnungRepo, vertragId);
   }

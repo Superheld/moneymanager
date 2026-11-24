@@ -24,8 +24,8 @@ import { sqliteRuecklagenRepository } from "../../persistence/sqliteRuecklagenRe
 import { sqliteKategorieRepository, sqliteZahlungskontoRepository } from "../../persistence/sqliteStammdatenRepositories";
 import { sqliteVermoegenRepository } from "../../persistence/sqliteVermoegenRepository";
 import { sqliteVertragszuordnungRepository } from "../../persistence/sqliteVertragZuordnungRepositories";
-import { sqliteZahlungsregelRepository } from "../../persistence/sqliteZahlungsregelRepository";
 import { AnalyseScreen } from "./AnalyseScreen";
+import { planzahlungSpeichern } from "../../../testwerkzeug/planzahlung";
 
 let db: Database;
 beforeAll(sqlLaden);
@@ -142,7 +142,7 @@ describe("Verlauf — die Frage nach den Kosten", () => {
   it("teilt eine gebuchte Kreditrate in Zinsen und eine schraffierte Tilgung", async () => {
     await haushalt();
     const jahr = new Date().getFullYear();
-    await sqliteZahlungsregelRepository.speichern({
+    await planzahlungSpeichern({
       id: "r-kredit", bezeichnung: "Tornquist", betrag: -80000, rhythmus: "monatlich", startdatum: `${jahr - 3}-01-15`,
       charakter: "Aufwand", kategorieId: "kat1", vertragId: "v-kredit",
     });

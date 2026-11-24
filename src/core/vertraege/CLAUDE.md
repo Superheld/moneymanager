@@ -2,9 +2,32 @@
 
 Gilt für die Zuordnung von Buchungen zu Verträgen und für die Erkennungsregeln. Was überall gilt, steht in der `CLAUDE.md` des Projekts.
 
+## Die Zahlung steht am Vertrag, die Planung liest eine Regel
+
+Ein Vertrag trägt seine Zahlung selbst: `Vertrag.zahlung` mit Betrag, Rhythmus, erster
+Fälligkeit, Charakter, Konto und (bei einer Umbuchung) Gegenkonto — Spalten der Tabelle
+`vertrag`. Bis Migration 84 stand sie in einer eigenen Tabelle `zahlungsregel`, verknüpft
+über `vertrag_id`: zwei Zeilen für eine Sache. Geschrieben hat die Regel nur noch
+`vertragAnlegen`, eine Regel ohne Vertrag liess sich weder anlegen noch bearbeiten, und
+alles, was beide betraf (das Ende einer Kündigung), hätte an zwei Stellen stehen müssen.
+
+**Der Typ `Zahlungsregel` ist geblieben, als Sicht.** Projektion, Monatsausblick,
+Liquidität und Ergebnisrechnung lesen weiter Regeln (`ZahlungsregelRepository.alle()`);
+`regelAusVertrag` baut sie aus dem Vertrag. Drei Dinge folgen daraus:
+
+- **Eine Regel hat keine eigene Id mehr** — sie trägt die des Vertrags, und ihre
+  Bezeichnung ist der Anbieter.
+- **Der Port kann nur lesen.** Wer eine Zahlung ändert, speichert den Vertrag.
+- **Ein Vertrag ohne Zahlung plant nichts.** Das gibt es nur im Altbestand (ein Vertrag,
+  dessen Regel fehlte); die Oberfläche legt keinen an. Die Spalten sind deshalb nullable,
+  und `zahlung` gibt es nur ganz oder gar nicht.
+
+In Tests schreibt `planzahlungSpeichern` (`src/testwerkzeug/planzahlung.ts`) eine geplante
+Zahlung in dieser Form.
+
 ## Ein Vertrag hat zwei Beträge: was abgeht und was er kostet
 
-Die Zahlungsregel trägt den Betrag **je Fälligkeit** — die Auszahlung. Daneben steht, was
+Die Zahlung des Vertrags (`Vertrag.zahlung`) trägt den Betrag **je Fälligkeit** — die Auszahlung. Daneben steht, was
 der Vertrag **den Monat kostet**: derselbe Betrag auf die Monate des Rhythmus verteilt
 (`kostenJeMonat` in `vertrag.ts`). Das sind die beiden Sichten aus `src/core/CLAUDE.md`
 („Auszahlung und Kosten"), und der Bereich zeigt beide, weil erst die zweite einen
@@ -245,7 +268,7 @@ Konten gibt es diesen Schlüssel nicht — dort steht je nach Bank die eigene IB
 eigene Name oder gar nichts, und aus dem Verwendungszweck etwas zu raten hiesse, sich auf
 einen Text zu verlassen, den niemand füllen muss.
 
-Deshalb trägt die **Zahlungsregel** ein `gegenkonto_id`, und `umbuchungErkennung` prüft
+Deshalb trägt die **Zahlung des Vertrags** ein `gegenkonto_id`, und `umbuchungErkennung` prüft
 strukturell: gleicher Weg (Konto → Gegenkonto), Charakter `Umschichtung`, abgehendes Bein.
 Das ist eine harte Übereinstimmung und keine Ähnlichkeit.
 

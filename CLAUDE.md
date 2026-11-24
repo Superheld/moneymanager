@@ -190,7 +190,7 @@ Fachgliederung schon vergeben hat, der vierte, weil ein Reiter keinen Navigation
 
 ### Das Datenmodell
 
-36 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
+35 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
 weder die Migrationskette (append-only, enthält auch Gedroppte) noch eine Übersicht — hier
 ist sie. Die ausführbare Gegenprobe steht in `migrations.test.ts`: `ERWARTETE_TABELLEN`
 prüft die Menge auf GLEICHHEIT, eine Tabelle zu viel oder zu wenig macht den Test rot:
@@ -203,7 +203,8 @@ prüft die Menge auf GLEICHHEIT, eine Tabelle zu viel oder zu wenig macht den Te
   siehe `src/application/fints/CLAUDE.md`) · `import_lauf` · `dubletten_freigabe`
 - **Ordnen:** `kategorie` · `budget` + `budget_betrag` (das monatliche Budget und die
   Reihe seiner Beträge — seit Migration 81 nur noch monatlich, siehe
-  `src/core/budgets/CLAUDE.md`) · `vertrag` · `vertrag_erkennung` · `zahlungsregel` ·
+  `src/core/budgets/CLAUDE.md`) · `vertrag` (samt seiner Zahlung, seit Migration 84) ·
+  `vertrag_erkennung` ·
   `ruecklage` (beide Sorten, seit Migration 81 auch die früheren aufbauenden Budgets) +
   `ruecklage_ausbuchung` + `ruecklage_rate` (die Reihe der freien Raten) +
   `ruecklage_zuordnung` (welche Rücklage einen Anteil trägt), siehe
@@ -229,7 +230,9 @@ Handkorrektur ist über `kategorie_herkunft` ohnehin sicher —, sondern eine
 VERALLGEMEINERUNG, und die soll das Modell leisten, über alle Merkmale statt über den
 Empfänger allein. Die Begründung samt dem, was beim Wiedereinbau zu bedenken wäre, steht
 im Kopf von `application/klassifikator/vorschlag.ts`. Und seit Migration 74 `kontogruppe` +
-`kontogruppe_konto` — aufgegangen in der Kontoklasse (siehe unten).
+`kontogruppe_konto` — aufgegangen in der Kontoklasse (siehe unten). Und seit Migration 84
+`zahlungsregel` — aufgegangen im Vertrag (siehe `src/core/vertraege/CLAUDE.md`); der Typ
+`Zahlungsregel` lebt als Sicht weiter, die Tabelle nicht.
 
 **Diese Liste stand bis zum 09.09.2026 selbst falsch da** — `kategorie_festlegung` war seit
 Migration 64 gedroppt und wurde hier weiter als lebend geführt. Das ist genau die

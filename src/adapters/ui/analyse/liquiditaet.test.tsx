@@ -27,9 +27,9 @@ import type { Liquiditaetssicht } from "../../../application";
 import { frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import { sqliteLedgerRepository } from "../../persistence/sqliteLedgerRepository";
 import { sqliteKategorieRepository, sqliteZahlungskontoRepository } from "../../persistence/sqliteStammdatenRepositories";
-import { sqliteZahlungsregelRepository } from "../../persistence/sqliteZahlungsregelRepository";
 import { AnalyseScreen } from "./AnalyseScreen";
 import { LiquiditaetKarte } from "./LiquiditaetKarte";
+import { planzahlungSpeichern } from "../../../testwerkzeug/planzahlung";
 
 let db: Database;
 beforeAll(sqlLaden);
@@ -171,7 +171,7 @@ describe("Analyse — der Ausblick zeigt die Vorschau wieder", () => {
     // Ohne Buchung zeigt die Analyse ihren Leerzustand und keine Register.
     await sqliteLedgerRepository.speichern({ id: "b1", datum: "2026-01-05", betrag: -1000, kontoId: "k1", charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1" });
     // Eine Rate, die das Konto allein schon reisst — fällig in jedem Monat, also sicher im Fenster.
-    await sqliteZahlungsregelRepository.speichern({
+    await planzahlungSpeichern({
       id: "r1", bezeichnung: "Vibora", betrag: -150000, rhythmus: "monatlich", startdatum: "2020-01-15",
       charakter: "Aufwand", kontoId: "k1", kategorieId: "kat1",
     });

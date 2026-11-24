@@ -24,7 +24,6 @@ import { ErgebnisKarten } from "./ErgebnisKarten";
 import { UebersichtScreen } from "./UebersichtScreen";
 import { sqliteBudgetRepository } from "../../persistence/sqliteBudgetRepository";
 import { sqliteLedgerRepository } from "../../persistence/sqliteLedgerRepository";
-import { sqliteZahlungsregelRepository } from "../../persistence/sqliteZahlungsregelRepository";
 import {
   sqliteKategorieRepository,
   sqliteZahlungskontoRepository,
@@ -34,6 +33,7 @@ import { sqliteVorsorgeRepository } from "../../persistence/sqliteVorsorgeReposi
 import { sqliteVermoegenRepository } from "../../persistence/sqliteVermoegenRepository";
 import { ergebnisbasis, monatsErgebnisse } from "../../../core";
 import type { Budget, ErgebnisVorsorge, Ruecklage, IstBuchung, Kategorie, Zahlungskonto, Zahlungsregel } from "../../../core";
+import { planzahlungSpeichern } from "../../../testwerkzeug/planzahlung";
 
 let db: Database;
 beforeAll(sqlLaden);
@@ -305,7 +305,7 @@ describe("ErgebnisKarten", () => {
 describe("Übersicht — Monatskarten am echten Schema", () => {
   it("lädt Regeln, Budgets und Rücklagen aus der Datenbank und zeigt die drei Karten", async () => {
     for (const k of KATEGORIEN) await sqliteKategorieRepository.speichern(k);
-    for (const r of REGELN) await sqliteZahlungsregelRepository.speichern({ ...r, vertragId: undefined });
+    for (const r of REGELN) await planzahlungSpeichern({ ...r, vertragId: undefined });
     for (const b of BUDGETS) await sqliteBudgetRepository.speichern(b);
     await sqliteZahlungskontoRepository.speichern({ ...KONTEN[0], saldo: 100000 });
     for (const g of RUECKLAGEN) await sqliteRuecklagenRepository.speichern(g);
@@ -329,7 +329,7 @@ describe("Übersicht — Monatskarten am echten Schema", () => {
   });
   it("liest das Vorsorgeziel aus der Datenbank und rechnet seine Rate in jede Karte", async () => {
     for (const k of KATEGORIEN) await sqliteKategorieRepository.speichern(k);
-    for (const r of REGELN) await sqliteZahlungsregelRepository.speichern({ ...r, vertragId: undefined });
+    for (const r of REGELN) await planzahlungSpeichern({ ...r, vertragId: undefined });
     await sqliteZahlungskontoRepository.speichern({ ...KONTEN[0], saldo: 100000 });
     const jetzt = new Date();
     const monat = `${jetzt.getFullYear()}-${String(jetzt.getMonth() + 1).padStart(2, "0")}`;
@@ -361,7 +361,7 @@ describe("Übersicht — Monatskarten am echten Schema", () => {
       const d = new Date(Date.UTC(jetzt.getFullYear(), jetzt.getMonth() + n, 1));
       return { iso: d.toISOString().slice(0, 10), name: `${text(`ergebnis.monat.${d.getUTCMonth() + 1}`)} ${d.getUTCFullYear()}` };
     };
-    await sqliteZahlungsregelRepository.speichern({
+    await planzahlungSpeichern({
       id: "r-quartal", bezeichnung: "Vibora", betrag: -9000, rhythmus: "quartalsweise", startdatum: monatsname(1).iso.replace(/01$/, "15"),
       charakter: "Aufwand", kategorieId: "wohnen",
     });
@@ -385,7 +385,7 @@ describe("Übersicht — Monatskarten am echten Schema", () => {
     for (const k of KATEGORIEN) await sqliteKategorieRepository.speichern(k);
     await sqliteZahlungskontoRepository.speichern({ ...KONTEN[0], saldo: 100000 });
     const jahr = new Date().getFullYear();
-    await sqliteZahlungsregelRepository.speichern({
+    await planzahlungSpeichern({
       id: "r-kredit", bezeichnung: "Tornquist", betrag: -90000, rhythmus: "monatlich", startdatum: `${jahr - 3}-01-20`,
       charakter: "Aufwand", kategorieId: "wohnen", vertragId: "v-kredit",
     });

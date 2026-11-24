@@ -69,6 +69,25 @@ function spaltenBedingung(sql: string): { tabelle: string; spalte: string } | nu
   return m ? { tabelle: m[1], spalte: m[2] } : null;
 }
 
+/**
+ * `-- @wennLeer x` am Anfang eines Statements → der Tabellenname; sonst null.
+ *
+ * Gebraucht beim ABRÄUMEN einer Tabelle, deren Inhalt eine Migration überführt hat: seit
+ * 0.30.0 fällt nur, was nachweislich leer ist, und das prüft die Migration selbst. Die
+ * Überführung löscht jede Zeile, deren Gegenstück dasteht; bleibt eine übrig, bleibt die
+ * Tabelle mit ihr stehen, statt sie mitzunehmen. Fehlt die Tabelle schon (zweiter
+ * Durchgang), wird das Statement ebenfalls übersprungen.
+ */
+function leerBedingung(sql: string): string | null {
+  const m = sql.match(/^\s*--\s*@wennLeer\s+(\w+)/i);
+  return m ? m[1] : null;
+}
+
+async function tabelleIstLeer(db: MigrationsDb, tabelle: string): Promise<boolean> {
+  const zeilen = await db.select<{ n: number }[]>(`SELECT COUNT(*) AS n FROM ${tabelle}`);
+  return (zeilen[0]?.n ?? 0) === 0;
+}
+
 async function tabelleExistiert(db: MigrationsDb, tabelle: string): Promise<boolean> {
   const zeilen = await db.select<{ name: string }[]>(
     `SELECT name FROM sqlite_master WHERE type='table' AND name='${tabelle}'`,
@@ -106,6 +125,7 @@ async function spalteExistiert(db: MigrationsDb, tabelle: string, spalte: string
  *  • `ALTER TABLE … DROP COLUMN` genauso, nur andersherum.
  *  • `-- @wennTabelle x` vor einem Statement überspringt es, wenn `x` fehlt.
  *  • `-- @wennSpalte x.y` dasselbe für eine Spalte.
+ *  • `-- @wennLeer x` überspringt es, wenn `x` fehlt oder noch Zeilen trägt.
  *
  * Ein Bestand, der unter dem alten Ablauf mitten in einer Migration stehengeblieben ist,
  * kommt so weiterhin hoch.
@@ -142,6 +162,8 @@ export async function migrate(db: MigrationsDb): Promise<void> {
       for (const stmt of m.sql) {
         const bedingung = tabellenBedingung(stmt);
         if (bedingung && !(await tabelleExistiert(db, bedingung))) continue;
+        const leer = leerBedingung(stmt);
+        if (leer && !((await tabelleExistiert(db, leer)) && (await tabelleIstLeer(db, leer)))) continue;
         const spaltig = spaltenBedingung(stmt);
         if (spaltig && !(await spalteExistiert(db, spaltig.tabelle, spaltig.spalte))) continue;
         const zugang = spaltenZugang(stmt);

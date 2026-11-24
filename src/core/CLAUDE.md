@@ -134,7 +134,7 @@ auf" ausführbar macht.
   darüber hinausgeht, ist ungedeckt und zählt als Kosten des Monats. Ohne die Grenze
   machte ein leerer Topf jede Ausgabe folgenlos.
 - **Verträge werden vorschüssig periodisiert:** die Zahlung gilt für die Monate AB ihrer
-  Fälligkeit, verteilt nach dem Rhythmus der Zahlungsregel. Vorschüssig, weil es der
+  Fälligkeit, verteilt nach dem Rhythmus seiner Zahlung. Vorschüssig, weil es der
   Normalfall ist (Versicherung, Jahresabo) und der Kern die Abweichung davon nicht kennt.
 - **Der Topf hängt an der KATEGORIE — die Zuordnung klärt nur, wo sie mehrdeutig ist.**
   Eine Rücklage findet ihre Ausgaben über ihre Kategorie samt Unterkategorien, ab ihrem

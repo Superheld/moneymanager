@@ -65,7 +65,7 @@ Monatsgrenzen hinweg würde eine solche Verknüpfung einen abgeschlossenen Monat
 ändern — genau das, was der Budgetbetrag (`src/core/budgets/CLAUDE.md`) aus gutem Grund nicht tut.
 
 **Für eine PLANGRÖSSE bleibt die Ableitung.** `vorzeichenbehaftet()` gibt es weiterhin,
-aber nur noch für Zahlungsregel und Vertragsrate: eine geplante Rate hat genau eine
+aber nur noch für die Zahlung eines Vertrags: eine geplante Rate hat genau eine
 Richtung, sonst wäre sie keine Rate. Für eine IST-Buchung gilt sie nicht — dort fallen
 Einordnung und Richtung beim Rückfluss auseinander, und dann gewinnt die Richtung.
 

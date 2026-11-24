@@ -54,7 +54,7 @@ export interface Kontoloeschung {
   readonly budgets: number;
   /** Rücklagen, deren Deckung auf diesem Konto liegt. */
   readonly ruecklagen: number;
-  /** Zahlungsregeln mit diesem Konto als Konto oder als Gegenkonto. */
+  /** Verträge, deren Zahlung dieses Konto als Konto oder als Gegenkonto trägt. */
   readonly regeln: number;
   /** Erkennungsregeln von Verträgen, die auf dieses Konto eingeschränkt sind. */
   readonly erkennungsregeln: number;

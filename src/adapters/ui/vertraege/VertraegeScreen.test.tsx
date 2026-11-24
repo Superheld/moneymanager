@@ -35,6 +35,7 @@ import {
   sqliteKategorieRepository,
   sqliteZahlungskontoRepository,
 } from "../../persistence/sqliteStammdatenRepositories";
+import { planzahlungSpeichern } from "../../../testwerkzeug/planzahlung";
 
 let db: Database;
 
@@ -103,7 +104,7 @@ describe("VertraegeScreen — Ansichten", () => {
     await sqliteVertragRepository.speichern({
       id, anbieter, beginn: start, verlaengerung: "keine", status: "aktiv", ...(art ? { art } : {}),
     });
-    await sqliteZahlungsregelRepository.speichern({
+    await planzahlungSpeichern({
       id: `r-${id}`, bezeichnung: anbieter, betrag, rhythmus: rhythmus as "monatlich",
       startdatum: start, charakter: "Aufwand", kontoId: "k1", vertragId: id,
     });
@@ -142,7 +143,7 @@ describe("VertraegeScreen — Ansichten", () => {
     await sqliteVertragRepository.speichern({
       id: "e", anbieter: "Epsilon", beginn: tagNach(5), verlaengerung: "keine", status: "aktiv", art: "dauervertrag",
     });
-    await sqliteZahlungsregelRepository.speichern({
+    await planzahlungSpeichern({
       id: "r-e", bezeichnung: "Epsilon", betrag: 200000, rhythmus: "monatlich",
       startdatum: tagNach(5), charakter: "Ertrag", kontoId: "k1", vertragId: "e",
     });
@@ -152,7 +153,7 @@ describe("VertraegeScreen — Ansichten", () => {
     await sqliteVertragRepository.speichern({
       id: "u", anbieter: "Zeta", beginn: tagNach(5), verlaengerung: "keine", status: "aktiv", art: "umbuchung",
     });
-    await sqliteZahlungsregelRepository.speichern({
+    await planzahlungSpeichern({
       id: "r-u", bezeichnung: "Zeta", betrag: -30000, rhythmus: "monatlich",
       startdatum: tagNach(5), charakter: "Umschichtung", kontoId: "k1", gegenkontoId: "k2", vertragId: "u",
     });
@@ -283,7 +284,7 @@ describe("VertraegeScreen — Beginn und Fälligkeit", () => {
       await sqliteVertragRepository.speichern({
         id, anbieter, beginn: "2025-01-01", verlaengerung: "automatisch", status: "aktiv",
       });
-      await sqliteZahlungsregelRepository.speichern({
+      await planzahlungSpeichern({
         id: `r-${id}`, bezeichnung: anbieter, betrag, rhythmus: "monatlich",
         startdatum: "2025-01-01", charakter: "Aufwand", kontoId: "k1", vertragId: id, kategorieId,
       });
@@ -321,7 +322,7 @@ describe("VertraegeScreen — Beginn und Fälligkeit", () => {
       await sqliteVertragRepository.speichern({
         id, anbieter, beginn: "2025-01-01", verlaengerung: "automatisch", status: "aktiv",
       });
-      await sqliteZahlungsregelRepository.speichern({
+      await planzahlungSpeichern({
         id: `r-${id}`, bezeichnung: anbieter, betrag, rhythmus: "monatlich",
         startdatum: "2025-01-01", charakter: "Aufwand", kontoId: "k1", vertragId: id, kategorieId,
       });
@@ -369,7 +370,7 @@ describe("VertraegeScreen — Beginn und Fälligkeit", () => {
       id: "v1", anbieter: "Sportverein", beginn: "2015-03-01",
       verlaengerung: "automatisch", verlaengerungMonate: 12, status: "aktiv",
     });
-    await sqliteZahlungsregelRepository.speichern({
+    await planzahlungSpeichern({
       id: "r1", bezeichnung: "Sportverein", betrag: -18000, rhythmus: "jaehrlich",
       startdatum: "2026-04-01", charakter: "Aufwand", kontoId: "k1", vertragId: "v1",
     });
@@ -534,7 +535,7 @@ describe("VertraegeScreen — Vorschläge", () => {
       id: "alt", anbieter: "Vibora GmbH", beginn: "2025-01-01",
       verlaengerung: "automatisch", status: "aktiv",
     });
-    await sqliteZahlungsregelRepository.speichern({
+    await planzahlungSpeichern({
       id: "r-alt", bezeichnung: "Vibora GmbH", betrag: -1650, rhythmus: "monatlich",
       startdatum: "2025-01-01", charakter: "Aufwand", kontoId: "k1", vertragId: "alt",
     });
@@ -564,7 +565,7 @@ describe("VertraegeScreen — Vorschläge", () => {
       id: "um", anbieter: "Sparrate aufs Tagesgeld", beginn: "2025-01-01",
       verlaengerung: "automatisch", status: "aktiv", art: "umbuchung",
     });
-    await sqliteZahlungsregelRepository.speichern({
+    await planzahlungSpeichern({
       id: "r-um", bezeichnung: "Sparrate aufs Tagesgeld", betrag: -20000, rhythmus: "monatlich",
       startdatum: "2025-01-01", charakter: "Umschichtung", kontoId: "k1", gegenkontoId: "k2",
       vertragId: "um",
@@ -628,7 +629,7 @@ describe("VertraegeScreen — Vorschläge", () => {
     // steht: gespeichert wird beides zusammen, und `vertragAktualisieren` verlangt einen
     // Betrag ueber null. Ein Vertrag ohne Regel entsteht nur hier im Test — beide
     // Use-Cases legen immer eine an.
-    await sqliteZahlungsregelRepository.speichern({
+    await planzahlungSpeichern({
       id: "r-v1", bezeichnung: "Vibora GmbH", betrag: -1650, rhythmus: "monatlich",
       startdatum: "2025-01-01", charakter: "Aufwand", kontoId: "k1", vertragId: "v1",
     });
@@ -731,7 +732,7 @@ describe("VertraegeScreen — Vorschläge", () => {
     // steht: gespeichert wird beides zusammen, und `vertragAktualisieren` verlangt einen
     // Betrag ueber null. Ein Vertrag ohne Regel entsteht nur hier im Test — beide
     // Use-Cases legen immer eine an.
-    await sqliteZahlungsregelRepository.speichern({
+    await planzahlungSpeichern({
       id: "r-v1", bezeichnung: "Petrossen Bonn", betrag: -5000, rhythmus: "monatlich",
       startdatum: "2025-01-01", charakter: "Aufwand", kontoId: "k1", vertragId: "v1",
     });
@@ -790,7 +791,7 @@ describe("VertraegeScreen — Vorschläge", () => {
       id: "v1", anbieter: "Zweitfunk", beginn: "2024-01-01",
       verlaengerung: "automatisch", status: "aktiv",
     });
-    await sqliteZahlungsregelRepository.speichern({
+    await planzahlungSpeichern({
       id: "r-v1", bezeichnung: "Zweitfunk", betrag: -4678, rhythmus: "monatlich",
       startdatum: "2025-01-01", charakter: "Aufwand", kontoId: "k1", vertragId: "v1",
     });
@@ -867,7 +868,7 @@ describe("VertraegeScreen — Vorschläge", () => {
       id: "v1", anbieter: "Ohlert Assekuranz", beginn: "2024-01-01",
       verlaengerung: "automatisch", status: "aktiv",
     });
-    await sqliteZahlungsregelRepository.speichern({
+    await planzahlungSpeichern({
       id: "r-v1", bezeichnung: "Ohlert Assekuranz", betrag: -5500, rhythmus: "monatlich",
       startdatum: "2025-01-01", charakter: "Aufwand", kontoId: "k1", vertragId: "v1",
     });
@@ -1115,7 +1116,7 @@ describe("VertraegeScreen — Könnte dazugehören", () => {
     await sqliteVertragRepository.speichern({
       id: "v1", anbieter: "Brakelmann", beginn: "2026-01-01", verlaengerung: "keine", status: "aktiv", kategorieId: "kat-x",
     });
-    await sqliteZahlungsregelRepository.speichern({
+    await planzahlungSpeichern({
       id: "r-v1", bezeichnung: "Brakelmann", betrag: -61300, rhythmus: "monatlich",
       startdatum: "2026-01-03", charakter: "Aufwand", kontoId: "k1", kategorieId: "kat-x", vertragId: "v1",
     });
@@ -1412,7 +1413,7 @@ describe("VertraegeScreen — Kategorie auf die Zahlungen übertragen", () => {
       id: "v-terhoven", anbieter: "Terhoven Media", beginn: "2025-01-01",
       verlaengerung: "automatisch", status: "aktiv", kategorieId: "kat-neu",
     });
-    await sqliteZahlungsregelRepository.speichern({
+    await planzahlungSpeichern({
       id: "r-terhoven", bezeichnung: "Terhoven Media", betrag: -2900, rhythmus: "monatlich",
       startdatum: "2025-01-01", charakter: "Aufwand", kontoId: "k1",
       vertragId: "v-terhoven", kategorieId: "kat-neu",

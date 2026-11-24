@@ -51,7 +51,7 @@ export const sqliteKontoentfernen: KontoentfernenPort = {
         ),
         eine("SELECT COUNT(*) AS n FROM budget WHERE konto_id = $1"),
         eine("SELECT COUNT(*) AS n FROM ruecklage WHERE konto_id = $1"),
-        eine("SELECT COUNT(*) AS n FROM zahlungsregel WHERE konto_id = $1 OR gegenkonto_id = $1"),
+        eine("SELECT COUNT(*) AS n FROM vertrag WHERE konto_id = $1 OR gegenkonto_id = $1"),
         eine("SELECT COUNT(*) AS n FROM vertrag_erkennung WHERE konto_id = $1"),
       ]);
 

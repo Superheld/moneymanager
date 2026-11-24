@@ -222,7 +222,7 @@ export const sqliteVertragszuordnungRepository: VertragszuordnungRepository = {
  *
  * Die Zahlungsregeln kamen 2026-08-31 dazu: ein Umbuchungsvertrag hängt an keinem
  * Empfänger und kann deshalb keine Erkennungsregel haben — er wird am WEG erkannt, und
- * der steht an seiner Zahlungsregel.
+ * der steht an seiner Zahlung (gelesen als Zahlungsregel).
  */
 export const vertragsAbgleichDeps: AbgleichDeps = {
   ledger: sqliteLedgerRepository,

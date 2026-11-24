@@ -19,6 +19,7 @@ vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 import { frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import { RuecklagenScreen } from "./RuecklagenScreen";
 import { sqliteRuecklagenRepository } from "../../persistence/sqliteRuecklagenRepository";
+import { planzahlungSpeichern } from "../../../testwerkzeug/planzahlung";
 
 let db: Database;
 beforeAll(sqlLaden);
@@ -258,7 +259,6 @@ describe("Rücklagen — diesen Monat und die Faustformel", () => {
     const { sqliteZahlungskontoRepository } = await import("../../persistence/sqliteStammdatenRepositories");
     const { sqliteLedgerRepository } = await import("../../persistence/sqliteLedgerRepository");
     const { sqliteVertragRepository } = await import("../../persistence/sqliteVertragRepository");
-    const { sqliteZahlungsregelRepository } = await import("../../persistence/sqliteZahlungsregelRepository");
     const n = new Date();
     const tag = (d: number) => `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 
@@ -266,7 +266,7 @@ describe("Rücklagen — diesen Monat und die Faustformel", () => {
     await sqliteZahlungskontoRepository.speichern({ id: "tg", bezeichnung: "Tagesgeld", typ: "Tagesgeld", klasse: "ruecklage", inhaberIds: [], saldo: 100000 });
     // Die Faustformel braucht Vertragseinnahmen: 1.000,00 im Monat → 3.000,00.
     await sqliteVertragRepository.speichern({ id: "v1", anbieter: "Arbeitgeber", beginn: "2024-01-01", verlaengerung: "keine", status: "aktiv" });
-    await sqliteZahlungsregelRepository.speichern({
+    await planzahlungSpeichern({
       id: "r1", bezeichnung: "Gehalt", betrag: 100000, rhythmus: "monatlich", startdatum: "2024-01-01",
       charakter: "Ertrag", kontoId: "giro", vertragId: "v1",
     });
@@ -299,11 +299,10 @@ describe("Rücklagen — diesen Monat und die Faustformel", () => {
     // Klasse „Sparen" lagen — die Zuordnung an der Rücklage zählte nicht.
     const { sqliteZahlungskontoRepository } = await import("../../persistence/sqliteStammdatenRepositories");
     const { sqliteVertragRepository } = await import("../../persistence/sqliteVertragRepository");
-    const { sqliteZahlungsregelRepository } = await import("../../persistence/sqliteZahlungsregelRepository");
     await sqliteZahlungskontoRepository.speichern({ id: "giro", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0 });
     await sqliteZahlungskontoRepository.speichern({ id: "spar", bezeichnung: "Sparkonto", typ: "Tagesgeld", klasse: "sparen", inhaberIds: [], saldo: 150000 });
     await sqliteVertragRepository.speichern({ id: "v1", anbieter: "Arbeitgeber", beginn: "2024-01-01", verlaengerung: "keine", status: "aktiv" });
-    await sqliteZahlungsregelRepository.speichern({
+    await planzahlungSpeichern({
       id: "r1", bezeichnung: "Gehalt", betrag: 100000, rhythmus: "monatlich", startdatum: "2024-01-01",
       charakter: "Ertrag", kontoId: "giro", vertragId: "v1",
     });

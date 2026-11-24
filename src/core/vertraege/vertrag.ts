@@ -1,10 +1,13 @@
-// Vertrag — Stammdaten einer wiederkehrenden Zahlung (KONZEPT §3.3): Konditionen
-// und Fristen. Die Zahlungsseite (Betrag/Rhythmus) lebt NICHT hier, sondern in der
-// abgeleiteten Zahlungsregel (Planung) — zwei Kontexte, verknüpft über vertragId.
-// Umfasst auch Einnahmen (Charakter Ertrag der Regel) und Versicherungen.
+// Vertrag — eine wiederkehrende Zahlung (KONZEPT §3.3): Konditionen, Fristen UND die
+// Zahlung selbst (`zahlung`). Bis Migration 84 lebte die Zahlungsseite in einer eigenen
+// Tabelle `zahlungsregel`, verknüpft über vertragId — zwei Zeilen für eine Sache, und
+// alles, was beide betraf (das Ende einer Kündigung), hätte an zwei Stellen stehen
+// müssen. Die Planung liest weiter eine `Zahlungsregel`; sie wird aus dem Vertrag gebaut
+// (`regelAusVertrag`). Umfasst auch Einnahmen (Charakter Ertrag) und Versicherungen.
 
 import { addMonate, ord, parseIso, tageBis, toIso } from "../basis/datum";
-import { RHYTHMUS_MONATE, type Zahlungsregel } from "../basis/zahlungsregel";
+import type { Cent } from "../basis/geld";
+import { RHYTHMUS_MONATE, type Charakter, type Rhythmus, type Zahlungsregel } from "../basis/zahlungsregel";
 
 export type Verlaengerungsart = "keine" | "automatisch";
 export type Vertragsstatus = "aktiv" | "gekuendigt" | "beendet";
@@ -36,6 +39,30 @@ export type Vertragsstatus = "aktiv" | "gekuendigt" | "beendet";
  */
 export type Vertragsart = "abo" | "dauervertrag" | "umbuchung";
 
+/**
+ * Die Zahlungsseite eines Vertrags: was wann von welchem Konto geht (oder kommt).
+ *
+ * Ein eigenes Objekt und keine sechs losen Felder am Vertrag, weil es sie nur ZUSAMMEN
+ * gibt: ein Betrag ohne Rhythmus plant nichts. Fehlt `zahlung` am Vertrag, hat er keine
+ * Planseite — das gibt es nur im Altbestand (ein Vertrag, dessen Regel fehlte); die
+ * Oberfläche legt keinen Vertrag ohne Zahlung an.
+ */
+export interface Vertragszahlung {
+  /** Betrag je Fälligkeit in Cent, vorzeichenbehaftet (negativ = Abfluss). */
+  readonly betrag: Cent;
+  readonly rhythmus: Rhythmus;
+  /** Erste Fälligkeit, ISO „YYYY-MM-DD" — nicht notwendig der Vertragsbeginn. */
+  readonly ersteZahlung: string;
+  readonly charakter: Charakter;
+  /** Das Konto, von dem gezahlt wird (bzw. auf dem die Einnahme eingeht). */
+  readonly kontoId?: string;
+  /**
+   * Das ZIELKONTO einer geplanten Umbuchung — nur sinnvoll mit `charakter:
+   * "Umschichtung"` (siehe `Zahlungsregel.gegenkontoId`).
+   */
+  readonly gegenkontoId?: string;
+}
+
 export interface Vertrag {
   readonly id: string;
   readonly anbieter: string;
@@ -60,6 +87,44 @@ export interface Vertrag {
    */
   readonly kategorieId?: string;
   readonly notizen?: string;
+  /** Die Zahlungsseite. Fehlend: der Vertrag plant nichts (nur im Altbestand). */
+  readonly zahlung?: Vertragszahlung;
+}
+
+/**
+ * Die Zahlungsregel eines Vertrags — die Form, in der die PLANUNG ihn liest (Projektion,
+ * Monatsausblick, Liquidität, Ergebnisrechnung).
+ *
+ * Gebaut und nicht gespeichert: bis Migration 84 war die Regel eine eigene Zeile, seither
+ * ist sie eine Sicht auf den Vertrag. Der Typ bleibt, damit kein Leser der Planung den
+ * Vertrag kennen muss. Ihre `id` ist die des Vertrags — eine Regel je Vertrag, also
+ * braucht sie keine eigene.
+ */
+export function regelAusVertrag(v: Vertrag): Zahlungsregel | undefined {
+  const z = v.zahlung;
+  if (!z) return undefined;
+  return {
+    id: v.id,
+    bezeichnung: v.anbieter,
+    betrag: z.betrag,
+    rhythmus: z.rhythmus,
+    startdatum: z.ersteZahlung,
+    charakter: z.charakter,
+    kontoId: z.kontoId,
+    gegenkontoId: z.gegenkontoId,
+    kategorieId: v.kategorieId,
+    vertragId: v.id,
+  };
+}
+
+/** Die Zahlungsregeln aller Verträge, die eine Zahlung tragen — nach erster Fälligkeit. */
+export function regelnAusVertraegen(vertraege: readonly Vertrag[]): Zahlungsregel[] {
+  const regeln: Zahlungsregel[] = [];
+  for (const v of vertraege) {
+    const r = regelAusVertrag(v);
+    if (r) regeln.push(r);
+  }
+  return regeln.sort((a, b) => (a.startdatum < b.startdatum ? -1 : a.startdatum > b.startdatum ? 1 : a.id < b.id ? -1 : 1));
 }
 
 export interface Kuendigungstermin {

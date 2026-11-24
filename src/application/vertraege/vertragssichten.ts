@@ -92,7 +92,7 @@ export interface Zuordnungsvorschlag extends Zuordnungskandidat {
 /** Ein Vertrag mit allem, was die Liste über ihn zeigt. */
 export interface Vertragszeile {
   readonly vertrag: Vertrag;
-  /** Die abgeleitete Zahlungsregel, falls es eine gibt. */
+  /** Die Zahlung des Vertrags als Regel der Planung — fehlt, wenn er keine trägt. */
   readonly regel?: Zahlungsregel;
   /** Nächste Fälligkeit aus der Regel — nicht aus dem Vertragsbeginn. */
   readonly naechsteZahlung: string | null;

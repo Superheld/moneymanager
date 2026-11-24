@@ -38,10 +38,12 @@ import type {
 import type { ImportLauf, Umsatz } from "./import";
 import type { Dublettenfreigabe } from "./dubletten/dublettensicht";
 
+/**
+ * Die Zahlungsregeln, wie die Planung sie liest. Nur LESEN: seit Migration 84 ist eine
+ * Regel eine Sicht auf ihren Vertrag (`regelAusVertrag`), geschrieben wird der Vertrag.
+ */
 export interface ZahlungsregelRepository {
   alle(): Promise<Zahlungsregel[]>;
-  speichern(regel: Zahlungsregel): Promise<void>;
-  loeschen(id: string): Promise<void>;
 }
 
 export interface PersonRepository {
