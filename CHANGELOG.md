@@ -3,7 +3,10 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
-## [Unveröffentlicht]
+## [0.31.0-pre.3] — 2026-11-24
+
+Ein Vertrag lässt sich kündigen, statt ihn löschen zu müssen, und trägt seine Zahlung
+jetzt selbst. Ein Zurück zu pre.2 gibt es nur über die Tagessicherung vor den Migrationen.
 
 **Drei Migrationen** (84–86). 84: die Zahlung eines Vertrags (Betrag, Rhythmus, erste
 Fälligkeit, Konto) zieht aus einer eigenen Tabelle in den Vertrag selbst; jede geplante
@@ -26,7 +29,7 @@ hing (möglich nur aus einer früheren Fassung der Planung), stand im Ausblick, 
 aber nirgends bearbeiten. Sie erscheint jetzt als Dauervertrag unter Verträge und kann
 dort geändert oder gelöscht werden. Geplante Zahlungen heissen überall wie ihr Vertrag.
 
- — 2026-11-24
+## [0.31.0-pre.2] — 2026-11-24
 
 Die Übersicht zeigt Verträge jetzt im Monat, in dem sie fällig sind; die anteilige Rechnung
 steht als Planrechnung in der Analyse. Depots zählen einzeln zum Vorsorgeziel, eine Rücklage
