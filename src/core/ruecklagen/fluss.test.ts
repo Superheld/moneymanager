@@ -52,6 +52,26 @@ const VON = "2026-06-01";
 const BIS = "2026-07-01";
 
 describe("ruecklagenfluss", () => {
+  it("nennt die Verträge hinter dem Plan, grösste Rate zuerst, den Jahresvertrag als Anteil", () => {
+    const f = ruecklagenfluss(
+      [],
+      konten,
+      [],
+      [
+        regel({ id: "klein", vertragId: "klein", bezeichnung: "Jahresrate", betrag: -60000, rhythmus: "jaehrlich" }),
+        regel({ id: "gross", vertragId: "gross", bezeichnung: "Sparrate" }),
+        regel({ id: "fremd", vertragId: "fremd", gegenkontoId: "zweit" }),
+      ],
+      VON,
+      BIS,
+    );
+    expect(f.planposten).toEqual([
+      { vertragId: "gross", bezeichnung: "Sparrate", vonKontoId: "giro", nachKontoId: "tagesgeld", monatsrate: 20000, monatlich: true },
+      { vertragId: "klein", bezeichnung: "Jahresrate", vonKontoId: "giro", nachKontoId: "tagesgeld", monatsrate: 5000, monatlich: false },
+    ]);
+    expect(f.plan).toBe(25000);
+  });
+
   it("plant die Umbuchung eines beendeten Vertrags nicht mehr, die eines gekündigten bis zum Ende", () => {
     const plan = (vertragsende: string) =>
       ruecklagenfluss([], konten, [], [regel({ vertragsende })], VON, BIS).plan;

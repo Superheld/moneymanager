@@ -65,7 +65,7 @@ const LEERE_DECKUNG: RuecklagenDeckung = {
   posten: [], soll: 0, sollMitKonto: 0, tatsaechlich: 0, grad: 100, nurRechnung: false,
 };
 const LEERE_LISTE: readonly never[] = [];
-const LEERER_FLUSS: Ruecklagenfluss = { bedarf: 0, plan: 0, ist: 0, posten: [] };
+const LEERER_FLUSS: Ruecklagenfluss = { bedarf: 0, plan: 0, planposten: [], ist: 0, posten: [] };
 
 function heuteIso(): string {
   const n = new Date();
@@ -231,6 +231,44 @@ export function RuecklagenScreen() {
           {fluss.plan === 0 && fluss.bedarf > 0 && (
             <div className="muted" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-2)" }}>
               {t("ruecklagen.flussOhnePlan")}
+            </div>
+          )}
+          {/* Die Verträge hinter „eingerichtet": die Summe sagt nicht, WELCHER Vertrag die
+              Rücklagen füllt, und bei „eingerichtet unter Bedarf" ist das die nächste Frage. */}
+          {fluss.planposten.length > 0 && (
+            <div style={{ marginTop: "var(--sp-3)" }}>
+              <div className="muted" style={{ fontSize: "var(--fs-sm)", marginBottom: 2 }}>
+                {t("ruecklagen.flussPlanListe")}
+              </div>
+              {fluss.planposten.map((p, i) => (
+                <div
+                  key={p.vertragId}
+                  style={{
+                    display: "flex", alignItems: "baseline", gap: 8, padding: "5px 0", fontSize: "var(--fs-ui)",
+                    borderTop: i === 0 ? "1px solid var(--line)" : "1px solid var(--line-soft)",
+                  }}
+                >
+                  <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--ink-2)" }}>
+                    {p.bezeichnung}
+                    <span className="muted">
+                      {" · "}
+                      {t("ruecklagen.flussPlanWeg", {
+                        von: kontoName.get(p.vonKontoId) ?? p.vonKontoId,
+                        nach: kontoName.get(p.nachKontoId) ?? p.nachKontoId,
+                      })}
+                      {!p.monatlich && ` · ${t("ruecklagen.flussPlanAnteilig")}`}
+                    </span>
+                  </span>
+                  <span className="num" style={{ marginLeft: "auto", flex: "0 0 auto", fontWeight: "var(--fw-semi)" }}>
+                    {geld.format(p.monatsrate)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          {fluss.planposten.length > 0 && fluss.posten.length > 0 && (
+            <div className="muted" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-3)", marginBottom: -8 }}>
+              {t("ruecklagen.flussIstListe")}
             </div>
           )}
           {fluss.posten.length === 0 ? (

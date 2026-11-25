@@ -49,6 +49,19 @@ export interface Flussposten {
   readonly nachKontoId: string;
 }
 
+/** Ein Umbuchungsvertrag, der im Plan steht — die Zeile hinter der Summe. */
+export interface Planposten {
+  /** Die Id der Regel und damit des Vertrags (`regelAusVertrag`). */
+  readonly vertragId: string;
+  readonly bezeichnung: string;
+  readonly vonKontoId: string;
+  readonly nachKontoId: string;
+  /** POSITIV, auf den Monat gerechnet (`monatsanteil`). */
+  readonly monatsrate: Cent;
+  /** Zahlt der Vertrag monatlich? Sonst ist `monatsrate` ein Anteil, kein Überweisungsbetrag. */
+  readonly monatlich: boolean;
+}
+
 export interface Ruecklagenfluss {
   /**
    * Σ der Monatsraten beider Formen — Rücklagen von Hand und über die Kategorie
@@ -57,6 +70,11 @@ export interface Ruecklagenfluss {
   readonly bedarf: Cent;
   /** Σ der eingerichteten Umbuchungen auf Rücklagenkonten, auf den Monat normalisiert. */
   readonly plan: Cent;
+  /**
+   * Woraus `plan` besteht, grösste Rate zuerst. Die Summe allein beantwortet nicht, WELCHER
+   * Vertrag eine Rücklage füllt — und bei „Plan unter Bedarf" ist genau das die nächste Frage.
+   */
+  readonly planposten: readonly Planposten[];
   /** Was im Zeitraum tatsächlich geflossen ist, positiv. */
   readonly ist: Cent;
   readonly posten: readonly Flussposten[];
@@ -129,13 +147,24 @@ export function ruecklagenfluss(
   // niemand mehr überweist — und „Plan über Ist" meldete eine ausgefallene Überweisung,
   // die es nicht gibt.
   const laeuft = (r: Zahlungsregel): boolean => !r.vertragsende || r.vertragsende >= von;
-  const plan = regeln
+  const planposten = regeln
     .filter((r) => laeuft(r) && istUmbuchungsregel(r) && istQuelle(r.kontoId) && istZiel(r.gegenkontoId))
-    .reduce((s, r) => s + monatsanteil(r), 0);
+    .map((r): Planposten => ({
+      vertragId: r.vertragId ?? r.id,
+      bezeichnung: r.bezeichnung,
+      // `istQuelle` und `istZiel` haben beide oben geprüft; der Typ weiss das nicht.
+      vonKontoId: r.kontoId as string,
+      nachKontoId: r.gegenkontoId as string,
+      monatsrate: monatsanteil(r),
+      monatlich: (RHYTHMUS_MONATE[r.rhythmus] ?? 1) === 1,
+    }))
+    .sort((a, b) => b.monatsrate - a.monatsrate || a.bezeichnung.localeCompare(b.bezeichnung));
+  const plan = planposten.reduce((s, p) => s + p.monatsrate, 0);
 
   return {
     bedarf: ruecklagenBedarf(ruecklagen, von.slice(0, 7)),
     plan,
+    planposten,
     ist: posten.reduce((s, p) => s + p.betrag, 0),
     posten: posten.sort((a, b) => a.datum.localeCompare(b.datum)),
   };

@@ -5,6 +5,10 @@ Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 
 ## [Unveröffentlicht]
 
+**Neu:** Die Karte „Diesen Monat" im Bereich Rücklagen nennt unter den drei Zahlen die
+Verträge hinter „eingerichtet" — je Vertrag der Weg von Konto zu Konto und die Rate je
+Monat. Bisher stand dort nur die Summe.
+
 **Behoben:** Der „Plan" im Bereich Rücklagen zählte die Umbuchung eines Vertrags weiter
 mit, nachdem der Vertrag beendet war. Ein gekündigter Vertrag zählt jetzt bis zu seinem
 Ende, danach nicht mehr.
