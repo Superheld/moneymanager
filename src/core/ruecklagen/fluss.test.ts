@@ -52,6 +52,16 @@ const VON = "2026-06-01";
 const BIS = "2026-07-01";
 
 describe("ruecklagenfluss", () => {
+  it("plant die Umbuchung eines beendeten Vertrags nicht mehr, die eines gekündigten bis zum Ende", () => {
+    const plan = (vertragsende: string) =>
+      ruecklagenfluss([], konten, [], [regel({ vertragsende })], VON, BIS).plan;
+    // Ende vor dem Fenster: der Vertrag ist vorbei, niemand überweist mehr.
+    expect(plan("2026-05-31")).toBe(0);
+    // Ende im Fenster oder danach: er läuft noch und zählt weiter.
+    expect(plan("2026-06-01")).toBe(20000);
+    expect(plan("2026-12-31")).toBe(20000);
+  });
+
   it("zählt eine Umbuchung vom liquiden Konto aufs Rücklagenkonto", () => {
     const f = ruecklagenfluss([buchung()], konten, [], [], VON, BIS);
     expect(f.ist).toBe(20000);
