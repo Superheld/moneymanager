@@ -3,6 +3,12 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [Unveröffentlicht]
+
+**Behoben:** Der „Plan" im Bereich Rücklagen zählte die Umbuchung eines Vertrags weiter
+mit, nachdem der Vertrag beendet war. Ein gekündigter Vertrag zählt jetzt bis zu seinem
+Ende, danach nicht mehr.
+
 ## [0.31.0-pre.3] — 2026-11-24
 
 Ein Vertrag lässt sich kündigen, statt ihn löschen zu müssen, und trägt seine Zahlung

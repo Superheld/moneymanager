@@ -123,8 +123,14 @@ export function ruecklagenfluss(
     });
   }
 
+  // Ein BEENDETER Vertrag plant nichts mehr: liegt sein Ende vor dem Fenster, fällt seine
+  // Umbuchung aus dem Plan. Ein gekündigter, der noch läuft, zählt bis zu seinem Ende
+  // weiter (`vertragLaeuft`). Ohne die Prüfung stünde hier Geld als eingerichtet, das
+  // niemand mehr überweist — und „Plan über Ist" meldete eine ausgefallene Überweisung,
+  // die es nicht gibt.
+  const laeuft = (r: Zahlungsregel): boolean => !r.vertragsende || r.vertragsende >= von;
   const plan = regeln
-    .filter((r) => istUmbuchungsregel(r) && istQuelle(r.kontoId) && istZiel(r.gegenkontoId))
+    .filter((r) => laeuft(r) && istUmbuchungsregel(r) && istQuelle(r.kontoId) && istZiel(r.gegenkontoId))
     .reduce((s, r) => s + monatsanteil(r), 0);
 
   return {
