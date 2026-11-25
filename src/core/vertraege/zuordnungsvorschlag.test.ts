@@ -129,11 +129,23 @@ describe("zuordnungskandidaten", () => {
     expect(k[0]).toMatchObject({ faelligkeit: "2026-07-31", tage: 0 });
   });
 
-  it("schlägt für einen Umbuchungsvertrag nichts vor — der wird am Weg erkannt", () => {
-    const sparrate = regel({ charakter: "Umschichtung", kontoId: "k1", gegenkontoId: "k2" });
-    const b = [buchung("b1", "2026-03-01", -80000, { charakter: "Umschichtung", gegenkontoId: "k2" })];
-    expect(ids(sparrate, b)).toEqual([]);
-    // Und eine Umschichtung ist auch für einen gewöhnlichen Vertrag kein Kandidat.
+  it("schlägt für einen Umbuchungsvertrag vor, was auf seinem Weg liegt und ungefähr passt", () => {
+    // Ohne Kategorie: bei ihm trägt der Weg. Was genau passt, ordnet die Erkennung selbst
+    // zu (`umbuchungErkennung`); hier bleibt die erhöhte Rate und der verschobene Termin.
+    const sparrate = regel({ charakter: "Umschichtung", kontoId: "k1", gegenkontoId: "k2", kategorieId: undefined });
+    const um = (id: string, datum: string, betrag: number, over: Partial<IstBuchung> = {}) =>
+      buchung(id, datum, betrag, { charakter: "Umschichtung", kontoId: "k1", gegenkontoId: "k2", kategorieId: undefined, ...over });
+    const b = [
+      um("erhoeht", "2026-03-01", -85000),
+      um("spaet", "2026-04-11", -80000),
+      // Eine einzelne Umbuchung in ganz anderer Höhe: kein Kandidat.
+      um("einzeln", "2026-03-01", -30000),
+      // Das ankommende Bein und ein anderer Weg: nie.
+      um("ankommend", "2026-03-01", 80000, { kontoId: "k2", gegenkontoId: "k1" }),
+      um("andererWeg", "2026-03-01", -80000, { gegenkontoId: "k3" }),
+    ];
+    expect(ids(sparrate, b).sort()).toEqual(["erhoeht", "spaet"]);
+    // Und eine Umschichtung ist für einen gewöhnlichen Vertrag kein Kandidat.
     expect(ids(regel(), b)).toEqual([]);
   });
 

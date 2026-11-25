@@ -26,7 +26,7 @@ import {
   vertragsAbgleichDeps,
 } from "../../persistence/sqliteVertragZuordnungRepositories";
 import { zuordnungenAbgleichen } from "../../../application/vertraege/vertragszuordnung";
-import { standardErkennung } from "../../../core";
+import { addMonate, parseIso, standardErkennung, toIso } from "../../../core";
 import i18n from "../../../i18n/i18n";
 import { sqliteZahlungsregelRepository } from "../../persistence/sqliteZahlungsregelRepository";
 import { sqliteLedgerRepository } from "../../persistence/sqliteLedgerRepository";
@@ -1262,13 +1262,21 @@ describe("VertraegeScreen — Umbuchungsvertrag", () => {
   it("speichert den Weg an der Zahlungsregel und ordnet die Umschichtung zu", async () => {
     await konten();
     // Die gebuchte Umbuchung liegt schon im Bestand — der Vertrag muss RÜCKWIRKEND greifen.
+    // Drei Monate vor heute: das Formular belegt die erste Zahlung mit heute vor, und
+    // der Vertrag greift nur, wo Weg, Betrag UND Termin passen.
+    const imTakt = toIso(addMonate(parseIso(new Date().toISOString().slice(0, 10)), -3));
     await sqliteLedgerRepository.speichern({
-      id: "ab", datum: "2026-06-02", betrag: -30000, kontoId: "giro", gegenkontoId: "tagesgeld",
+      id: "ab", datum: imTakt, betrag: -30000, kontoId: "giro", gegenkontoId: "tagesgeld",
       transferId: "t1", charakter: "Umschichtung", quelle: "import",
     });
     await sqliteLedgerRepository.speichern({
-      id: "zu", datum: "2026-06-02", betrag: 30000, kontoId: "tagesgeld", gegenkontoId: "giro",
+      id: "zu", datum: imTakt, betrag: 30000, kontoId: "tagesgeld", gegenkontoId: "giro",
       transferId: "t1", charakter: "Umschichtung", quelle: "import",
+    });
+    // Derselbe Weg, anderer Betrag: eine einzelne Umbuchung, kein Teil des Vertrags.
+    await sqliteLedgerRepository.speichern({
+      id: "einzeln", datum: imTakt, betrag: -12000, kontoId: "giro", gegenkontoId: "tagesgeld",
+      transferId: "t2", charakter: "Umschichtung", quelle: "import",
     });
 
     const nutzer = userEvent.setup();

@@ -18,8 +18,9 @@
 // `manuell`) — und damit wird der Treffer zugleich zum Beleg, aus dem die
 // Merkmalsableitung die Erkennungsregel verbessern kann.
 
-import { addMonate, monateZwischen, parseIso, tageBis, toIso } from "../basis/datum";
-import { RHYTHMUS_MONATE, type Zahlungsregel } from "../basis/zahlungsregel";
+import type { Zahlungsregel } from "../basis/zahlungsregel";
+import { naechstgelegeneFaelligkeit } from "./faelligkeit";
+import { istUmbuchungsregel } from "./umbuchungErkennung";
 import { kategorieAnteile, type IstBuchung } from "../buchung/istbuchung";
 import type { Vertragszuordnung } from "./vertragZuordnung";
 
@@ -61,32 +62,6 @@ export interface Zuordnungskandidat {
   readonly abweichung: number;
 }
 
-/** Die Fälligkeit der Regel, die `datum` am nächsten liegt, samt Abstand in Tagen. */
-function naechstgelegeneFaelligkeit(
-  regel: Zahlungsregel,
-  datum: string,
-): { faelligkeit: string; tage: number } {
-  const schritt = RHYTHMUS_MONATE[regel.rhythmus];
-  const start = parseIso(regel.startdatum);
-  // Aus dem ORIGINAL-Startdatum + k·Schritt, nie iterativ: sonst klebt ein Vertrag ab dem
-  // 31. nach dem Februar am 28. (dieselbe Regel wie in `projiziereRegel`). Der Zyklus um
-  // das Buchungsdatum herum und seine beiden Nachbarn genügen — weiter weg liegt keine
-  // Fälligkeit näher.
-  //
-  // Vor der ersten Fälligkeit gibt es keine (k ≥ 0). Eine Buchung VOR dem Start misst
-  // sich deshalb an der ersten — kurz davor kann sie eine vorgezogene Abbuchung sein,
-  // lange davor fällt sie am Abstand heraus.
-  const k0 = Math.max(0, Math.round(monateZwischen(regel.startdatum, datum) / schritt));
-  let beste = { faelligkeit: regel.startdatum, tage: tageBis(regel.startdatum, datum) };
-  for (const k of [k0 - 1, k0, k0 + 1]) {
-    if (k < 1) continue; // k = 0 ist der Startwert oben
-    const faelligkeit = toIso(addMonate(start, k * schritt));
-    const tage = tageBis(faelligkeit, datum);
-    if (Math.abs(tage) < Math.abs(beste.tage)) beste = { faelligkeit, tage };
-  }
-  return beste;
-}
-
 /**
  * Die Buchungen, die zu `regel` gehören könnten — jüngste zuerst.
  *
@@ -110,9 +85,13 @@ function naechstgelegeneFaelligkeit(
  *     Bestand, an der „gehört nicht dazu" wirklich dasteht; ein Vorschlag, der es
  *     übergeht, stellt dieselbe Frage bei jedem Öffnen wieder. Beides steht in
  *     `zuordnungen` als Eintrag, deshalb genügt die Frage, ob es einen gibt.
- *   • **Eine Umschichtung**, auf beiden Seiten. Ein Umbuchungsvertrag wird am WEG erkannt
- *     (`umbuchungErkennung`), und das ist eine harte Übereinstimmung — daneben eine
- *     weiche zu stellen hiesse, für dieselbe Frage zwei Antworten zu haben.
+ *
+ * **Ein Umbuchungsvertrag sucht am WEG statt an der Kategorie** (seit 2026-11-25). Bis
+ * dahin gab es für ihn keine Vorschläge, weil der Weg allein ihn schon zuordnete; seit
+ * die Erkennung auch Betrag und Termin verlangt (`umbuchungErkennung`), bleibt übrig,
+ * was auf dem Weg liegt und nur ungefähr passt — die erhöhte Sparrate, der verschobene
+ * Termin. Höhe und Termin gelten dafür wie für jeden Vertrag. Eine Umschichtung OHNE
+ * Gegenkonto an der Regel bekommt weiterhin keine Vorschläge.
  *
  * `kategorieId` kommt als eigener Parameter, weil die Kategorie an zwei Stellen stehen
  * kann (Regel und Vertrag) und der Aufrufer weiss, welche gilt. Ohne Kategorie gibt es
@@ -125,7 +104,11 @@ export function zuordnungskandidaten(
   zuordnungen: readonly Vertragszuordnung[],
   kategorieId: string | undefined = regel.kategorieId,
 ): Zuordnungskandidat[] {
-  if (!kategorieId || regel.betrag === 0 || regel.charakter === "Umschichtung") return [];
+  if (regel.betrag === 0) return [];
+  // Ein Umbuchungsvertrag hat keine Kategorie, an der man suchen könnte — bei ihm trägt
+  // der WEG, und der ist die schärfere Angabe von beiden.
+  const umbuchung = istUmbuchungsregel(regel);
+  if (!umbuchung && (!kategorieId || regel.charakter === "Umschichtung")) return [];
   const entschieden = new Set(zuordnungen.map((z) => z.istbuchungId));
   const hoehe = Math.abs(regel.betrag);
 
@@ -134,10 +117,13 @@ export function zuordnungskandidaten(
     if (entschieden.has(b.id)) continue;
     if (b.charakter !== regel.charakter) continue;
     if (Math.sign(b.betrag) !== Math.sign(regel.betrag)) continue;
-    if (!kategorieAnteile(b).some((a) => a.kategorieId === kategorieId)) continue;
+    if (umbuchung) {
+      // Nur das abgehende Bein (das Vorzeichen oben) und nur derselbe Weg.
+      if (b.kontoId !== regel.kontoId || b.gegenkontoId !== regel.gegenkontoId) continue;
+    } else if (!kategorieAnteile(b).some((a) => a.kategorieId === kategorieId)) continue;
     const abweichung = b.betrag - regel.betrag;
     if (Math.abs(abweichung) / hoehe > VORSCHLAG_BETRAGSTOLERANZ) continue;
-    const { faelligkeit, tage } = naechstgelegeneFaelligkeit(regel, b.datum);
+    const { faelligkeit, tage } = naechstgelegeneFaelligkeit(regel, b.datum, umbuchung);
     if (Math.abs(tage) > VORSCHLAG_TAGE) continue;
     kandidaten.push({ buchung: b, faelligkeit, tage, abweichung });
   }

@@ -158,9 +158,10 @@ seinen Zahlungen („Könnte dazugehören"), herausgegeben über `Vertragszeile.
   sieht man und klickt es weg; was fehlt, sieht niemand. Beim Termin heisst das: bei
   monatlichem Takt schränkt er praktisch nichts ein (die erste Fälligkeit einer Regel ist
   oft geschätzt), erst bei längerem Takt trennt er.
-- **Für einen Umbuchungsvertrag gibt es keine Vorschläge.** Er wird am Weg erkannt
-  (unten), und das ist eine harte Übereinstimmung; eine weiche daneben wären zwei
-  Antworten auf dieselbe Frage.
+- **Ein Umbuchungsvertrag sucht am WEG statt an der Kategorie** (seit 2026-11-25). Was
+  auf seinem Weg liegt und in Höhe und Termin nur ungefähr passt, steht hier; was genau
+  passt, ordnet die Erkennung selbst zu (unten). Bis dahin gab es für ihn keine
+  Vorschläge, weil der Weg allein schon zuordnete.
 
 ## Ein Merkmal kann MUSS sein, und die Regel hat ein Fälligkeitsfenster
 
@@ -281,7 +282,7 @@ Drei Dinge, die daran hängen:
   Umbuchungs-Bein bleibt unberührt. Damit kommt auch der Journaleintrag mit, den
   `ledger.speichern` schreibt.
 
-## Ein Umbuchungsvertrag wird am WEG erkannt, nicht am Empfänger
+## Ein Umbuchungsvertrag wird an Weg, Betrag und Termin erkannt, nicht am Empfänger
 
 Ein gewöhnlicher Vertrag hängt an einem Namen: `vertrag_erkennung` normalisiert die
 Gegenpartei und vergleicht mit Unschärfe. Bei einer Verschiebung zwischen zwei eigenen
@@ -290,23 +291,40 @@ eigene Name oder gar nichts, und aus dem Verwendungszweck etwas zu raten hiesse,
 einen Text zu verlassen, den niemand füllen muss.
 
 Deshalb trägt die **Zahlung des Vertrags** ein `gegenkonto_id`, und `umbuchungErkennung` prüft
-strukturell: gleicher Weg (Konto → Gegenkonto), Charakter `Umschichtung`, abgehendes Bein.
-Das ist eine harte Übereinstimmung und keine Ähnlichkeit.
+strukturell: gleicher Weg (Konto → Gegenkonto), Charakter `Umschichtung`, abgehendes Bein
+— und dazu **derselbe Betrag** und ein **Termin** höchstens `UMBUCHUNG_TAGE` neben einer
+Fälligkeit.
 
-Drei Entscheidungen darin, die man kennen muss:
+**Bis 2026-11-25 genügte der Weg.** Der Betrag wählte nur unter mehreren Regeln auf
+demselben Weg; begründet war das mit der erhöhten Sparrate, die als erkannte Umbuchung mit
+Abweichung dastehen sollte. Übersehen war der häufigere Fall: zwischen zwei eigenen Konten
+wird auch ohne Vertrag verschoben, und jede solche Buchung landete beim Vertrag, nur weil
+sie denselben Weg nahm. Sein Ist hatte dann mit ihm nichts mehr zu tun.
 
-- **Der Betrag entscheidet NICHT über die Passung**, sondern nur darüber, WELCHE Regel es
-  ist, wenn mehrere denselben Weg beschreiben. Wer seine Sparrate erhöht und die Regel
-  nicht nachzieht, soll eine erkannte Umbuchung mit Abweichung sehen — mit einer
-  Betragsschwelle wäre sie stattdessen gar nicht erkannt, und die Zeile stünde als „offen"
-  da, während daneben eine unerklärte Umschichtung liegt.
+Was man dazu kennen muss:
+
+- **Der Betrag muss GENAU passen, ohne Spanne.** Ein Dauerauftrag überweist jedes Mal
+  dasselbe; eine Spanne finge die Einzelumbuchungen wieder ein. Wer seine Sparrate erhöht
+  und den Vertrag nicht nachzieht, sieht die neue Rate als Vorschlag am Vertrag
+  (`zuordnungsvorschlag.ts`, innerhalb der dortigen Toleranz) und bestätigt sie — oder
+  zieht den Vertrag nach, dann greift die Erkennung wieder von selbst.
+- **Der Takt gilt auch rückwärts**, vor die erste Fälligkeit (`naechstgelegeneFaelligkeit`
+  mit `rueckwaerts`). Ein Umbuchungsvertrag wird oft erst erfasst, wenn der Dauerauftrag
+  längst läuft, und soll die Umbuchungen davor finden. Nach dem Ende des Vertrags greift
+  er nicht mehr.
+- **Was nicht passt, bleibt ohne Vertrag — und lässt sich von Hand zuordnen.** Der
+  Buchungsdialog zeigt die Vertragswahl am abgehenden Bein einer Umbuchung
+  (`BuchungDetail`), nicht am ankommenden. „Vertrag daraus machen" steht dort nicht: der
+  Dialog dahinter belegt einen Empfänger vor, ein Umbuchungsvertrag hat ein Zielkonto.
 - **Nur das abgehende Bein** bekommt die Zuordnung. Beide zuzuordnen hübe die Ist-Summe
   des Vertrags auf: einmal −200, einmal +200, obwohl 200 geflossen sind.
-- **`gegenkonto_id` steht an der REGEL, nicht am Vertrag.** Die Regel beschreibt die
-  Zahlung, der Vertrag die Vereinbarung darüber — derselbe Grund, aus dem `konto_id` dort
-  steht. Sinnvoll ist es nur mit `charakter = 'Umschichtung'`; erzwungen wird das an der
-  Anwendungsgrenze, weil SQLite eine Bedingung über zwei Spalten nur mit einem CHECK
-  ausdrücken kann und ein CHECK an einer bestehenden Tabelle einen Umbau kostet.
+- **`gegenkonto_id` steht an der ZAHLUNG des Vertrags**, wie `konto_id`. Sinnvoll ist es
+  nur mit `charakter = 'Umschichtung'`; erzwungen wird das an der Anwendungsgrenze, weil
+  SQLite eine Bedingung über zwei Spalten nur mit einem CHECK ausdrücken kann und ein CHECK
+  an einer bestehenden Tabelle einen Umbau kostet.
+- **Der nächste Abgleich nimmt alte automatische Zuordnungen zurück**, die nur am Weg
+  hingen. Das ist gewollt und trifft keine Handentscheidung: `manuell` rührt der Abgleich
+  nie an.
 
 Die Vertragsart `umbuchung` hängt daran und trägt eine Folge: **keine
 Kündigungswarnung.** Eine Abmachung mit sich selbst kündigt man, indem man sie löscht.

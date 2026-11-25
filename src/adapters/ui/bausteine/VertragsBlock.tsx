@@ -45,7 +45,15 @@ export interface VertragsBindung {
  * Zeilen verteilt liest sich wie zwei Angaben. Übrig bleibt, was das Feld NICHT sagt:
  * woher die Zuordnung kommt, und die beiden Wege daneben.
  */
-export function VertragsBlock({ bindung }: { bindung: VertragsBindung }) {
+export function VertragsBlock({ bindung, ohneAnlegen = false }: {
+  bindung: VertragsBindung;
+  /**
+   * „Vertrag daraus machen" weglassen — am Bein einer Umbuchung. Der Dialog dahinter
+   * belegt aus der Zahlung einen Vertrag mit Empfänger vor; ein Umbuchungsvertrag hat
+   * keinen, er hat ein Zielkonto, und angelegt wird er im Bereich Verträge.
+   */
+  ohneAnlegen?: boolean;
+}) {
   const { t } = useTranslation();
   const { vertrag, zuordnung, alle } = bindung;
   const vonHand = zuordnung?.herkunft === "manuell";
@@ -88,7 +96,7 @@ export function VertragsBlock({ bindung }: { bindung: VertragsBindung }) {
         )}
         {/* „Vertrag daraus machen" gibt es nur, solange keiner zugeordnet ist — sonst
             wäre es ein Angebot, zwei Verträge für dieselbe Zahlung anzulegen. */}
-        {!vertrag && !ausgeschlossen && (
+        {!vertrag && !ausgeschlossen && !ohneAnlegen && (
           <div className="feldzeile-knopf">
             <Button onClick={bindung.neuAnlegen}>{t("konten.zuVertrag.aktion")}</Button>
           </div>
