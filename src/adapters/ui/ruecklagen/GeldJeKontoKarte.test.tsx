@@ -15,6 +15,7 @@ vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 import i18n from "../../../i18n/i18n";
 import { frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
+import { planzahlungSpeichern } from "../../../testwerkzeug/planzahlung";
 import { RuecklagenScreen } from "./RuecklagenScreen";
 import { sqliteRuecklagenRepository } from "../../persistence/sqliteRuecklagenRepository";
 import { sqliteKategorieRepository, sqliteZahlungskontoRepository } from "../../persistence/sqliteStammdatenRepositories";
@@ -71,6 +72,21 @@ describe("Rücklagen — Kennzahlen über beide Formen", () => {
     // Bedarf diesen Monat: 100,00 + 20,00 + 300,00.
     const fluss = await karte(i18n.t("ruecklagen.flussTitel"));
     expect(fluss.textContent).toMatch(/420,00/);
+  });
+
+  it("nennt unter den drei Zahlen den Vertrag, der die Rücklagen füllt", async () => {
+    await bestand();
+    await sqliteZahlungskontoRepository.speichern({ id: "giro", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0 });
+    await planzahlungSpeichern({
+      id: "v-ostrau", bezeichnung: "Dauerauftrag Ostrau", betrag: -25000, rhythmus: "monatlich",
+      startdatum: monatsanfang(6), charakter: "Umschichtung", kontoId: "giro", gegenkontoId: "tg",
+    });
+    rendere(<RuecklagenScreen />);
+    const fluss = await karte(i18n.t("ruecklagen.flussTitel"));
+    await waitFor(() => expect(fluss.textContent).toContain("Dauerauftrag Ostrau"));
+    expect(fluss.textContent).toContain(i18n.t("ruecklagen.flussPlanListe"));
+    expect(fluss.textContent).toContain(i18n.t("ruecklagen.flussPlanWeg", { von: "Girokonto", nach: "Tagesgeld" }));
+    expect(fluss.textContent).toMatch(/250,00/);
   });
 
   it("steht auch da, wenn es nur Rücklagen über die Kategorie gibt", async () => {

@@ -299,7 +299,8 @@ davon ersetzt einen anderen:
 | **Plan** | Σ Umbuchungsregeln auf Rücklagenkonten | was du eingerichtet hast |
 | **Eingegangen** (`ist`) | jede Einzahlung auf ein Rücklagenkonto im Fenster, Zinsen eingeschlossen; Umbuchungen nur, wenn sie nicht von einem anderen Rücklagenkonto kommen | was tatsächlich angekommen ist — bis 2026-11-08 „geflossen" und nur das abgehende Bein vom liquiden Konto |
 
-Im Plan zählt ein Vertrag, solange er läuft: ein gekündigter bis zu seinem Ende, ein
+`planposten` nennt die Verträge hinter dem Plan; die Karte „Diesen Monat" zeigt sie unter
+den drei Zahlen, damit die Summe nicht für sich steht. Im Plan zählt ein Vertrag, solange er läuft: ein gekündigter bis zu seinem Ende, ein
 beendeter nicht mehr (`Zahlungsregel.vertragsende` gegen den Fensterbeginn).
 
 Bedarf über Plan heisst: du legst zu wenig zurück, die Deckung wird schlechter, ohne dass
