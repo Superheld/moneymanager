@@ -395,7 +395,8 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
           {/* Das Zielkonto erscheint nur bei einer Umschichtung — und genau daran wird
               ein Umbuchungsvertrag später wiedererkannt: nicht am Empfänger (bei einer
               Zahlung zwischen zwei eigenen Konten steht dort je nach Bank die eigene
-              IBAN, der eigene Name oder nichts), sondern am WEG. Ohne Zielkonto bleibt
+              IBAN, der eigene Name oder nichts), sondern am WEG, zusammen mit Betrag und
+              Termin (`umbuchungErkennung`). Ohne Zielkonto bleibt
               die Regel ein Plan ohne Ist. */}
           {f.charakter === "Umschichtung" && (
             <FormField label={t("vertraege.feldZielkonto")} hint={t("vertraege.feldZielkontoHinweis")}>

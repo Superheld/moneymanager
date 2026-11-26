@@ -310,6 +310,8 @@ function BuchungFormular({
   const [fehler, setFehler] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const gepaart = !!buchung?.transferId;
+  /** Das Bein einer Umbuchung, das das Konto verlässt — nur dieses trägt einen Vertrag. */
+  const abgehendesBein = !!buchung && buchung.betrag < 0;
   const loeschfrage = useLoeschfrage();
   const geteilt = !!buchung && istGeteilt(buchung);
   const konto = konten.find((k) => k.id === kontoId);
@@ -407,7 +409,7 @@ function BuchungFormular({
 
         // `umsaetzeBuchen` hat die Zuordnungen schon abgeglichen. ZULETZT die
         // Handentscheidung: sie überstimmt, was der Abgleich gerechnet hat.
-        if (neueBuchung && vertragWahl && !istUmschichtung) {
+        if (neueBuchung && vertragWahl && (!istUmschichtung || neueBuchung.betrag < 0)) {
           await vertragZuordnenVonHand(neueBuchung.id, vertragWahl === "__keiner" ? null : vertragWahl);
         }
       } else if (!buchung) {
@@ -781,10 +783,15 @@ function BuchungFormular({
         </div>
       )}
 
-      {/* Vertrag — nicht bei Umbuchungs-Beinen: eine Umbuchung aufs eigene Sparkonto ist
-          perfekt regelmäßig und trotzdem kein Vertrag (dieselbe Grenze zieht die
-          Erkennung, siehe core/vertragZuordnung#passtZu). */}
-      {!gepaart && vertragsBindung && <VertragsBlock bindung={vertragsBindung} />}
+      {/* Vertrag — bei einer Umbuchung nur am ABGEHENDEN Bein. Ein Umbuchungsvertrag
+          beschreibt, was das Konto verlässt; das ankommende Bein zuzuordnen hübe seine
+          Ist-Summe auf (`umbuchungErkennung`). Bis 2026-11-25 stand der Block an keinem
+          der beiden Beine: der Weg allein ordnete zu, und von Hand war nichts zu sagen.
+          Seit Betrag und Termin mitentscheiden, bleibt eine Umbuchung öfter ohne Vertrag
+          — und wer es besser weiss, braucht die Wahl. */}
+      {(!gepaart || abgehendesBein) && vertragsBindung && (
+        <VertragsBlock bindung={vertragsBindung} ohneAnlegen={gepaart} />
+      )}
 
       {/* Vertrag im Entwurf: eine VORMERKUNG. Die Zuordnung hängt an der Ist-Buchung
           (`Vertragszuordnung.istbuchungId`), die es hier noch nicht gibt — also wird die
@@ -793,7 +800,7 @@ function BuchungFormular({
           Kein „Vertrag daraus machen": das öffnet einen zweiten Dialog, und der Entwurf
           verlöre dabei alles hier Eingestellte, weil noch nichts gespeichert ist. Aus
           einer übernommenen Buchung geht es weiterhin. */}
-      {istEntwurf && !istUmschichtung && (
+      {istEntwurf && (!istUmschichtung || gebuchterBetrag < 0) && (
         <div className="abschnitt">
           <div style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)", marginBottom: 8 }}>
             {t("konten.zuVertrag.gehoertZu")}

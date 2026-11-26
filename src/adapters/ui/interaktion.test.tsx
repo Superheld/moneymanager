@@ -18,6 +18,7 @@ const halter = vi.hoisted(() => {
 vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 import { auswahlWaehlen, frischeDb, pluginApi, rendere, sqlLaden } from "../../testwerkzeug/harness";
+import { planzahlungSpeichern } from "../../testwerkzeug/planzahlung";
 import { AppShell } from "./bausteine/AppShell";
 import { BudgetsScreen } from "./budgets/BudgetsScreen";
 import { RuecklagenScreen } from "./ruecklagen/RuecklagenScreen";
@@ -1050,6 +1051,40 @@ describe("Vertrag aus einer Buchung", () => {
     await detailOeffnen(nutzer);
     await screen.findByText(/Gegenkonto/i);
     expect(screen.queryByRole("button", { name: /vertrag daraus machen/i })).toBeNull();
+  });
+
+  /**
+   * Eine Umbuchung, die der Vertrag nicht von selbst nimmt (anderer Betrag), lässt sich am
+   * abgehenden Bein von Hand zuordnen. Bis 2026-11-25 fehlte die Auswahl dort: der Weg
+   * allein ordnete zu, und zu sagen gab es nichts.
+   */
+  it("lässt das abgehende Bein einer Umbuchung von Hand einem Vertrag zuordnen", async () => {
+    await grunddaten();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k2", bezeichnung: "Tagesgeld", typ: "Tagesgeld", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    await planzahlungSpeichern({
+      id: "v-ellrich", bezeichnung: "Sparplan Ellrich", betrag: -40000, rhythmus: "monatlich",
+      startdatum: heute, charakter: "Umschichtung", kontoId: "k1", gegenkontoId: "k2",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -50000, kontoId: "k1", gegenkontoId: "k2",
+      transferId: "t1", charakter: "Umschichtung", quelle: "manuell",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i2", datum: heute, betrag: 50000, kontoId: "k2", gegenkontoId: "k1",
+      transferId: "t1", charakter: "Umschichtung", quelle: "manuell",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await detailOeffnen(nutzer);
+    await auswahlWaehlen(nutzer, /vertrag zuordnen/i, "Sparplan Ellrich");
+
+    await waitFor(async () => {
+      const z = await sqliteVertragszuordnungRepository.alle();
+      expect(z).toEqual([{ istbuchungId: "i1", vertragId: "v-ellrich", herkunft: "manuell" }]);
+    });
   });
 });
 

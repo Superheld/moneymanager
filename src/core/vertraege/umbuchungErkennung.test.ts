@@ -48,12 +48,32 @@ describe("umbuchungsregelFuer", () => {
   });
 
   /**
-   * Der Betrag prüft NICHT auf Passung. Wer seine Sparrate erhöht und die Regel nicht
-   * nachzieht, soll eine erkannte Umbuchung mit Abweichung sehen — nicht eine
-   * unerklärte Umschichtung neben einer Zeile, die als „offen" dasteht.
+   * Der Betrag MUSS passen (seit 2026-11-25). Zwischen zwei eigenen Konten wird auch
+   * ohne Vertrag verschoben, und jede solche Buchung landete sonst beim Vertrag, nur
+   * weil sie denselben Weg nahm.
    */
-  it("erkennt sie auch bei stark abweichendem Betrag", () => {
-    expect(umbuchungsregelFuer([regel()], spur({ betrag: -95000 }))?.id).toBe("r1");
+  it("greift nicht bei abweichendem Betrag — auch nicht bei einem knapp daneben", () => {
+    expect(umbuchungsregelFuer([regel()], spur({ betrag: -95000 }))).toBeUndefined();
+    expect(umbuchungsregelFuer([regel()], spur({ betrag: -20001 }))).toBeUndefined();
+  });
+
+  it("verlangt den Termin: wenige Tage neben der Fälligkeit ja, mitten im Monat nein", () => {
+    expect(umbuchungsregelFuer([regel()], spur({ datum: "2026-06-04" }))?.id).toBe("r1");
+    // Vor dem Ersten gebucht, weil der Erste auf ein Wochenende fiel.
+    expect(umbuchungsregelFuer([regel()], spur({ datum: "2026-05-29" }))?.id).toBe("r1");
+    expect(umbuchungsregelFuer([regel()], spur({ datum: "2026-06-15" }))).toBeUndefined();
+  });
+
+  it("findet auch Umbuchungen vor der ersten Fälligkeit, wenn sie im Takt liegen", () => {
+    // Der Vertrag wird oft erst erfasst, wenn der Dauerauftrag längst läuft.
+    expect(umbuchungsregelFuer([regel()], spur({ datum: "2025-09-02" }))?.id).toBe("r1");
+    expect(umbuchungsregelFuer([regel()], spur({ datum: "2025-09-16" }))).toBeUndefined();
+  });
+
+  it("greift nicht mehr nach dem Ende des Vertrags", () => {
+    const beendet = regel({ vertragsende: "2026-04-30" });
+    expect(umbuchungsregelFuer([beendet], spur({ datum: "2026-04-01" }))?.id).toBe("r1");
+    expect(umbuchungsregelFuer([beendet], spur({ datum: "2026-06-01" }))).toBeUndefined();
   });
 
   it("nimmt nur das abgehende Bein", () => {
@@ -78,10 +98,16 @@ describe("umbuchungsregelFuer", () => {
     expect(umbuchungsregelFuer([regel()], spur({ gegenkontoId: undefined }))).toBeUndefined();
   });
 
-  it("wählt bei mehreren Regeln auf demselben Weg die mit dem nächsten Betrag", () => {
+  it("trennt zwei Regeln auf demselben Weg am Betrag, bei gleichem Betrag am Termin", () => {
     const klein = regel({ id: "klein", betrag: -5000, vertragId: "v-klein" });
     const gross = regel({ id: "gross", betrag: -50000, vertragId: "v-gross" });
-    expect(umbuchungsregelFuer([klein, gross], spur({ betrag: -48000 }))?.id).toBe("gross");
-    expect(umbuchungsregelFuer([klein, gross], spur({ betrag: -6000 }))?.id).toBe("klein");
+    expect(umbuchungsregelFuer([klein, gross], spur({ betrag: -50000 }))?.id).toBe("gross");
+    expect(umbuchungsregelFuer([klein, gross], spur({ betrag: -5000 }))?.id).toBe("klein");
+    expect(umbuchungsregelFuer([klein, gross], spur({ betrag: -48000 }))).toBeUndefined();
+
+    const anfang = regel({ id: "anfang", vertragId: "v-anfang" });
+    const mitte = regel({ id: "mitte", startdatum: "2026-01-04", vertragId: "v-mitte" });
+    expect(umbuchungsregelFuer([anfang, mitte], spur({ datum: "2026-06-01" }))?.id).toBe("anfang");
+    expect(umbuchungsregelFuer([anfang, mitte], spur({ datum: "2026-06-04" }))?.id).toBe("mitte");
   });
 });

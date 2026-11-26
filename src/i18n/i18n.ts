@@ -2474,7 +2474,7 @@ const de = {
     artHinweis: {
       abo: "wird auf den nächsten Kündigungstermin hin überwacht",
       dauervertrag: "keine Kündigungswarnung — die Frist steht trotzdem in der Tabelle",
-      umbuchung: "eine Abmachung mit dir selbst — sie wird am Weg erkannt, nicht am Empfänger",
+      umbuchung: "eine Abmachung mit dir selbst — erkannt an Weg, Betrag und Termin, nicht am Empfänger",
     },
     feldZielkonto: "Zielkonto",
     feldZielkontoHinweis: "wohin umgebucht wird — daran wird die Zahlung wiedererkannt",
@@ -2568,7 +2568,7 @@ const de = {
       spanneAnpassen: "Betragsspanne auf {{von}} bis {{bis}} setzen — dann fallen keine Zahlungen mehr durch",
       abschnitt: "Erkennung",
       umbuchungHinweis:
-        "Ein Umbuchungsvertrag wird am WEG erkannt — Konto → Zielkonto, mit Charakter Umschichtung —, nicht am Empfänger. Bei einer Zahlung zwischen zwei eigenen Konten steht dort je nach Bank die eigene IBAN, der eigene Name oder gar nichts. Deshalb gibt es hier keine Merkmale einzustellen.",
+        "Ein Umbuchungsvertrag wird nicht am Empfänger erkannt, sondern an drei Dingen zusammen: dem Weg (Konto → Zielkonto), dem Betrag und dem Termin. Bei einer Zahlung zwischen zwei eigenen Konten steht als Empfänger je nach Bank die eigene IBAN, der eigene Name oder gar nichts. Deshalb gibt es hier keine Merkmale einzustellen. Eine Umbuchung auf demselben Weg, die in Betrag oder Termin abweicht, bleibt ohne Vertrag — du kannst sie in der Buchung von Hand zuordnen.",
       zusammen: "Merkmale: {{merkmale}} · Treffer: {{count}}",
       merkmale: "Merkmale",
       merkmaleHinweis:
@@ -5139,7 +5139,7 @@ const en: typeof de = {
     artHinweis: {
       abo: "watched for its next cancellation deadline",
       dauervertrag: "no cancellation warning — the notice period still shows in the table",
-      umbuchung: "an arrangement with yourself — recognised by the route, not the payee",
+      umbuchung: "an arrangement with yourself — recognised by route, amount and date, not the payee",
     },
     feldZielkonto: "Target account",
     feldZielkontoHinweis: "where the money goes — the payment is recognised by this route",
@@ -5233,7 +5233,7 @@ const en: typeof de = {
       spanneAnpassen: "Set the amount range to {{von}} – {{bis}} so no payments fall through",
       abschnitt: "Matching",
       umbuchungHinweis:
-        "An internal transfer contract is matched by its ROUTE — account → target account, character Umschichtung — not by the payee. On a transfer between two of your own accounts the payee field holds your own IBAN, your own name or nothing at all, depending on the bank. There are therefore no features to set here.",
+        "An internal transfer contract is not matched by the payee but by three things together: the route (account → target account), the amount and the date. On a transfer between two of your own accounts the payee field holds your own IBAN, your own name or nothing at all, depending on the bank. That is why there are no features to set here. A transfer on the same route that differs in amount or date stays without a contract — you can assign it by hand in the entry.",
       zusammen: "Features: {{merkmale}} · Matches: {{count}}",
       merkmale: "Features",
       merkmaleHinweis:

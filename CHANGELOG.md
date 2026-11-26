@@ -9,6 +9,16 @@ Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 Verträge hinter „eingerichtet" — je Vertrag der Weg von Konto zu Konto und die Rate je
 Monat. Bisher stand dort nur die Summe.
 
+**Geändert:** Ein Umbuchungsvertrag (etwa die Sparrate vom Giro aufs Tagesgeld) nimmt eine
+Umbuchung nur noch von selbst, wenn Weg, Betrag und Termin passen. Bisher genügte der Weg,
+und jede einzelne Umbuchung zwischen denselben zwei Konten landete beim Vertrag. Nach dem
+Update verliert ein solcher Vertrag deshalb Zuordnungen, die nur am Weg hingen; was du von
+Hand zugeordnet hast, bleibt.
+
+**Neu:** Was auf dem Weg eines Umbuchungsvertrags liegt und nur ungefähr passt, steht am
+Vertrag unter „Könnte dazugehören". Und im Buchungsdialog lässt sich eine Umbuchung von
+Hand einem Vertrag zuordnen oder ausdrücklich keinem.
+
 **Behoben:** Der „Plan" im Bereich Rücklagen zählte die Umbuchung eines Vertrags weiter
 mit, nachdem der Vertrag beendet war. Ein gekündigter Vertrag zählt jetzt bis zu seinem
 Ende, danach nicht mehr.
