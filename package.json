@@ -1,7 +1,7 @@
 {
   "name": "moneymanager",
   "private": true,
-  "version": "0.31.0-pre.3",
+  "version": "0.31.0-pre.4",
   "type": "module",
   "engines": {
     "node": ">=22"
