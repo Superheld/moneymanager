@@ -3,7 +3,10 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
-## [Unveröffentlicht]
+## [0.31.0-pre.4] — 2026-11-26
+
+Umbuchungsverträge erkennen ihre Umbuchungen genauer, und der Bereich Rücklagen zeigt,
+welche Verträge hinter dem Plan stehen. Keine Migration.
 
 **Neu:** Die Karte „Diesen Monat" im Bereich Rücklagen nennt unter den drei Zahlen die
 Verträge hinter „eingerichtet" — je Vertrag der Weg von Konto zu Konto und die Rate je
